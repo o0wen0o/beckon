@@ -48,9 +48,13 @@ export interface RegistrySnapshot {
   hotkey_errors: Record<string, string>;
 }
 
+/** `system` follows the Windows app theme; `light` is what an absent setting is. */
+export type Theme = "light" | "dark" | "system";
+
 export interface Config {
   launcher_hotkey: string;
   autostart: boolean;
+  theme: Theme;
   api: { base_url: string };
   defaults: ModelParams;
 }

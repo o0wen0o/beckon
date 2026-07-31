@@ -20,8 +20,26 @@ pub const DEFAULT_TEMPERATURE: f64 = 1.3;
 pub struct Config {
     pub launcher_hotkey: String,
     pub autostart: bool,
+    /// Declared before the tables: `toml` serializes in field order and a
+    /// scalar written after a table would land inside it.
+    pub theme: Theme,
     pub api: ApiConfig,
     pub defaults: ModelDefaults,
+}
+
+/// Which palette the three surfaces paint in.
+///
+/// `Light` is the default, so an absent `theme` resolves to light like every
+/// other missing field. `System` reads the Windows app theme — but only once it
+/// has been *chosen*: the OS preference never applies on its own, which is why
+/// this is a three-valued setting rather than a bool plus a media query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    #[default]
+    Light,
+    Dark,
+    System,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -47,6 +65,7 @@ impl Default for Config {
         Self {
             launcher_hotkey: DEFAULT_LAUNCHER_HOTKEY.to_string(),
             autostart: true,
+            theme: Theme::default(),
             api: ApiConfig::default(),
             defaults: ModelDefaults::default(),
         }
@@ -139,6 +158,52 @@ mod tests {
     }
 
     #[test]
+    fn absent_theme_is_light() {
+        assert_eq!(Config::default().theme, Theme::Light);
+        assert_eq!(
+            toml::from_str::<Config>("autostart = false\n")
+                .unwrap()
+                .theme,
+            Theme::Light
+        );
+        // Not "whatever Windows is set to": `system` has to be asked for.
+        assert_eq!(toml::from_str::<Config>("").unwrap().theme, Theme::Light);
+    }
+
+    #[test]
+    fn every_theme_round_trips_through_toml() {
+        for theme in [Theme::Light, Theme::Dark, Theme::System] {
+            let config = Config {
+                theme,
+                ..Config::default()
+            };
+            let text = toml::to_string_pretty(&config).unwrap();
+            assert_eq!(toml::from_str::<Config>(&text).unwrap(), config);
+        }
+    }
+
+    #[test]
+    fn theme_is_written_as_a_lowercase_string() {
+        let text = toml::to_string_pretty(&Config::default()).unwrap();
+        assert!(text.contains("theme = \"light\""), "{text}");
+    }
+
+    #[test]
+    fn theme_survives_a_file_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let config = Config {
+            theme: Theme::Dark,
+            ..Config::default()
+        };
+
+        save(&path, &config).unwrap();
+        let loaded = load_or_create(&path);
+        assert!(loaded.error.is_none());
+        assert_eq!(loaded.config.theme, Theme::Dark);
+    }
+
+    #[test]
     fn unknown_fields_are_tolerated() {
         let parsed: Config =
             toml::from_str("launcher_hotkey = \"Ctrl+Alt+K\"\nfuture_option = 3\n").unwrap();
@@ -150,6 +215,7 @@ mod tests {
         let text = r#"
 launcher_hotkey = "Ctrl+Alt+Space"
 autostart = true
+theme = "light"
 
 [api]
 base_url = "https://api.deepseek.com"

@@ -1,7 +1,38 @@
-/* One theme for all three surfaces. Dark, quiet, and out of the way: this thing
-   appears on top of whatever the user was actually doing. */
+/* The whole palette for all three surfaces, in one place: every component
+   styles itself out of these tokens and names no colour of its own, so a theme
+   is a swap of this block and nothing else.
+
+   Light is the base and dark is the override, which is what makes light the
+   value an unstyled document falls back to — the same default `Config::theme`
+   deserializes to. `theme = "system"` is resolved to a concrete `data-theme`
+   by src/lib/theme.ts; there is deliberately no bare `prefers-color-scheme`
+   rule here, because the OS preference must only apply once it is chosen. */
 
 :root {
+  --bg: #f5f6fa;
+  --bg-raised: #ffffff;
+  --bg-input: #eceef4;
+  --border: #d5d8e2;
+  --border-strong: #b3b7c6;
+  --text: #1b1c23;
+  --text-dim: #575b6b;
+  --text-faint: #83879a;
+  --accent: #3564cc;
+  --accent-dim: #d5e0fa;
+  --danger: #c8353a;
+  --warn: #96620d;
+  --ok: #2c7a3f;
+  --radius: 10px;
+  --shadow: 0 12px 32px rgba(24, 28, 48, 0.18);
+
+  color-scheme: light;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+:root[data-theme="dark"] {
   --bg: #16161d;
   --bg-raised: #1d1d26;
   --bg-input: #101017;
@@ -15,14 +46,9 @@
   --danger: #f77676;
   --warn: #e0af68;
   --ok: #8fd67a;
-  --radius: 10px;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 
   color-scheme: dark;
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
 }
 
 * {

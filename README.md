@@ -51,12 +51,13 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - A hotkey registration failure at startup is never silent: the tray icon switches to an error state plus a one-time balloon notification that opens settings when clicked.
 - On first run (no key readable from the Credential Manager), open the settings window directly, including a "Test connection" button — it sends a minimal request to verify the key and `base_url` on the spot.
 - On first run, if `actions/` does not exist, write two example Actions (one `selection` type and one `prompt` type) covering both main paths. Once deleted, they are not regenerated.
+- The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose Windows app theme is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
 
 ## Config file layout
 
 ```
 %APPDATA%\Beckon\
-├── config.toml        # global hotkey, autostart, base_url, global model defaults
+├── config.toml        # global hotkey, autostart, theme, base_url, global model defaults
 └── actions\
     ├── translate.toml
     └── ask.toml
@@ -71,6 +72,7 @@ An Action's **identity is its filename**; the `name` field is only for display.
 ```toml
 launcher_hotkey = "Ctrl+Alt+Space"
 autostart = true
+theme = "light"                 # light | dark | system
 
 [api]
 base_url = "https://api.deepseek.com"

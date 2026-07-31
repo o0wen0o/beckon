@@ -389,6 +389,24 @@
       </label>
     </section>
 
+    <!-- Appearance ---------------------------------------------------- -->
+    <section>
+      <h2>Appearance</h2>
+
+      <label>
+        <span>Theme</span>
+        <select class="theme" bind:value={config.theme} onchange={() => commitConfig(true)}>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system">Follow Windows</option>
+        </select>
+        <p class="hint">
+          Applies to the Launcher, the Popover and this window at once. Beckon starts light unless
+          you say otherwise — “Follow Windows” is the only setting that reads the system preference.
+        </p>
+      </label>
+    </section>
+
     <!-- Model defaults ------------------------------------------------ -->
     <section>
       <h2>Model defaults</h2>
@@ -720,6 +738,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  select.theme {
+    max-width: 220px;
   }
 
   .grid {
