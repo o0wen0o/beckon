@@ -76,6 +76,7 @@ fn main() {
             commands::set_api_key,
             commands::delete_api_key,
             commands::test_connection,
+            commands::get_models,
             commands::probe_hotkey,
             commands::get_popover_view,
             commands::pick_action,

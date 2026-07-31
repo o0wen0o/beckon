@@ -1,10 +1,12 @@
 //! The OpenAI-compatible LLM layer.
 //!
 //! `sse` is a pure parser, `deepseek` is the one place provider quirks live,
-//! and `client` does the request. Nothing here knows about windows or Actions.
+//! `models` is the catalog both `deepseek` and the Settings dropdown read, and
+//! `client` does the request. Nothing here knows about windows or Actions.
 
 pub mod client;
 pub mod deepseek;
+pub mod models;
 pub mod sse;
 
 use serde::{Deserialize, Serialize};

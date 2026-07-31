@@ -11,11 +11,17 @@
 //! Anything we cannot map is a hard error. Silently omitting the field on a
 //! DeepSeek model would leave thinking on and quietly add seconds of latency to
 //! every translation — the exact failure the README wants gone.
+//!
+//! Per-model behaviour is not written down here: it lives in
+//! [`super::models::CATALOG`], which is also what the Settings dropdown is built
+//! from. Keeping one table means the set of models we offer and the set we know
+//! how to send cannot drift apart.
 
 use serde_json::{json, Value};
 
 use crate::action::ModelParams;
 
+use super::models::{self, Thinking};
 use super::Message;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,34 +62,32 @@ pub fn build_probe_body(model: &str) -> Value {
 }
 
 fn thinking_wire(model: &str, thinking: bool) -> Result<ThinkingWire, String> {
+    // A catalogued model: the one table decides. Legacy DeepSeek naming picked
+    // the mode through the model id, so for those a `thinking` flag that
+    // disagrees with the model cannot be honoured.
+    if let Some(entry) = models::find(model) {
+        let suggestion = models::switchable_suggestion();
+        return match entry.thinking {
+            Thinking::Switchable => Ok(ThinkingWire::Object(thinking)),
+            Thinking::AlwaysOn if thinking => Ok(ThinkingWire::Omit),
+            Thinking::AlwaysOn => Err(format!(
+                "{model} always thinks; set thinking = true for it, or choose {suggestion} to \
+                 turn thinking off"
+            )),
+            Thinking::Never if thinking => Err(format!(
+                "{model} has no thinking mode; set thinking = false for it, or choose {suggestion}"
+            )),
+            Thinking::Never => Ok(ThinkingWire::Omit),
+        };
+    }
+
     let model_lower = model.to_ascii_lowercase();
 
-    // The v4 family: documented `thinking` object, both directions.
+    // Uncatalogued, but in the documented v4 family: the `thinking` object is
+    // the family's wire format, so a v4 id newer than this build is still safe
+    // to map.
     if model_lower.starts_with("deepseek-v4") {
         return Ok(ThinkingWire::Object(thinking));
-    }
-
-    // Older DeepSeek naming picked the mode through the model id, so a
-    // `thinking` flag that disagrees with the model cannot be honoured.
-    if model_lower == "deepseek-reasoner" {
-        return if thinking {
-            Ok(ThinkingWire::Omit)
-        } else {
-            Err(format!(
-                "{model} always thinks; set thinking = true for it, or choose deepseek-v4-flash \
-                 to turn thinking off"
-            ))
-        };
-    }
-    if model_lower == "deepseek-chat" {
-        return if thinking {
-            Err(format!(
-                "{model} has no thinking mode; set thinking = false for it, or choose \
-                 deepseek-v4-pro"
-            ))
-        } else {
-            Ok(ThinkingWire::Omit)
-        };
     }
 
     // Any other `deepseek-*`: we do not know its wire format, and guessing
@@ -160,6 +164,60 @@ mod tests {
         );
         assert!(thinking_wire("deepseek-chat", true).is_err());
         assert!(thinking_wire("deepseek-reasoner", false).is_err());
+    }
+
+    /// The dropdown offers exactly what this loop walks; if the two lists were
+    /// kept separately, this is the test that would stop existing.
+    #[test]
+    fn every_catalogued_model_maps_without_guessing() {
+        for entry in models::CATALOG {
+            match entry.thinking {
+                Thinking::Switchable => {
+                    assert_eq!(
+                        thinking_wire(entry.id, true).unwrap(),
+                        ThinkingWire::Object(true),
+                        "{}",
+                        entry.id
+                    );
+                    assert_eq!(
+                        thinking_wire(entry.id, false).unwrap(),
+                        ThinkingWire::Object(false),
+                        "{}",
+                        entry.id
+                    );
+                }
+                Thinking::AlwaysOn => {
+                    assert!(thinking_wire(entry.id, true).is_ok(), "{}", entry.id);
+                    assert!(thinking_wire(entry.id, false).is_err(), "{}", entry.id);
+                }
+                Thinking::Never => {
+                    assert!(thinking_wire(entry.id, false).is_ok(), "{}", entry.id);
+                    assert!(thinking_wire(entry.id, true).is_err(), "{}", entry.id);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn model_ids_are_matched_case_insensitively() {
+        assert_eq!(
+            thinking_wire("DeepSeek-V4-Flash", false).unwrap(),
+            ThinkingWire::Object(false)
+        );
+    }
+
+    #[test]
+    fn a_v4_id_newer_than_the_catalog_still_maps() {
+        assert_eq!(
+            thinking_wire("deepseek-v4-turbo", true).unwrap(),
+            ThinkingWire::Object(true)
+        );
+    }
+
+    #[test]
+    fn errors_suggest_a_model_the_dropdown_offers() {
+        let err = thinking_wire("deepseek-chat", true).unwrap_err();
+        assert!(err.contains(models::switchable_suggestion()), "{err}");
     }
 
     #[test]

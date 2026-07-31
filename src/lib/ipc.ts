@@ -12,6 +12,7 @@ import type {
   Failure,
   InterruptedPayload,
   KeyStatus,
+  ModelCatalog,
   PopoverView,
   RegistrySnapshot,
 } from "./types";
@@ -40,6 +41,14 @@ export const getKeyStatus = () => invoke<KeyStatus>("get_key_status");
 export const setApiKey = (key: string) => invoke<KeyStatus>("set_api_key", { key });
 export const deleteApiKey = () => invoke<KeyStatus>("delete_api_key");
 export const testConnection = () => invoke<void>("test_connection");
+
+// --- models ---------------------------------------------------------------
+
+/**
+ * `live = false` is the documented catalog, answered without touching the
+ * network; `true` asks the endpoint and falls back to the same catalog.
+ */
+export const getModels = (live: boolean) => invoke<ModelCatalog>("get_models", { live });
 
 // --- hotkeys --------------------------------------------------------------
 

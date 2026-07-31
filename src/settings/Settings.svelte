@@ -12,6 +12,7 @@
     getActions,
     getConfig,
     getKeyStatus,
+    getModels,
     getStartupErrors,
     onActionsChanged,
     onConfigChanged,
@@ -30,6 +31,8 @@
     Config,
     InputSource,
     KeyStatus,
+    ModelCatalog,
+    ModelOption,
     RegistrySnapshot,
   } from "../lib/types";
   import HotkeyInput from "./HotkeyInput.svelte";
@@ -39,6 +42,8 @@
   let config = $state<Config | null>(null);
   let snapshot = $state<RegistrySnapshot>({ actions: [], errors: [], hotkey_errors: {} });
   let keyStatus = $state<KeyStatus | null>(null);
+  let models = $state<ModelCatalog | null>(null);
+  let modelsLoading = $state(false);
   let startupErrors = $state<string[]>([]);
   let saveError = $state<string | null>(null);
 
@@ -111,6 +116,10 @@
     keyStatus = await getKeyStatus();
     startupErrors = await getStartupErrors();
     syncDraft();
+    // Not awaited: this one can go to the network, and the rest of the form
+    // must not wait on it. The dropdowns render from the current value until
+    // the catalog lands.
+    void refreshModels();
   }
 
   function syncDraft() {
@@ -218,6 +227,8 @@
       keyDraft = "";
       keyMessage = "Saved to the Windows Credential Manager.";
       test = { state: "idle" };
+      // A key is what the live model list was missing.
+      void refreshModels();
     } catch (error) {
       keyMessage = describeError(error).message;
     }
@@ -227,6 +238,7 @@
     try {
       keyStatus = await deleteApiKey();
       keyMessage = "Removed.";
+      void refreshModels();
     } catch (error) {
       keyMessage = describeError(error).message;
     }
@@ -252,6 +264,77 @@
       test = { state: "failed", message: `${prefix}: ${failure.message}` };
     }
   }
+
+  // --- models -------------------------------------------------------------
+
+  // Rust decides the option set — the catalog it derives from is the same table
+  // the request layer maps `thinking` with, so the dropdown can never offer a
+  // model that would then be refused. Nothing here re-derives it.
+  async function refreshModels() {
+    modelsLoading = true;
+    try {
+      // Populate from the documented catalog first. The live fetch is
+      // deliberately unbounded (no HTTP timeout, by design), and a dropdown
+      // holding nothing but its own current value while that is in flight is
+      // the regression the fallback exists to prevent. A refresh keeps the
+      // list already on screen instead of flashing back to the catalog.
+      if (!models) models = await getModels(false);
+      models = await getModels(true);
+    } catch (error) {
+      // The command is infallible by design; if it ever is not, keep whatever
+      // list is already on screen rather than emptying the dropdowns.
+      saveError = describeError(error).message;
+    } finally {
+      modelsLoading = false;
+    }
+  }
+
+  /**
+   * The options to render, with `current` guaranteed present. Rust already
+   * appends a configured-but-unknown model; this only covers the moment before
+   * the catalog has arrived, so a select is never rendered without its own
+   * value in it — a select whose value is missing would silently reset it.
+   */
+  function modelOptions(current: string): ModelOption[] {
+    const options = models?.options ?? [];
+    if (current === "" || options.some((option) => option.id === current)) return options;
+    return [
+      { id: current, label: current, description: "", thinking: null, origin: "configured" },
+      ...options,
+    ];
+  }
+
+  function modelOption(id: string): ModelOption | undefined {
+    return modelOptions(id).find((option) => option.id === id);
+  }
+
+  /** A model only the config vouches for: say so instead of dropping it. */
+  function unknownModelHint(id: string | null): string | null {
+    if (!id) return null;
+    const option = modelOption(id);
+    if (!option || option.origin !== "configured") return null;
+    return models?.live
+      ? `${id} is not in the endpoint's model list. Kept because your configuration names it.`
+      : `${id} is not one of the models Beckon knows. Kept because your configuration names it.`;
+  }
+
+  // Same rule as "Test connection": the cause decides the wording, and a
+  // missing credential is not a read error is not a rejected key (ADR-0005).
+  const MODEL_FALLBACK_PREFIX: Record<string, string> = {
+    "no-credential": "No API key stored yet",
+    "read-error": "The Credential Manager could not be read",
+    auth: "The API rejected this key",
+    network: "Could not reach the API",
+    empty: "The endpoint listed no models",
+  };
+
+  const modelNotice = $derived.by(() => {
+    if (!models || models.live) return null;
+    const failure = models.fallback;
+    if (!failure) return null;
+    const prefix = MODEL_FALLBACK_PREFIX[failure.kind] ?? "The model list could not be fetched";
+    return `${prefix} — showing the models DeepSeek documents. ${failure.message}`;
+  });
 
   // --- small helpers ------------------------------------------------------
 
@@ -415,16 +498,20 @@
       <div class="grid">
         <label>
           <span>Model</span>
-          <input
-            bind:value={config.defaults.model}
-            onfocus={() => (configFocused = true)}
-            onblur={() => {
-              configFocused = false;
+          <!-- `value` + `onchange`, never `bind:` — binding would write back
+               whatever the select settled on before the catalog arrived, which
+               is exactly how a configured model gets silently replaced. -->
+          <select
+            value={config.defaults.model}
+            onchange={(event) => {
+              config!.defaults.model = event.currentTarget.value;
               commitConfig(true);
             }}
-            oninput={() => commitConfig()}
-            spellcheck="false"
-          />
+          >
+            {#each modelOptions(config.defaults.model) as option (option.id)}
+              <option value={option.id}>{option.label}</option>
+            {/each}
+          </select>
         </label>
 
         <label>
@@ -453,6 +540,24 @@
           <span>Thinking mode</span>
         </label>
       </div>
+
+      {#if unknownModelHint(config.defaults.model)}
+        <p class="hint error">{unknownModelHint(config.defaults.model)}</p>
+      {:else if modelOption(config.defaults.model)?.description}
+        <p class="hint">{modelOption(config.defaults.model)?.description}</p>
+      {/if}
+
+      <div class="row">
+        <button onclick={refreshModels} disabled={modelsLoading}>
+          {modelsLoading ? "Loading models…" : "Refresh models"}
+        </button>
+        {#if models?.live}
+          <span class="hint">Listed by the endpoint at your base URL.</span>
+        {:else if modelNotice}
+          <span class="hint">{modelNotice}</span>
+        {/if}
+      </div>
+
       <p class="hint">
         DeepSeek thinks by default. Leaving it on adds seconds of latency to translation-shaped
         Actions, which is why this is off unless you ask for it.
@@ -605,15 +710,21 @@
           <div class="grid">
             <label>
               <span>Model</span>
-              <input
+              <select
                 value={draft.model.model ?? ""}
-                placeholder="inherit"
-                oninput={(event) => {
+                onchange={(event) => {
                   draft!.model.model = event.currentTarget.value || null;
-                  commitAction();
+                  commitAction(true);
                 }}
-                onblur={() => commitAction(true)}
-              />
+              >
+                <option value="">inherit ({config?.defaults.model ?? "default"})</option>
+                {#each modelOptions(draft.model.model ?? "") as option (option.id)}
+                  <option value={option.id}>{option.label}</option>
+                {/each}
+              </select>
+              {#if unknownModelHint(draft.model.model)}
+                <p class="hint error">{unknownModelHint(draft.model.model)}</p>
+              {/if}
             </label>
 
             <label>

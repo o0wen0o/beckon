@@ -64,6 +64,31 @@ export type KeyStatus =
   | { kind: "no-credential" }
   | { kind: "read-error"; message: string };
 
+/** What a model does with thinking mode; `null` when Beckon knows nothing. */
+export type ThinkingSupport = "switchable" | "always-on" | "never";
+
+/**
+ * Where one dropdown option came from. `configured` is the user's own value
+ * that neither the catalog nor the endpoint vouches for — it is offered so that
+ * it is never silently rewritten.
+ */
+export type ModelOrigin = "documented" | "live" | "configured";
+
+export interface ModelOption {
+  id: string;
+  label: string;
+  description: string;
+  thinking: ThinkingSupport | null;
+  origin: ModelOrigin;
+}
+
+/** `get_models` never fails; `fallback` says why the list is not the live one. */
+export interface ModelCatalog {
+  options: ModelOption[];
+  live: boolean;
+  fallback: Failure | null;
+}
+
 export type PopoverPhase = "needs-input" | "empty-selection" | "running";
 
 export interface PopoverView {

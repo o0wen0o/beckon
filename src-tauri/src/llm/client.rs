@@ -61,6 +61,17 @@ pub fn chat_url(base_url: &str) -> String {
     }
 }
 
+/// `GET {base_url}/v1/models`, the OpenAI-compatible list endpoint, with the
+/// same tolerance for a `base_url` that already carries the version segment.
+pub fn models_url(base_url: &str) -> String {
+    let base = base_url.trim().trim_end_matches('/');
+    if base.ends_with("/v1") {
+        format!("{base}/models")
+    } else {
+        format!("{base}/v1/models")
+    }
+}
+
 pub fn build_http_client() -> reqwest::Client {
     // No `.timeout(..)` on purpose — see the module docs.
     reqwest::Client::builder()
@@ -217,6 +228,54 @@ pub async fn test_connection(
     ))
 }
 
+/// The ids the endpoint says it serves.
+///
+/// Every failure comes back as an ordinary [`LlmError`], so a rejected key
+/// stays distinguishable from an unreachable API (ADR-0005) even though the
+/// caller's response to both is the same: fall back to the documented list.
+pub async fn list_models(
+    http: &reqwest::Client,
+    base_url: &str,
+    api_key: &str,
+) -> Result<Vec<String>, LlmError> {
+    let response = http
+        .get(models_url(base_url))
+        .bearer_auth(api_key)
+        .send()
+        .await
+        .map_err(|e| LlmError::Network(e.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(status_error(
+            status.as_u16(),
+            &response.text().await.unwrap_or_default(),
+        ));
+    }
+
+    let body = response
+        .text()
+        .await
+        .map_err(|e| LlmError::Network(e.to_string()))?;
+    parse_model_list(&body)
+}
+
+/// Split out from the request so the shape can be tested without a network.
+fn parse_model_list(body: &str) -> Result<Vec<String>, LlmError> {
+    let list: ModelList = serde_json::from_str(body).map_err(|e| LlmError::Http {
+        status: 200,
+        message: format!("the model list could not be read: {e}"),
+    })?;
+    Ok(list
+        .data
+        .into_iter()
+        .filter_map(|entry| {
+            let id = entry.id.trim().to_string();
+            (!id.is_empty()).then_some(id)
+        })
+        .collect())
+}
+
 /// The one place a status code becomes an [`LlmError`]. ADR-0005 needs "key
 /// rejected" to stay distinguishable from every other failure, so the 401/403
 /// boundary is decided here rather than at each call site.
@@ -266,6 +325,20 @@ struct Delta {
     reasoning_content: Option<String>,
 }
 
+/// `GET /models`: `{"object":"list","data":[{"id":…,"object":"model",…}]}`
+/// (<https://api-docs.deepseek.com/api/list-models>). Only `id` is used.
+#[derive(Debug, Deserialize)]
+struct ModelList {
+    #[serde(default)]
+    data: Vec<ModelEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelEntry {
+    #[serde(default)]
+    id: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct ApiErrorFrame {
     error: Option<ApiError>,
@@ -299,6 +372,49 @@ mod tests {
             chat_url("  https://example.com/api/  "),
             "https://example.com/api/v1/chat/completions"
         );
+    }
+
+    #[test]
+    fn builds_the_models_url() {
+        assert_eq!(
+            models_url("https://api.deepseek.com"),
+            "https://api.deepseek.com/v1/models"
+        );
+        assert_eq!(
+            models_url("https://api.deepseek.com/"),
+            "https://api.deepseek.com/v1/models"
+        );
+        assert_eq!(
+            models_url("http://localhost:11434/v1"),
+            "http://localhost:11434/v1/models"
+        );
+    }
+
+    #[test]
+    fn reads_the_documented_model_list_shape() {
+        // Verbatim from https://api-docs.deepseek.com/api/list-models.
+        let body = r#"{"object":"list","data":[
+            {"id":"deepseek-v4-flash","object":"model","owned_by":"deepseek"},
+            {"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek"}]}"#;
+        assert_eq!(
+            parse_model_list(body).unwrap(),
+            vec!["deepseek-v4-flash", "deepseek-v4-pro"]
+        );
+    }
+
+    #[test]
+    fn an_empty_or_odd_model_list_is_not_a_crash() {
+        assert!(parse_model_list(r#"{"object":"list","data":[]}"#)
+            .unwrap()
+            .is_empty());
+        assert!(parse_model_list("{}").unwrap().is_empty());
+        // Blank ids are dropped rather than offered as an unselectable option.
+        assert!(parse_model_list(r#"{"data":[{"id":"  "}]}"#)
+            .unwrap()
+            .is_empty());
+        // A page of HTML is a failure, not an empty list — the caller has to be
+        // able to say why it fell back.
+        assert!(parse_model_list("<html>nope</html>").is_err());
     }
 
     fn drain(payload: &str) -> (Vec<StreamEvent>, Result<Flow, LlmError>) {

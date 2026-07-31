@@ -12,6 +12,7 @@ use crate::action::{slug, Action, ActionFile};
 use crate::atomic::write_atomic;
 use crate::config::Config;
 use crate::llm::client::{self, LlmError};
+use crate::llm::models::{self, ModelOption};
 use crate::secrets::{self, KeyStatus};
 use crate::state::{AppState, PopoverView};
 use crate::{hotkey, platform, reload, trigger};
@@ -278,6 +279,102 @@ pub async fn test_connection(app: AppHandle) -> Result<(), Failure> {
     client::test_connection(&http, &base_url, &key, &model)
         .await
         .map_err(Failure::from)
+}
+
+// ---------------------------------------------------------------- models
+
+/// What the model dropdown renders.
+#[derive(Debug, Clone, Serialize)]
+pub struct ModelCatalog {
+    pub options: Vec<ModelOption>,
+    /// `true` when the options came from the endpoint's own list.
+    pub live: bool,
+    /// Why the documented list is being shown instead, by cause: ADR-0005 needs
+    /// "no credential", "read error" and "key rejected" to stay three different
+    /// things, and this is the last hop before the UI.
+    pub fallback: Option<Failure>,
+}
+
+/// The models the user may pick from.
+///
+/// **Never fails.** A dropdown that goes empty because the machine is offline
+/// would be worse than the problem it reports, so a failed fetch downgrades to
+/// the officially documented list and says why. Whatever the configuration
+/// already names is always among the options — a value we cannot vouch for gets
+/// surfaced, never quietly rewritten.
+///
+/// `live = false` answers from the catalog alone, touching neither the network
+/// nor the Credential Manager. Settings asks for that first: the fetch is
+/// deliberately unbounded (client.rs has no timeout), so the dropdown has to be
+/// usable before it is attempted.
+#[tauri::command]
+pub async fn get_models(app: AppHandle, live: bool) -> ModelCatalog {
+    // Locks are dropped before the await (state.rs).
+    let (base_url, configured, http) = {
+        let state = app.state::<AppState>();
+        let config = state.config_snapshot();
+        let registry = state.registry.read().expect("registry lock");
+        let mut configured = vec![config.defaults.model.clone()];
+        configured.extend(
+            registry
+                .actions
+                .iter()
+                .filter_map(|action| action.file.model.model.clone()),
+        );
+        (config.api.base_url, configured, state.http.clone())
+    };
+
+    if !live {
+        return ModelCatalog {
+            options: models::options(None, &configured),
+            live: false,
+            fallback: None,
+        };
+    }
+
+    match fetch_model_ids(&http, &base_url).await {
+        Ok(ids) => ModelCatalog {
+            options: models::options(Some(&ids), &configured),
+            live: true,
+            fallback: None,
+        },
+        Err(failure) => ModelCatalog {
+            options: models::options(None, &configured),
+            live: false,
+            fallback: Some(failure),
+        },
+    }
+}
+
+async fn fetch_model_ids(http: &reqwest::Client, base_url: &str) -> Result<Vec<String>, Failure> {
+    let key = match secrets::read() {
+        Ok(Some(key)) => key,
+        Ok(None) => {
+            return Err(Failure::new(
+                "no-credential",
+                "No API key is stored, so the models below are the documented ones.",
+            ))
+        }
+        Err(message) => {
+            return Err(Failure::new(
+                "read-error",
+                format!("The Credential Manager could not be read: {message}"),
+            ))
+        }
+    };
+
+    let ids = client::list_models(http, base_url, &key)
+        .await
+        .map_err(Failure::from)?;
+    if ids.is_empty() {
+        // An endpoint that serves nothing would leave the user unable to change
+        // model at all. Treat it as no answer.
+        return Err(Failure::new(
+            "empty",
+            "The endpoint listed no models, so the documented ones are shown.",
+        ));
+    }
+    Ok(ids)
 }
 
 // ---------------------------------------------------------------- hotkeys
