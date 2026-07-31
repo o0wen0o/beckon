@@ -18,6 +18,12 @@ pub fn foreground_window() -> Option<isize> {
     }
 }
 
+/// One of our own windows as the same raw handle value `foreground_window`
+/// returns, so business logic can compare the two without ever naming `HWND`.
+pub fn window_handle(window: &tauri::WebviewWindow) -> Option<isize> {
+    window.hwnd().ok().map(|hwnd| hwnd.0 as isize)
+}
+
 /// Give focus back. Returns false if the window is gone — the user closed it
 /// while the Popover was open, which is not worth reporting.
 pub fn restore_foreground(handle: isize) -> bool {

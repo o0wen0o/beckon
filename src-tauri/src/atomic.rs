@@ -7,11 +7,10 @@
 
 use std::fs;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-/// Write `contents` to `path` atomically. Returns the temp path that was used,
-/// which the caller may want to feed to the watcher's self-write suppression.
-pub fn write_atomic(path: &Path, contents: &str) -> io::Result<PathBuf> {
+/// Write `contents` to `path` atomically.
+pub fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
     let dir = path.parent().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "path has no parent directory")
     })?;
@@ -29,14 +28,9 @@ pub fn write_atomic(path: &Path, contents: &str) -> io::Result<PathBuf> {
         file.sync_all()?;
     }
 
-    // Windows `rename` fails if the destination exists, so remove it first.
-    // The window between the two calls is why the temp file is kept around: a
-    // crash there leaves `.name.beckon-tmp` recoverable by hand.
-    if path.exists() {
-        fs::remove_file(path)?;
-    }
-    fs::rename(&tmp, path)?;
-    Ok(tmp)
+    // `fs::rename` replaces an existing destination on every platform we build
+    // for, so there is no unlink-then-rename window to crash inside.
+    fs::rename(&tmp, path)
 }
 
 #[cfg(test)]

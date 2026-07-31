@@ -4,7 +4,7 @@
 //! missing field means "use the default", never an error.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -106,7 +106,7 @@ pub fn load_or_create(path: &Path) -> Loaded {
     }
 }
 
-pub fn save(path: &Path, config: &Config) -> Result<PathBuf, String> {
+pub fn save(path: &Path, config: &Config) -> Result<(), String> {
     let text = toml::to_string_pretty(config).map_err(|e| e.to_string())?;
     write_atomic(path, &text).map_err(|e| e.to_string())
 }

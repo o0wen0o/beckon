@@ -5,7 +5,6 @@ use std::fs;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
-use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::action::registry::RegistrySnapshot;
@@ -59,31 +58,14 @@ pub fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Re
     let path = state.paths.config_file.clone();
     state.self_writes.mark(&path);
     crate::config::save(&path, &config)?;
-    *state.config.write().expect("config lock") = config.clone();
 
     if config.autostart != previous.autostart {
-        sync_autostart(&app, config.autostart)?;
+        reload::sync_autostart(&app, config.autostart)?;
     }
 
-    reload::apply_hotkeys(&app);
-    reload::emit_config(&app);
+    // The one funnel: re-read what we just wrote, re-derive hotkeys, broadcast.
+    reload::reload_config(&app);
     Ok(())
-}
-
-#[tauri::command]
-pub fn set_autostart(app: AppHandle, state: State<AppState>, enabled: bool) -> Result<(), String> {
-    let mut config = state.config_snapshot();
-    config.autostart = enabled;
-    save_config(app, state, config)
-}
-
-fn sync_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
-    let manager = app.autolaunch();
-    if enabled {
-        manager.enable().map_err(|e| e.to_string())
-    } else {
-        manager.disable().map_err(|e| e.to_string())
-    }
 }
 
 #[tauri::command]
@@ -338,29 +320,15 @@ pub fn cancel_exchange(state: State<AppState>, exchange_id: String) {
     state.exchanges.cancel(&exchange_id);
 }
 
-/// Retry after an error: same input, new turn.
+/// Retry after an error: resend the last user message as a new turn.
 #[tauri::command]
 pub fn retry_exchange(app: AppHandle, exchange_id: String) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let plan = {
-        let exchange = state
-            .exchanges
-            .get(&exchange_id)
-            .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
-        // The last user message is what failed; resend it untouched.
-        let last_user = exchange
-            .messages
-            .iter()
-            .rev()
-            .find(|m| m.role == crate::llm::Role::User)
-            .map(|m| m.content.clone())
-            .ok_or_else(|| "there is nothing to retry".to_string())?;
-        state.exchanges.begin_turn(&exchange_id, &last_user)
-    }
-    .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
-
-    crate::exchange::spawn_turn(app.clone(), plan);
-    Ok(())
+    let last_user = app
+        .state::<AppState>()
+        .exchanges
+        .last_user_message(&exchange_id)
+        .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
+    trigger::follow_up(&app, &exchange_id, &last_user)
 }
 
 #[tauri::command]

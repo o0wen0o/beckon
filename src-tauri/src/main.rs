@@ -64,7 +64,6 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
-            commands::set_autostart,
             commands::reveal_config_dir,
             commands::get_startup_errors,
             commands::get_actions,
@@ -105,7 +104,7 @@ fn main() {
                         }
                     }
                 }
-                // A palette that outlives its focus is a bug; the Popover
+                // A Launcher that outlives its focus is a bug; the Popover
                 // instead stays until Esc, so a follow-up survives a glance at
                 // another app.
                 WindowEvent::Focused(false) if window.label() == trigger::WINDOW_LAUNCHER => {
@@ -188,7 +187,7 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
     // its error state and fires the one-time balloon (README).
     reload::apply_hotkeys(&handle);
 
-    if let Err(err) = sync_autostart(&handle, autostart_wanted) {
+    if let Err(err) = reload::sync_autostart(&handle, autostart_wanted) {
         log::warn!("could not apply the autostart setting: {err}");
     }
 
@@ -199,18 +198,4 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
     }
 
     Ok(())
-}
-
-fn sync_autostart(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
-    use tauri_plugin_autostart::ManagerExt;
-    let manager = app.autolaunch();
-    let currently = manager.is_enabled().map_err(|e| e.to_string())?;
-    if currently == enabled {
-        return Ok(());
-    }
-    if enabled {
-        manager.enable().map_err(|e| e.to_string())
-    } else {
-        manager.disable().map_err(|e| e.to_string())
-    }
 }

@@ -35,9 +35,9 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            // Left click opens Settings. On Windows a toast's click cannot be
-            // routed back to us, so the tray icon is the reliable target for
-            // "the error notification says: open Settings".
+            // Left click opens Settings. On Windows a notification's click
+            // cannot be routed back to us, so the tray icon is the reliable
+            // target for "the error notification says: open Settings".
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,

@@ -24,7 +24,7 @@
     submitInput,
     Subscriptions,
   } from "../lib/ipc";
-  import type { PopoverView } from "../lib/types";
+  import type { Failure, PopoverView } from "../lib/types";
 
   type Status =
     | "waiting-first-token"
@@ -103,16 +103,16 @@
       )
       .add(
         onExchangeError((payload) =>
-          forCurrent(payload.exchange_id, (turn) => {
-            turn.status = "error";
-            turn.note = payload.message;
-            turn.errorKind = payload.kind;
-            waitingSince = 0;
-          }),
+          forCurrent(payload.exchange_id, (turn) => applyFailure(turn, payload)),
         ),
       );
 
-    const ticker = setInterval(() => (now = Date.now()), 250);
+    // Only the "waiting for the first token" counter reads `now`, so outside
+    // that wait this would be a write per quarter second for the process's
+    // lifetime — the Popover window is never destroyed (ADR-0007).
+    const ticker = setInterval(() => {
+      if (waitingSince > 0) now = Date.now();
+    }, 250);
     return () => {
       clearInterval(ticker);
       void subscriptions.dispose();
@@ -188,14 +188,18 @@
     }
   }
 
-  function failCurrent(error: unknown) {
-    const failure = describeError(error);
-    const turn = turns[turns.length - 1];
-    if (!turn) return;
+  /** The one place a failure lands on a turn, whether it arrived as an event
+   * or as a rejected command. */
+  function applyFailure(turn: Turn, failure: Failure) {
     turn.status = "error";
     turn.note = failure.message;
     turn.errorKind = failure.kind;
     waitingSince = 0;
+  }
+
+  function failCurrent(error: unknown) {
+    const turn = turns[turns.length - 1];
+    if (turn) applyFailure(turn, describeError(error));
   }
 
   async function retry() {

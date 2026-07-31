@@ -115,7 +115,6 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     let mut view = PopoverView {
         action_id: action.id.clone(),
         action_name: action.file.name.clone(),
-        input_source: action.file.input_source,
         model: params.clone(),
         phase,
         input: input.clone(),
@@ -124,9 +123,7 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
 
     if phase == PopoverPhase::Running {
         let input = input.unwrap_or_default();
-        let exchange_id = state
-            .exchanges
-            .create(&action.id, &action.file.prompt.system, params);
+        let exchange_id = state.exchanges.create(&action.file.prompt.system, params);
         view.exchange_id = Some(exchange_id.clone());
         if let Some(plan) = state
             .exchanges
@@ -165,10 +162,9 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
     };
 
     let params = action.model_params(&defaults);
-    let exchange_id =
-        state
-            .exchanges
-            .create(&action.id, &action.file.prompt.system, params.clone());
+    let exchange_id = state
+        .exchanges
+        .create(&action.file.prompt.system, params.clone());
     let plan = state
         .exchanges
         .begin_turn(&exchange_id, &action.render_user(text))
@@ -278,10 +274,7 @@ fn is_ours(app: &AppHandle, hwnd: isize) -> bool {
     [WINDOW_LAUNCHER, WINDOW_POPOVER, WINDOW_SETTINGS]
         .iter()
         .filter_map(|label| app.get_webview_window(label))
-        .any(|window| match window.hwnd() {
-            Ok(handle) => handle.0 as isize == hwnd,
-            Err(_) => false,
-        })
+        .any(|window| platform::focus::window_handle(&window) == Some(hwnd))
 }
 
 /// Hand focus back once nothing of ours is on screen.
@@ -321,7 +314,7 @@ fn place_at_cursor(window: &WebviewWindow) {
 }
 
 /// The Launcher is centred on the monitor the cursor is on: the README only
-/// promises the *Popover* is cursor-adjacent, and a centred palette is what
+/// promises the *Popover* is cursor-adjacent, and a centred Launcher is what
 /// every comparable tool does.
 fn center_on_active_monitor(window: &WebviewWindow) {
     let Some(cursor) = platform::cursor::cursor_position() else {

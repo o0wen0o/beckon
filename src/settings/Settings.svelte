@@ -62,8 +62,30 @@
   const firstRun = $derived(keyStatus !== null && keyStatus.kind !== "present");
 
   const subscriptions = new Subscriptions();
-  let configTimer: ReturnType<typeof setTimeout> | undefined;
-  let actionTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * One debounced save slot. ADR-0003 makes disk authoritative, so every edit
+   * has to land there — but not on every keystroke.
+   */
+  function saveSlot() {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    return (write: () => Promise<void>, immediate: boolean) => {
+      clearTimeout(timer);
+      const run = async () => {
+        try {
+          await write();
+          saveError = null;
+        } catch (error) {
+          saveError = describeError(error).message;
+        }
+      };
+      if (immediate) void run();
+      else timer = setTimeout(run, SAVE_DEBOUNCE);
+    };
+  }
+
+  const saveConfigSoon = saveSlot();
+  const saveActionSoon = saveSlot();
 
   onMount(() => {
     void refreshAll();
@@ -117,17 +139,7 @@
   function commitConfig(immediate = false) {
     if (!config) return;
     const next = structuredClone(config);
-    clearTimeout(configTimer);
-    const run = async () => {
-      try {
-        await saveConfig(next);
-        saveError = null;
-      } catch (error) {
-        saveError = describeError(error).message;
-      }
-    };
-    if (immediate) void run();
-    else configTimer = setTimeout(run, SAVE_DEBOUNCE);
+    saveConfigSoon(() => saveConfig(next), immediate);
   }
 
   function setLauncherHotkey(accelerator: string | null) {
@@ -142,17 +154,7 @@
     if (!draft || !selectedFile) return;
     const fileName = selectedFile;
     const next = structuredClone(draft);
-    clearTimeout(actionTimer);
-    const run = async () => {
-      try {
-        await saveAction(fileName, next);
-        saveError = null;
-      } catch (error) {
-        saveError = describeError(error).message;
-      }
-    };
-    if (immediate) void run();
-    else actionTimer = setTimeout(run, SAVE_DEBOUNCE);
+    saveActionSoon(() => saveAction(fileName, next), immediate);
   }
 
   function setActionHotkey(accelerator: string | null) {
@@ -230,6 +232,15 @@
     }
   }
 
+  // Kinds matter here: a rejected key is not an unreachable API, and neither is
+  // a missing credential (ADR-0005).
+  const TEST_FAILURE_PREFIX: Record<string, string> = {
+    auth: "The API rejected this key",
+    network: "Could not reach the API",
+    "no-credential": "No key stored",
+    "read-error": "The Credential Manager could not be read",
+  };
+
   async function runTest() {
     test = { state: "running" };
     try {
@@ -237,18 +248,7 @@
       test = { state: "ok", message: "The key and base URL work." };
     } catch (error) {
       const failure = describeError(error);
-      // Kinds matter here: a rejected key is not an unreachable API, and
-      // neither is a missing credential (ADR-0005).
-      const prefix =
-        failure.kind === "auth"
-          ? "The API rejected this key"
-          : failure.kind === "network"
-            ? "Could not reach the API"
-            : failure.kind === "no-credential"
-              ? "No key stored"
-              : failure.kind === "read-error"
-                ? "The Credential Manager could not be read"
-                : "Failed";
+      const prefix = TEST_FAILURE_PREFIX[failure.kind] ?? "Failed";
       test = { state: "failed", message: `${prefix}: ${failure.message}` };
     }
   }

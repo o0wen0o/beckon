@@ -65,7 +65,6 @@ export type PopoverPhase = "needs-input" | "empty-selection" | "running";
 export interface PopoverView {
   action_id: string;
   action_name: string;
-  input_source: InputSource;
   model: ModelParams;
   phase: PopoverPhase;
   input: string | null;
@@ -95,8 +94,4 @@ export interface ErrorPayload extends ExchangeIdPayload {
 
 export interface InterruptedPayload extends ExchangeIdPayload {
   message: string;
-}
-
-export function emptyOverrides(): ModelOverrides {
-  return { model: null, thinking: null, temperature: null };
 }

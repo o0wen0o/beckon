@@ -31,6 +31,9 @@ pub mod focus {
     pub fn foreground_window() -> Option<isize> {
         None
     }
+    pub fn window_handle(_window: &tauri::WebviewWindow) -> Option<isize> {
+        None
+    }
     pub fn restore_foreground(_hwnd: isize) -> bool {
         false
     }

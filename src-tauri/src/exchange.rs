@@ -17,6 +17,9 @@ use crate::action::ModelParams;
 use crate::llm::client::{self, LlmError, StreamEvent};
 use crate::llm::{deepseek, Message};
 use crate::state::AppState;
+// Where the streamed events go: only the Popover renders an Exchange, and the
+// label is owned by the layer that creates windows.
+use crate::trigger::WINDOW_POPOVER as TARGET_WINDOW;
 
 /// Deltas are coalesced onto this tick. Per-token IPC floods the WebView and
 /// makes the Popover feel *slower* than the network.
@@ -28,13 +31,8 @@ pub const EVENT_DONE: &str = "exchange:done";
 pub const EVENT_ERROR: &str = "exchange:error";
 pub const EVENT_INTERRUPTED: &str = "exchange:interrupted";
 
-/// Where the streamed events go. Only the Popover renders an Exchange.
-const TARGET_WINDOW: &str = "popover";
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
 pub struct Exchange {
-    pub id: String,
-    pub action_id: String,
     pub params: ModelParams,
     /// `messages[0]` is the system prompt; the rest is the turn history.
     pub messages: Vec<Message>,
@@ -63,11 +61,9 @@ pub struct ExchangeManager {
 
 impl ExchangeManager {
     /// Open an Exchange. The caller then starts its first turn.
-    pub fn create(&self, action_id: &str, system_prompt: &str, params: ModelParams) -> String {
+    pub fn create(&self, system_prompt: &str, params: ModelParams) -> String {
         let id = format!("ex{}", self.next_id.fetch_add(1, Ordering::Relaxed));
         let exchange = Exchange {
-            id: id.clone(),
-            action_id: action_id.to_string(),
             params,
             messages: vec![Message::system(system_prompt)],
         };
@@ -127,9 +123,17 @@ impl ExchangeManager {
         map.clear();
     }
 
-    pub fn get(&self, id: &str) -> Option<Exchange> {
+    /// The last thing the user sent. A retry resends exactly that — the turn
+    /// that failed is the one worth repeating.
+    pub fn last_user_message(&self, id: &str) -> Option<String> {
         let map = self.inner.lock().expect("exchange lock");
-        map.get(id).map(|entry| entry.exchange.clone())
+        map.get(id)?
+            .exchange
+            .messages
+            .iter()
+            .rev()
+            .find(|message| message.role == crate::llm::Role::User)
+            .map(|message| message.content.clone())
     }
 }
 
@@ -221,8 +225,9 @@ async fn run_turn(app: AppHandle, plan: TurnPlan) {
     .await;
 
     sink.flush();
-    let answer = sink.answer.clone();
-    state.exchanges.commit_assistant(&plan.exchange_id, &answer);
+    state
+        .exchanges
+        .commit_assistant(&plan.exchange_id, &sink.answer);
 
     match result {
         Ok(()) => {
@@ -349,7 +354,7 @@ mod tests {
     #[test]
     fn a_turn_carries_the_full_history_untruncated() {
         let manager = ExchangeManager::default();
-        let id = manager.create("translate", "you are a translator", params());
+        let id = manager.create("you are a translator", params());
 
         let first = manager.begin_turn(&id, "hello").unwrap();
         assert_eq!(first.messages.len(), 2);
@@ -365,7 +370,7 @@ mod tests {
     #[test]
     fn each_turn_gets_a_fresh_cancellation_token() {
         let manager = ExchangeManager::default();
-        let id = manager.create("a", "s", params());
+        let id = manager.create("s", params());
 
         let first = manager.begin_turn(&id, "one").unwrap();
         manager.cancel(&id);
@@ -378,21 +383,33 @@ mod tests {
     #[test]
     fn discarding_cancels_and_forgets() {
         let manager = ExchangeManager::default();
-        let id = manager.create("a", "s", params());
+        let id = manager.create("s", params());
         let plan = manager.begin_turn(&id, "one").unwrap();
 
         manager.discard_all();
         assert!(plan.cancel.is_cancelled());
-        assert!(manager.get(&id).is_none());
+        assert!(manager.last_user_message(&id).is_none());
         assert!(manager.begin_turn(&id, "two").is_none());
     }
 
     #[test]
     fn empty_assistant_text_is_not_recorded() {
         let manager = ExchangeManager::default();
-        let id = manager.create("a", "s", params());
+        let id = manager.create("s", params());
         manager.begin_turn(&id, "one").unwrap();
         manager.commit_assistant(&id, "");
-        assert_eq!(manager.get(&id).unwrap().messages.len(), 2);
+        // Still just system + "one": the next turn is only the third message.
+        let next = manager.begin_turn(&id, "two").unwrap();
+        assert_eq!(next.messages.len(), 3);
+    }
+
+    #[test]
+    fn a_retry_resends_the_last_user_message() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        manager.begin_turn(&id, "one").unwrap();
+        manager.commit_assistant(&id, "answer");
+        manager.begin_turn(&id, "two").unwrap();
+        assert_eq!(manager.last_user_message(&id).as_deref(), Some("two"));
     }
 }

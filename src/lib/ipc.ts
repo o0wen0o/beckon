@@ -4,7 +4,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
-  Action,
   ActionFile,
   Config,
   DeltaPayload,
@@ -21,7 +20,6 @@ import type {
 
 export const getConfig = () => invoke<Config>("get_config");
 export const saveConfig = (config: Config) => invoke<void>("save_config", { config });
-export const setAutostart = (enabled: boolean) => invoke<void>("set_autostart", { enabled });
 export const revealConfigDir = () => invoke<void>("reveal_config_dir");
 export const getStartupErrors = () => invoke<string[]>("get_startup_errors");
 
@@ -110,6 +108,3 @@ export function describeError(error: unknown): Failure {
   }
   return { kind: "error", message: String(error) };
 }
-
-/** A single Action's identity: the filename stem (README). */
-export const actionLabel = (action: Action) => action.name || action.id;

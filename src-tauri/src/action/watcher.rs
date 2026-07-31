@@ -95,7 +95,7 @@ where
                     }
                 };
 
-                let paths = events.iter().flat_map(|event| event.paths.clone());
+                let paths = events.iter().flat_map(|event| event.paths.iter());
                 for change in classify(&watched, paths, &self_writes) {
                     on_change(change);
                 }
@@ -112,23 +112,23 @@ pub struct WatcherGuard {
 
 /// Decide what a batch of paths means. Returns at most one [`Change`] of each
 /// kind, so a save touching several Actions triggers a single reload.
-fn classify(
+fn classify<'a>(
     watched: &Watched,
-    paths: impl Iterator<Item = PathBuf>,
+    paths: impl Iterator<Item = &'a PathBuf>,
     self_writes: &SelfWrites,
 ) -> Vec<Change> {
     let mut config = false;
     let mut actions = false;
 
     for path in paths {
-        if is_ignored(&path) {
+        if is_ignored(path) {
             continue;
         }
         // Only swallow the echo when the path is genuinely one of ours.
-        if self_writes.take(&path) {
+        if self_writes.take(path) {
             continue;
         }
-        if path == watched.config_file {
+        if *path == watched.config_file {
             config = true;
         } else if path.starts_with(&watched.actions_dir) {
             actions = true;
@@ -145,8 +145,10 @@ fn classify(
     out
 }
 
-/// Temp files, backup files and anything that is not TOML.
-fn is_ignored(path: &Path) -> bool {
+/// Temp files, backup files and anything that is not TOML. Shared with
+/// [`Registry::load`](crate::action::registry::Registry::load) so the loader and
+/// the watcher cannot disagree about what counts as an Action file.
+pub fn is_ignored(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return true;
     };
@@ -175,16 +177,12 @@ mod tests {
         let root = Path::new("C:/beckon");
         let w = watched(root);
         let writes = SelfWrites::default();
-        let changes = classify(
-            &w,
-            vec![
-                root.join("config.toml"),
-                root.join("actions").join("a.toml"),
-                root.join("actions").join("b.toml"),
-            ]
-            .into_iter(),
-            &writes,
-        );
+        let paths = [
+            root.join("config.toml"),
+            root.join("actions").join("a.toml"),
+            root.join("actions").join("b.toml"),
+        ];
+        let changes = classify(&w, paths.iter(), &writes);
         assert_eq!(changes, vec![Change::Config, Change::Actions]);
     }
 
@@ -193,17 +191,12 @@ mod tests {
         let root = Path::new("C:/beckon");
         let w = watched(root);
         let writes = SelfWrites::default();
-        let changes = classify(
-            &w,
-            vec![
-                root.join("actions").join(".a.toml.beckon-tmp"),
-                root.join("actions").join("notes.txt"),
-                root.join("actions").join("a.toml~"),
-            ]
-            .into_iter(),
-            &writes,
-        );
-        assert!(changes.is_empty());
+        let paths = [
+            root.join("actions").join(".a.toml.beckon-tmp"),
+            root.join("actions").join("notes.txt"),
+            root.join("actions").join("a.toml~"),
+        ];
+        assert!(classify(&w, paths.iter(), &writes).is_empty());
     }
 
     #[test]
@@ -214,12 +207,10 @@ mod tests {
         let path = root.join("actions").join("a.toml");
 
         writes.mark(&path);
-        assert!(classify(&w, vec![path.clone()].into_iter(), &writes).is_empty());
+        let paths = [path];
+        assert!(classify(&w, paths.iter(), &writes).is_empty());
         // The next event for the same path is a real external edit.
-        assert_eq!(
-            classify(&w, vec![path].into_iter(), &writes),
-            vec![Change::Actions]
-        );
+        assert_eq!(classify(&w, paths.iter(), &writes), vec![Change::Actions]);
     }
 
     #[test]

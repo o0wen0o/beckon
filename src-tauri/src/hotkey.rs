@@ -25,7 +25,6 @@ pub struct HotkeyState {
     pub bindings: HashMap<Shortcut, Target>,
     /// Action id ⇒ why its Direct Hotkey is not active (conflict or refusal).
     pub action_errors: HashMap<String, String>,
-    pub launcher_error: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -102,16 +101,7 @@ pub fn probe(app: &AppHandle, accelerator: &str) -> Result<(), String> {
 pub fn apply(app: &AppHandle) -> ApplyReport {
     let state = app.state::<AppState>();
     let launcher_accelerator = state.config_snapshot().launcher_hotkey;
-    let (plan, actions_with_hotkeys) = {
-        let registry = state.registry.read().expect("registry lock");
-        let plan = registry.hotkey_plan();
-        let names: HashMap<String, String> = registry
-            .actions
-            .iter()
-            .map(|a| (a.id.clone(), a.file.name.clone()))
-            .collect();
-        (plan, names)
-    };
+    let plan = state.registry.read().expect("registry lock").hotkey_plan();
 
     let manager = app.global_shortcut();
     let _ = manager.unregister_all();
@@ -146,9 +136,17 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
             }
         };
         if let Some(existing) = bindings.get(&shortcut) {
+            // Only the loser's message needs a display name, so it is looked up
+            // here rather than mapped for every Action on every apply.
             let owner = match existing {
                 Target::Launcher => "the Launcher hotkey".to_string(),
-                Target::Action(id) => format!("\"{}\"", actions_with_hotkeys.get(id).unwrap_or(id)),
+                Target::Action(id) => {
+                    let registry = state.registry.read().expect("registry lock");
+                    let name = registry
+                        .get(id)
+                        .map_or(id.as_str(), |a| a.file.name.as_str());
+                    format!("\"{name}\"")
+                }
             };
             report.action_errors.insert(
                 action_id,
@@ -173,7 +171,6 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
         let mut hotkeys = state.hotkeys.lock().expect("hotkey lock");
         hotkeys.bindings = bindings;
         hotkeys.action_errors = report.action_errors.clone();
-        hotkeys.launcher_error = report.launcher_error.clone();
     }
 
     report

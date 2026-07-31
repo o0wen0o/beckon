@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::action::registry::Registry;
 use crate::action::watcher::{SelfWrites, WatcherGuard};
-use crate::action::{InputSource, ModelParams};
+use crate::action::ModelParams;
 use crate::config::Config;
 use crate::exchange::ExchangeManager;
 use crate::hotkey::HotkeyState;
@@ -51,7 +51,6 @@ impl Paths {
 pub struct PopoverView {
     pub action_id: String,
     pub action_name: String,
-    pub input_source: InputSource,
     pub model: ModelParams,
     pub phase: PopoverPhase,
     /// The input that was sent, for display above the answer.

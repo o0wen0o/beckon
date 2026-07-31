@@ -6,10 +6,11 @@
 //! snapshot this module broadcasts.
 
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::action::registry::{Registry, RegistrySnapshot};
 use crate::config;
-use crate::hotkey::{self, ApplyReport};
+use crate::hotkey;
 use crate::state::AppState;
 use crate::tray;
 
@@ -40,14 +41,29 @@ pub fn reload_actions(app: &AppHandle) {
 }
 
 /// Re-register every hotkey and reflect the outcome on the tray.
-pub fn apply_hotkeys(app: &AppHandle) -> ApplyReport {
+pub fn apply_hotkeys(app: &AppHandle) {
     let report = hotkey::apply(app);
     if report.is_clean() {
         tray::set_normal(app);
     } else {
         tray::set_error(app, &report.summary());
     }
-    report
+}
+
+/// Autostart is config-derived state, so it is applied from beside the config
+/// funnel rather than separately by each caller that changes the setting.
+pub fn sync_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    let manager = app.autolaunch();
+    // An unreadable current state is no reason to refuse; just apply the wanted
+    // one. Skipping the redundant write keeps startup off the registry.
+    if manager.is_enabled().is_ok_and(|current| current == enabled) {
+        return Ok(());
+    }
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())
+    } else {
+        manager.disable().map_err(|e| e.to_string())
+    }
 }
 
 pub fn actions_snapshot(app: &AppHandle) -> RegistrySnapshot {

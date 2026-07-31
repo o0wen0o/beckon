@@ -93,22 +93,11 @@ pub async fn stream_chat(
 
     let status = response.status();
     if !status.is_success() {
-        let message = response
+        let body = response
             .text()
             .await
             .unwrap_or_else(|e| format!("<no response body: {e}>"));
-        let message = trim_error_body(&message);
-        return Err(if status.as_u16() == 401 || status.as_u16() == 403 {
-            LlmError::Auth {
-                status: status.as_u16(),
-                message,
-            }
-        } else {
-            LlmError::Http {
-                status: status.as_u16(),
-                message,
-            }
-        });
+        return Err(status_error(status.as_u16(), &body));
     }
 
     let mut stream = response.bytes_stream();
@@ -116,7 +105,7 @@ pub async fn stream_chat(
     let mut received_any = false;
     let mut saw_done = false;
 
-    loop {
+    'stream: loop {
         let chunk = tokio::select! {
             biased;
             _ = cancel.cancelled() => return Err(LlmError::Cancelled),
@@ -139,12 +128,9 @@ pub async fn stream_chat(
                 Flow::Continue => received_any = true,
                 Flow::Done => {
                     saw_done = true;
-                    break;
+                    break 'stream;
                 }
             }
-        }
-        if saw_done {
-            break;
         }
     }
 
@@ -177,13 +163,7 @@ fn handle_event(event: SseEvent, on_event: &mut impl FnMut(StreamEvent)) -> Resu
         SseEvent::Data(payload) => payload,
     };
 
-    // Some gateways report failures as an SSE frame rather than a status code.
-    if let Ok(error) = serde_json::from_str::<ApiErrorFrame>(&payload) {
-        if let Some(error) = error.error {
-            return Err(LlmError::Interrupted(error.message));
-        }
-    }
-
+    // One parse per frame: this runs once per streamed token.
     let chunk: Chunk = match serde_json::from_str(&payload) {
         Ok(chunk) => chunk,
         Err(err) => {
@@ -192,6 +172,10 @@ fn handle_event(event: SseEvent, on_event: &mut impl FnMut(StreamEvent)) -> Resu
             return Ok(Flow::Continue);
         }
     };
+
+    if let Some(error) = chunk.error {
+        return Err(LlmError::Interrupted(error.message));
+    }
 
     for choice in chunk.choices {
         let Some(delta) = choice.delta else { continue };
@@ -227,18 +211,22 @@ pub async fn test_connection(
     if status.is_success() {
         return Ok(());
     }
-    let message = trim_error_body(&response.text().await.unwrap_or_default());
-    Err(if status.as_u16() == 401 || status.as_u16() == 403 {
-        LlmError::Auth {
-            status: status.as_u16(),
-            message,
-        }
+    Err(status_error(
+        status.as_u16(),
+        &response.text().await.unwrap_or_default(),
+    ))
+}
+
+/// The one place a status code becomes an [`LlmError`]. ADR-0005 needs "key
+/// rejected" to stay distinguishable from every other failure, so the 401/403
+/// boundary is decided here rather than at each call site.
+fn status_error(status: u16, body: &str) -> LlmError {
+    let message = trim_error_body(body);
+    if status == 401 || status == 403 {
+        LlmError::Auth { status, message }
     } else {
-        LlmError::Http {
-            status: status.as_u16(),
-            message,
-        }
-    })
+        LlmError::Http { status, message }
+    }
 }
 
 /// Error bodies are sometimes an HTML page. Prefer the JSON `error.message`,
@@ -261,6 +249,9 @@ fn trim_error_body(body: &str) -> String {
 struct Chunk {
     #[serde(default)]
     choices: Vec<Choice>,
+    /// Some gateways report failures as an SSE frame rather than a status code,
+    /// so the same frame carries either deltas or an error — never both.
+    error: Option<ApiError>,
 }
 
 #[derive(Debug, Deserialize)]

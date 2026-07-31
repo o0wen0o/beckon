@@ -61,17 +61,13 @@ impl Registry {
             }
         };
 
-        let mut files: Vec<String> = Vec::new();
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            // Skip editors' and our own temp files.
-            if name.starts_with('.') || !name.ends_with(".toml") {
-                continue;
-            }
-            if entry.path().is_file() {
-                files.push(name);
-            }
-        }
+        // Editors' and our own temp files are skipped by the same rule the
+        // watcher uses, so the two can never disagree.
+        let mut files: Vec<String> = entries
+            .flatten()
+            .filter(|entry| entry.path().is_file() && !super::watcher::is_ignored(&entry.path()))
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
         files.sort();
 
         for file_name in files {
