@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/windows-schema.json",
+  "identifier": "default",
+  "description": "Capabilities for the Launcher, Popover and Settings surfaces.",
+  "windows": ["launcher", "popover", "settings"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
+    "core:event:default",
+    "opener:default",
+    "notification:default"
+  ]
+}
