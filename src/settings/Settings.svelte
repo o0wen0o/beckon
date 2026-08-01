@@ -245,12 +245,14 @@
   }
 
   // Kinds matter here: a rejected key is not an unreachable API, and neither is
-  // a missing credential (ADR-0005).
-  const TEST_FAILURE_PREFIX: Record<string, string> = {
+  // a missing credential (ADR-0005). One map for every consumer of a
+  // `Failure.kind`, so a new kind cannot reach one banner and miss another.
+  const FAILURE_PREFIX: Record<string, string> = {
     auth: "The API rejected this key",
     network: "Could not reach the API",
-    "no-credential": "No key stored",
+    "no-credential": "No API key stored",
     "read-error": "The Credential Manager could not be read",
+    empty: "The endpoint listed no models",
   };
 
   async function runTest() {
@@ -260,7 +262,7 @@
       test = { state: "ok", message: "The key and base URL work." };
     } catch (error) {
       const failure = describeError(error);
-      const prefix = TEST_FAILURE_PREFIX[failure.kind] ?? "Failed";
+      const prefix = FAILURE_PREFIX[failure.kind] ?? "Failed";
       test = { state: "failed", message: `${prefix}: ${failure.message}` };
     }
   }
@@ -311,30 +313,27 @@
   /** A model only the config vouches for: say so instead of dropping it. */
   function unknownModelHint(id: string | null): string | null {
     if (!id) return null;
-    const option = modelOption(id);
-    if (!option || option.origin !== "configured") return null;
-    return models?.live
-      ? `${id} is not in the endpoint's model list. Kept because your configuration names it.`
-      : `${id} is not one of the models Beckon knows. Kept because your configuration names it.`;
+    if (modelOption(id)?.origin !== "configured") return null;
+    const missing = models?.live
+      ? "not in the endpoint's model list"
+      : "not one of the models Beckon knows";
+    return `${id} is ${missing}. Kept because your configuration names it.`;
   }
-
-  // Same rule as "Test connection": the cause decides the wording, and a
-  // missing credential is not a read error is not a rejected key (ADR-0005).
-  const MODEL_FALLBACK_PREFIX: Record<string, string> = {
-    "no-credential": "No API key stored yet",
-    "read-error": "The Credential Manager could not be read",
-    auth: "The API rejected this key",
-    network: "Could not reach the API",
-    empty: "The endpoint listed no models",
-  };
 
   const modelNotice = $derived.by(() => {
     if (!models || models.live) return null;
     const failure = models.fallback;
     if (!failure) return null;
-    const prefix = MODEL_FALLBACK_PREFIX[failure.kind] ?? "The model list could not be fetched";
-    return `${prefix} — showing the models DeepSeek documents. ${failure.message}`;
+    const prefix = FAILURE_PREFIX[failure.kind] ?? "The model list could not be fetched";
+    return `${prefix} — showing the documented models. ${failure.message}`;
   });
+
+  // Rendered under the default-model select. Derived rather than called from
+  // the markup: each call rebuilds the option list.
+  const defaultModelHint = $derived(unknownModelHint(config?.defaults.model ?? null));
+  const defaultModelInfo = $derived(
+    config ? (modelOption(config.defaults.model)?.description ?? "") : "",
+  );
 
   // --- small helpers ------------------------------------------------------
 
@@ -541,10 +540,10 @@
         </label>
       </div>
 
-      {#if unknownModelHint(config.defaults.model)}
-        <p class="hint error">{unknownModelHint(config.defaults.model)}</p>
-      {:else if modelOption(config.defaults.model)?.description}
-        <p class="hint">{modelOption(config.defaults.model)?.description}</p>
+      {#if defaultModelHint}
+        <p class="hint error">{defaultModelHint}</p>
+      {:else if defaultModelInfo}
+        <p class="hint">{defaultModelInfo}</p>
       {/if}
 
       <div class="row">
@@ -627,6 +626,7 @@
             <button onclick={() => (raw = null)}>Close</button>
           </div>
         {:else if draft && selected}
+          {@const draftModelHint = unknownModelHint(draft.model.model)}
           <div class="editor-head">
             <h3>{draft.name || selected.file_name}</h3>
             <span class="hint">
@@ -722,8 +722,8 @@
                   <option value={option.id}>{option.label}</option>
                 {/each}
               </select>
-              {#if unknownModelHint(draft.model.model)}
-                <p class="hint error">{unknownModelHint(draft.model.model)}</p>
+              {#if draftModelHint}
+                <p class="hint error">{draftModelHint}</p>
               {/if}
             </label>
 

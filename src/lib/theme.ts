@@ -6,38 +6,37 @@
 import { getConfig, onConfigChanged } from "./ipc";
 import type { Theme } from "./types";
 
-/** What the stylesheet understands. `system` is resolved before it gets there. */
-type Painted = "light" | "dark";
+// One MediaQueryList for the module: `matchMedia` hands back a new object every
+// call, so a per-call listener could never be removed again.
+const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)");
 
-const SYSTEM_IS_DARK = "(prefers-color-scheme: dark)";
+/** The theme currently on the document, or `null` before the first apply. */
+let applied: Theme | null = null;
 
-/** Live only while the theme is `system`; see [applyTheme]. */
-let following: ((event: MediaQueryListEvent) => void) | null = null;
-
-function paint(scheme: Painted) {
-  document.documentElement.dataset.theme = scheme;
-}
+// Registered once and left there — it is a no-op unless the theme is `system`,
+// and the windows outlive any reason to detach it (ADR-0007).
+systemIsDark.addEventListener("change", () => {
+  if (applied === "system") paint("system");
+});
 
 /**
- * Put `theme` on the document, and keep it there.
+ * Put `theme` on the document.
  *
  * The Windows app theme is consulted **only** for `system`. That is the whole
  * reason app.css carries no bare `prefers-color-scheme` rule: a machine set to
  * dark must still get the light default until the user asks for otherwise.
  */
-export function applyTheme(theme: Theme) {
-  const query = window.matchMedia(SYSTEM_IS_DARK);
-  if (following) {
-    query.removeEventListener("change", following);
-    following = null;
-  }
-  if (theme !== "system") {
-    paint(theme);
-    return;
-  }
-  following = (event) => paint(event.matches ? "dark" : "light");
-  query.addEventListener("change", following);
-  paint(query.matches ? "dark" : "light");
+function paint(theme: Theme) {
+  document.documentElement.dataset.theme =
+    theme === "system" ? (systemIsDark.matches ? "dark" : "light") : theme;
+}
+
+function applyTheme(theme: Theme) {
+  // `config-changed` fires for every setting, not just this one; re-stamping
+  // the root element would invalidate the whole document's style for nothing.
+  if (theme === applied) return;
+  applied = theme;
+  paint(theme);
 }
 
 /**

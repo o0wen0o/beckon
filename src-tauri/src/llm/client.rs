@@ -50,26 +50,26 @@ pub enum StreamEvent {
     Reasoning(String),
 }
 
-/// `POST {base_url}/v1/chat/completions`, tolerating a `base_url` that already
-/// carries the version segment.
-pub fn chat_url(base_url: &str) -> String {
+/// `{base_url}/v1/{path}`, tolerating a `base_url` that already carries the
+/// version segment. Every endpoint goes through here so the tolerance is one
+/// rule and not one per route.
+fn api_url(base_url: &str, path: &str) -> String {
     let base = base_url.trim().trim_end_matches('/');
     if base.ends_with("/v1") {
-        format!("{base}/chat/completions")
+        format!("{base}/{path}")
     } else {
-        format!("{base}/v1/chat/completions")
+        format!("{base}/v1/{path}")
     }
 }
 
-/// `GET {base_url}/v1/models`, the OpenAI-compatible list endpoint, with the
-/// same tolerance for a `base_url` that already carries the version segment.
+/// `POST {base_url}/v1/chat/completions`.
+pub fn chat_url(base_url: &str) -> String {
+    api_url(base_url, "chat/completions")
+}
+
+/// `GET {base_url}/v1/models`, the OpenAI-compatible list endpoint.
 pub fn models_url(base_url: &str) -> String {
-    let base = base_url.trim().trim_end_matches('/');
-    if base.ends_with("/v1") {
-        format!("{base}/models")
-    } else {
-        format!("{base}/v1/models")
-    }
+    api_url(base_url, "models")
 }
 
 pub fn build_http_client() -> reqwest::Client {
@@ -355,38 +355,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builds_the_completions_url() {
+    fn tolerates_a_base_url_that_already_carries_the_version() {
+        for (base, expected) in [
+            ("https://api.deepseek.com", "https://api.deepseek.com/v1/x"),
+            ("https://api.deepseek.com/", "https://api.deepseek.com/v1/x"),
+            ("http://localhost:11434/v1", "http://localhost:11434/v1/x"),
+            (
+                "  https://example.com/api/  ",
+                "https://example.com/api/v1/x",
+            ),
+        ] {
+            assert_eq!(api_url(base, "x"), expected, "base {base}");
+        }
+    }
+
+    #[test]
+    fn names_the_two_endpoints() {
         assert_eq!(
             chat_url("https://api.deepseek.com"),
             "https://api.deepseek.com/v1/chat/completions"
         );
         assert_eq!(
-            chat_url("https://api.deepseek.com/"),
-            "https://api.deepseek.com/v1/chat/completions"
-        );
-        assert_eq!(
-            chat_url("http://localhost:11434/v1"),
-            "http://localhost:11434/v1/chat/completions"
-        );
-        assert_eq!(
-            chat_url("  https://example.com/api/  "),
-            "https://example.com/api/v1/chat/completions"
-        );
-    }
-
-    #[test]
-    fn builds_the_models_url() {
-        assert_eq!(
             models_url("https://api.deepseek.com"),
             "https://api.deepseek.com/v1/models"
-        );
-        assert_eq!(
-            models_url("https://api.deepseek.com/"),
-            "https://api.deepseek.com/v1/models"
-        );
-        assert_eq!(
-            models_url("http://localhost:11434/v1"),
-            "http://localhost:11434/v1/models"
         );
     }
 

@@ -183,6 +183,7 @@ fn push_unique(out: &mut Vec<ModelOption>, id: &str, origin: Origin) {
 }
 
 fn describe(id: &str, origin: Origin) -> ModelOption {
+    let id = id.trim();
     match find(id) {
         Some(entry) => ModelOption {
             id: entry.id.to_string(),
@@ -192,8 +193,8 @@ fn describe(id: &str, origin: Origin) -> ModelOption {
             origin,
         },
         None => ModelOption {
-            id: id.trim().to_string(),
-            label: id.trim().to_string(),
+            id: id.to_string(),
+            label: id.to_string(),
             description: String::new(),
             thinking: None,
             origin,

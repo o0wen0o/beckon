@@ -246,6 +246,20 @@ pub fn delete_api_key() -> Result<KeyStatus, String> {
     Ok(secrets::status())
 }
 
+/// The stored key, or why there is none. ADR-0005 needs "no credential" and
+/// "read error" to stay two different things all the way to the UI, so the
+/// split lives here once; callers supply only the sentence that varies.
+fn require_api_key(when_missing: &str) -> Result<String, Failure> {
+    match secrets::read() {
+        Ok(Some(key)) => Ok(key),
+        Ok(None) => Err(Failure::new("no-credential", when_missing)),
+        Err(message) => Err(Failure::new(
+            "read-error",
+            format!("The Credential Manager could not be read: {message}"),
+        )),
+    }
+}
+
 /// "Test connection": one minimal request, reporting a rejected key separately
 /// from an unreachable API (ADR-0005).
 #[tauri::command]
@@ -260,21 +274,7 @@ pub async fn test_connection(app: AppHandle) -> Result<(), Failure> {
         )
     };
 
-    let key = match secrets::read() {
-        Ok(Some(key)) => key,
-        Ok(None) => {
-            return Err(Failure::new(
-                "no-credential",
-                "No API key is stored yet. Enter one above, then test again.",
-            ))
-        }
-        Err(message) => {
-            return Err(Failure::new(
-                "read-error",
-                format!("The Credential Manager could not be read: {message}"),
-            ))
-        }
-    };
+    let key = require_api_key("No API key is stored yet. Enter one above, then test again.")?;
 
     client::test_connection(&http, &base_url, &key, &model)
         .await
@@ -312,7 +312,7 @@ pub async fn get_models(app: AppHandle, live: bool) -> ModelCatalog {
     // Locks are dropped before the await (state.rs).
     let (base_url, configured, http) = {
         let state = app.state::<AppState>();
-        let config = state.config_snapshot();
+        let config = state.config.read().expect("config lock");
         let registry = state.registry.read().expect("registry lock");
         let mut configured = vec![config.defaults.model.clone()];
         configured.extend(
@@ -321,47 +321,30 @@ pub async fn get_models(app: AppHandle, live: bool) -> ModelCatalog {
                 .iter()
                 .filter_map(|action| action.file.model.model.clone()),
         );
-        (config.api.base_url, configured, state.http.clone())
+        (config.api.base_url.clone(), configured, state.http.clone())
     };
 
-    if !live {
-        return ModelCatalog {
-            options: models::options(None, &configured),
-            live: false,
-            fallback: None,
-        };
-    }
+    // One decision, one literal: `live` cannot then disagree with the options.
+    let (fetched, fallback) = if !live {
+        (None, None)
+    } else {
+        match fetch_model_ids(&http, &base_url).await {
+            Ok(ids) => (Some(ids), None),
+            Err(failure) => (None, Some(failure)),
+        }
+    };
 
-    match fetch_model_ids(&http, &base_url).await {
-        Ok(ids) => ModelCatalog {
-            options: models::options(Some(&ids), &configured),
-            live: true,
-            fallback: None,
-        },
-        Err(failure) => ModelCatalog {
-            options: models::options(None, &configured),
-            live: false,
-            fallback: Some(failure),
-        },
+    ModelCatalog {
+        options: models::options(fetched.as_deref(), &configured),
+        live: fetched.is_some(),
+        fallback,
     }
 }
 
 async fn fetch_model_ids(http: &reqwest::Client, base_url: &str) -> Result<Vec<String>, Failure> {
-    let key = match secrets::read() {
-        Ok(Some(key)) => key,
-        Ok(None) => {
-            return Err(Failure::new(
-                "no-credential",
-                "No API key is stored, so the models below are the documented ones.",
-            ))
-        }
-        Err(message) => {
-            return Err(Failure::new(
-                "read-error",
-                format!("The Credential Manager could not be read: {message}"),
-            ))
-        }
-    };
+    // The cause only — the UI adds "so the documented list is shown", because
+    // that consequence is the dropdown's to explain, not this layer's.
+    let key = require_api_key("Store one to list the models your endpoint actually serves.")?;
 
     let ids = client::list_models(http, base_url, &key)
         .await
@@ -369,10 +352,7 @@ async fn fetch_model_ids(http: &reqwest::Client, base_url: &str) -> Result<Vec<S
     if ids.is_empty() {
         // An endpoint that serves nothing would leave the user unable to change
         // model at all. Treat it as no answer.
-        return Err(Failure::new(
-            "empty",
-            "The endpoint listed no models, so the documented ones are shown.",
-        ));
+        return Err(Failure::new("empty", "Its list came back empty."));
     }
     Ok(ids)
 }
