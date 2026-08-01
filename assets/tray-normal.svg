@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Tray icon, normal state. Same silhouette as logo.svg — squircle, ring,
+       spark — but redrawn flat for 32px: no gradients, no blur, no drop shadow
+       and no accent spark, because at tray size every one of those turns into
+       a grey smear. Strokes are fattened and the squircle bleeds closer to the
+       edge to buy back the pixels the shadow used to reserve. -->
+  <rect x="6" y="6" width="244" height="244" rx="56" fill="#16161f"/>
+  <path d="M 128 44 C 174 44, 212 82, 212 128 C 212 174, 174 212, 128 212 C 82 212, 44 174, 44 128"
+        fill="none" stroke="#3a8ee0" stroke-width="18" stroke-linecap="round"/>
+  <path d="M 128 68 Q 128 128 188 128 Q 128 128 128 188 Q 128 128 68 128 Q 128 128 128 68 Z"
+        fill="#45d3ff"/>
+  <circle cx="128" cy="128" r="11" fill="#ffffff"/>
+</svg>

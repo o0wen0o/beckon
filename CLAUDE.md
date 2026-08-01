@@ -21,6 +21,7 @@ npm run tauri dev               # run the app (spawns vite on :1420, then cargo)
 npm run tauri build             # MSI + NSIS bundle
 npm run dev                     # vite only, no Rust (webviews will fail on invoke)
 npm run check                   # svelte-check + tsc over the frontend
+npm run icons                   # re-rasterize src-tauri/icons from assets/*.svg
 
 cargo test                      # workspace tests (all in src-tauri)
 cargo test action::tests::slugs_display_names        # one test
@@ -84,6 +85,12 @@ Rules that break subtly if ignored:
 ### Platform isolation ([src-tauri/src/platform/](src-tauri/src/platform/))
 
 All Win32 lives under `platform/windows/`, re-exported through `platform/mod.rs` with non-Windows stubs so the crate still compiles elsewhere (ADR-0001). Do not scatter `#[cfg]` into business logic. `selection.rs` documents the grab's step order — release physically-held modifiers, back up the clipboard, poll `GetClipboardSequenceNumber`, restore, drop the backup — and each step there fixes a specific failure.
+
+### Icons are generated, not edited ([assets/](assets/))
+
+Every PNG and the ICO in `src-tauri/icons` is output from `npm run icons` ([scripts/gen-icons.ps1](scripts/gen-icons.ps1)); editing a raster by hand is how the old 32px and 256px icons drifted out of alignment with each other. The script rasterizes with `tauri icon`, already a devDependency, so there is no extra toolchain — but the app icon needs two passes, because only the default pass emits `icon.ico` and only a `--png` pass can ask for 256.
+
+There are three sources, not one. `assets/logo.svg` is the app icon; it uses gradients, a glow filter and a drop shadow, which at 32px collapse into a grey smear. So the tray renders from `assets/tray-normal.svg` / `assets/tray-error.svg` — the same silhouette redrawn flat, with fattened strokes and no shadow margin. The two tray sources must stay geometrically identical to each other and differ only in accent colour, or the error state stops reading as the same app.
 
 ### Adding an IPC command
 
