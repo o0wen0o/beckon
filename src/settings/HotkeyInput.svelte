@@ -108,6 +108,7 @@
 
 <div class="recorder">
   <button
+    class="slot"
     class:recording
     class:invalid={error !== null}
     onclick={() => (recording ? stop() : start())}
@@ -115,6 +116,7 @@
     onblur={stop}
   >
     {#if recording}
+      <span class="dot"></span>
       Press a combination…
     {:else}
       {value ?? "Not set"}
@@ -134,20 +136,64 @@
   .recorder {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
-  .recorder > button:first-child {
+  /* Reads as a field, not a button: it holds a value, and pressing it puts the
+     value in play. Its width is fixed so recording does not resize the form. */
+  .slot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     min-width: 190px;
+    min-height: 34px;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: var(--bg-input);
+    border-color: transparent;
   }
 
-  .recording {
+  .slot:hover:not(:disabled) {
+    background: var(--bg-input);
+    border-color: var(--border-strong);
+  }
+
+  .recording,
+  .recording:hover:not(:disabled) {
     border-color: var(--accent);
     color: var(--accent);
   }
 
-  .invalid {
+  /* A live recorder is the one place in the app that is waiting on the user
+     rather than the other way round, so it gets the same pulse the Popover
+     uses for "waiting". */
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.25;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dot {
+      opacity: 1;
+    }
+  }
+
+  .invalid,
+  .invalid:hover:not(:disabled) {
     border-color: var(--danger);
     color: var(--danger);
   }
@@ -158,5 +204,11 @@
     color: var(--text-dim);
     text-decoration: underline;
     padding: 2px 4px;
+  }
+
+  .link:hover:not(:disabled) {
+    background: none;
+    border-color: transparent;
+    color: var(--text);
   }
 </style>

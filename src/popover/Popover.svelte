@@ -6,6 +6,9 @@
   // Output is rendered as plain text with preserved whitespace: acceptable for
   // the MVP, and it cannot inject anything into the WebView.
   import { onMount } from "svelte";
+  import Check from "lucide-svelte/icons/check";
+  import Copy from "lucide-svelte/icons/copy";
+  import X from "lucide-svelte/icons/x";
   import {
     cancelExchange,
     copyToClipboard,
@@ -265,9 +268,12 @@
   <header data-tauri-drag-region>
     <span class="title">{view?.action_name ?? "Beckon"}</span>
     <span class="model">
-      {view?.model.model}{#if view?.model.thinking}<span class="thinking-badge">thinking</span>{/if}
+      <span class="model-id">{view?.model.model}</span>
+      {#if view?.model.thinking}<span class="thinking-badge">thinking</span>{/if}
     </span>
-    <button class="close" title="Close (Esc)" onclick={() => hidePopover()}>✕</button>
+    <button class="icon close" aria-label="Close" title="Close (Esc)" onclick={() => hidePopover()}>
+      <X size={15} aria-hidden="true" />
+    </button>
   </header>
 
   <div class="body" bind:this={scroller}>
@@ -302,7 +308,11 @@
         {#if turn.status === "waiting-first-token"}
           <div class="waiting">
             <span class="pulse"></span>
-            <span>Sent — waiting for the first token{waitedSeconds > 0 ? ` · ${waitedSeconds}s` : ""}</span>
+            <span class="tabular"
+              >Sent — waiting for the first token{waitedSeconds > 0
+                ? ` · ${waitedSeconds}s`
+                : ""}</span
+            >
           </div>
         {/if}
 
@@ -343,9 +353,13 @@
         {#if turn.answer && (turn.status === "done" || turn.status === "interrupted" || turn.status === "cancelled")}
           <div class="turn-actions">
             <button class="primary copy" onclick={() => copy(turn.answer)}>
-              {copied && index === turns.length - 1 ? "Copied ✓" : "Copy"}
+              {#if copied && index === turns.length - 1}
+                <Check size={14} aria-hidden="true" /> Copied
+              {:else}
+                <Copy size={14} aria-hidden="true" /> Copy
+              {/if}
             </button>
-            <span class="hint"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></span>
+            <span class="hint"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></span>
           </div>
         {/if}
       </article>
@@ -359,6 +373,7 @@
         bind:value={draft}
         onkeydown={onDraftKeydown}
         rows="2"
+        aria-label={turns.length === 0 ? "Input" : "Follow-up"}
         placeholder={turns.length === 0 ? "Your input…" : "Ask a follow-up…"}
       ></textarea>
       <button class="primary" disabled={draft.trim() === "" || busy} onclick={() => send()}>
@@ -378,68 +393,78 @@
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 8px 8px 14px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--border);
-    background: var(--bg-raised);
-    border-radius: 12px 12px 0 0;
     cursor: default;
     user-select: none;
   }
 
   .title {
     font-weight: 600;
+    letter-spacing: -0.011em;
   }
 
   .model {
-    font-size: 11px;
-    color: var(--text-faint);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  /* A model id is a machine string; setting it in the mono face says so, and
+     stops `deepseek-v3.2` from reading as prose next to the Action name. */
+  .model-id {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .thinking-badge {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0 6px;
+    flex: none;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+    background: var(--bg-input);
     color: var(--warn);
   }
 
   .close {
     margin-left: auto;
-    border: none;
-    background: none;
-    color: var(--text-dim);
-    padding: 2px 8px;
   }
 
   .body {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 14px;
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-4);
   }
 
   .notice p {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-2);
   }
 
   .turn {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
+  /* The prompt is context, not content: recessed, capped, and scrollable so a
+     long Selection cannot push the answer off screen. */
   .question {
     font-size: 12px;
     color: var(--text-dim);
     background: var(--bg-input);
-    border-left: 2px solid var(--border-strong);
-    border-radius: 0 6px 6px 0;
-    padding: 6px 10px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
     white-space: pre-wrap;
     max-height: 5.5em;
     overflow-y: auto;
@@ -459,6 +484,7 @@
     height: 1em;
     margin-left: 2px;
     vertical-align: text-bottom;
+    border-radius: 1px;
     background: var(--accent);
     animation: blink 1s steps(2, start) infinite;
   }
@@ -473,14 +499,14 @@
   .waiting {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     color: var(--text-dim);
     font-size: 13px;
   }
 
   .pulse {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--accent);
     animation: pulse 1.1s ease-in-out infinite;
@@ -498,6 +524,20 @@
     }
   }
 
+  /* Both loops above mark a live state, so with motion off they hold their
+     visible frame instead of stopping wherever the last keyframe left them —
+     a caret frozen invisible would read as "done". */
+  @media (prefers-reduced-motion: reduce) {
+    .pulse {
+      opacity: 1;
+      transform: none;
+    }
+
+    .answer.streaming::after {
+      visibility: visible;
+    }
+  }
+
   .status-line {
     font-size: 12px;
     color: var(--text-faint);
@@ -510,9 +550,9 @@
   .reasoning {
     font-size: 12px;
     color: var(--text-dim);
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
+    background: var(--bg-input);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
   }
 
   .reasoning summary {
@@ -522,44 +562,51 @@
 
   .reasoning-text {
     white-space: pre-wrap;
-    margin-top: 6px;
+    margin-top: var(--space-2);
     max-height: 8em;
     overflow-y: auto;
   }
 
   .failure {
-    border: 1px solid var(--danger);
-    border-radius: 8px;
-    padding: 8px 10px;
+    background: var(--danger-soft);
+    border-radius: var(--radius);
+    padding: var(--space-3);
   }
 
   .failure p {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
   }
 
   .failure-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .turn-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-3);
   }
 
   .copy {
-    min-width: 92px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 96px;
+  }
+
+  .turn-actions .hint {
+    display: flex;
+    gap: 3px;
   }
 
   footer {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: flex-end;
-    padding: 10px 12px;
+    padding: var(--space-3);
     border-top: 1px solid var(--border);
-    background: var(--bg-raised);
-    border-radius: 0 0 12px 12px;
   }
 
   footer textarea {

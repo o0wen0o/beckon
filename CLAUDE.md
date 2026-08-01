@@ -10,7 +10,7 @@ Read these before non-trivial changes:
 
 - [README.md](README.md) — MVP scope, out-of-scope list with reasons, decided behavior, config/Action TOML schema.
 - [CONTEXT.md](CONTEXT.md) — the ubiquitous language (Action, Input Source, Selection, Launcher, Direct Hotkey, Popover, Exchange) **and the words to avoid**. Naming in code and UI follows it.
-- [docs/adr/](docs/adr/) — ADR-0001…0007. The code cites them by number in module docs; a change that contradicts one needs a new ADR, not a quiet edit.
+- [docs/adr/](docs/adr/) — ADR-0001…0008. The code cites them by number in module docs; a change that contradicts one needs a new ADR, not a quiet edit.
 - [docs/PLAN.md](docs/PLAN.md) — build phases plus an "Implementation notes / Still needs a human" section (manual selection-grab checklist, autostart-from-installer, end-to-end key test).
 
 ## Commands
@@ -85,6 +85,16 @@ Rules that break subtly if ignored:
 ### Platform isolation ([src-tauri/src/platform/](src-tauri/src/platform/))
 
 All Win32 lives under `platform/windows/`, re-exported through `platform/mod.rs` with non-Windows stubs so the crate still compiles elsewhere (ADR-0001). Do not scatter `#[cfg]` into business logic. `selection.rs` documents the grab's step order — release physically-held modifiers, back up the clipboard, poll `GetClipboardSequenceNumber`, restore, drop the backup — and each step there fixes a specific failure.
+
+### Styling: one token file, headless components (ADR-0008)
+
+[src/app.css](src/app.css) names every colour, radius, spacing step and duration; components name none of their own, so a theme is a swap of that block. Dark mode is `data-theme` on the root element, written by [src/lib/theme.ts](src/lib/theme.ts) from `Config::theme` — **not** `prefers-color-scheme`, which is why no styled component kit (shadcn-svelte, Skeleton, Flowbite — they all key off a `.dark` class and ship their own tokens) is usable here.
+
+Third-party UI packages are allowed in only for behaviour: `bits-ui` (headless `Select`), `lucide-svelte` (the only icon set — no text glyphs, no second family), `@fontsource-variable/*` (fonts bundled, never fetched at runtime).
+
+- Shared wrappers live in [src/lib/ui/](src/lib/ui/). A file lands there when a second surface needs the same behaviour; used-once stays in its surface.
+- Bits UI portals into `document.body`, which scoped styles never reach — hence `:global()` with a `bk-` prefix on every selector in [Select.svelte](src/lib/ui/Select.svelte). The prefix is what keeps that global block safe.
+- Palette changes get checked against WCAG AA in both themes before they land, small text included; the faint metadata tier is the one that fails first.
 
 ### Icons are generated, not edited ([assets/](assets/))
 

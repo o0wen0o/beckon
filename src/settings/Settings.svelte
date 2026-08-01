@@ -4,6 +4,12 @@
   // re-render the form. The only local state is the field currently being typed
   // into — adopting a snapshot mid-keystroke would fight the user.
   import { onMount } from "svelte";
+  import Eye from "lucide-svelte/icons/eye";
+  import EyeOff from "lucide-svelte/icons/eye-off";
+  import FolderOpen from "lucide-svelte/icons/folder-open";
+  import Plus from "lucide-svelte/icons/plus";
+  import RefreshCw from "lucide-svelte/icons/refresh-cw";
+  import Trash2 from "lucide-svelte/icons/trash-2";
   import {
     createAction,
     deleteAction,
@@ -34,10 +40,16 @@
     ModelCatalog,
     ModelOption,
     RegistrySnapshot,
+    Theme,
   } from "../lib/types";
+  import Select, { type Option } from "../lib/ui/Select.svelte";
   import HotkeyInput from "./HotkeyInput.svelte";
 
   const SAVE_DEBOUNCE = 400;
+
+  /** "Use the default" as a dropdown value. Not `""`: an empty string is how a
+   * Select spells "nothing chosen", and inheriting is a choice. */
+  const INHERIT = "__inherit";
 
   let config = $state<Config | null>(null);
   let snapshot = $state<RegistrySnapshot>({ actions: [], errors: [], hotkey_errors: {} });
@@ -48,6 +60,7 @@
   let saveError = $state<string | null>(null);
 
   let keyDraft = $state("");
+  let keyVisible = $state(false);
   let keyMessage = $state<string | null>(null);
   let test = $state<{ state: "idle" | "running" | "ok" | "failed"; message?: string }>({
     state: "idle",
@@ -225,6 +238,7 @@
     try {
       keyStatus = await setApiKey(keyDraft);
       keyDraft = "";
+      keyVisible = false;
       keyMessage = "Saved to the Windows Credential Manager.";
       test = { state: "idle" };
       // A key is what the live model list was missing.
@@ -306,6 +320,16 @@
     ];
   }
 
+  /** The same list as a Select's options. The description rides on the row it
+   * describes, which is the whole reason this is not a native `<select>`. */
+  function modelChoices(current: string): Option[] {
+    return modelOptions(current).map((option) => ({
+      value: option.id,
+      label: option.label,
+      description: option.description || undefined,
+    }));
+  }
+
   function modelOption(id: string): ModelOption | undefined {
     return modelOptions(id).find((option) => option.id === id);
   }
@@ -337,15 +361,33 @@
 
   // --- small helpers ------------------------------------------------------
 
-  const sources: InputSource[] = ["selection", "prompt", "auto"];
+  // Spelling out what each source does on the row itself: "auto" is the one
+  // nobody guesses right from the word alone.
+  const SOURCE_CHOICES: Option[] = [
+    { value: "selection", label: "selection", description: "Send the selected text" },
+    { value: "prompt", label: "prompt", description: "Always ask; ignore the Selection" },
+    { value: "auto", label: "auto", description: "The Selection if there is one, else ask" },
+  ];
+
+  const THEME_CHOICES: Option[] = [
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+    { value: "system", label: "Follow Windows" },
+  ];
+
+  const THINKING_CHOICES: Option[] = [
+    { value: INHERIT, label: "inherit" },
+    { value: "on", label: "on" },
+    { value: "off", label: "off" },
+  ];
 
   function thinkingChoice(value: boolean | null): string {
-    return value === null ? "inherit" : value ? "on" : "off";
+    return value === null ? INHERIT : value ? "on" : "off";
   }
 
   function setThinking(value: string) {
     if (!draft) return;
-    draft.model.thinking = value === "inherit" ? null : value === "on";
+    draft.model.thinking = value === INHERIT ? null : value === "on";
     commitAction(true);
   }
 
@@ -392,15 +434,30 @@
     <label>
       <span>API key</span>
       <div class="row">
-        <input
-          type="password"
-          bind:value={keyDraft}
-          placeholder={keyStatus?.kind === "present"
-            ? `stored — ends in ${keyStatus.last4}`
-            : "sk-…"}
-          autocomplete="off"
-          onkeydown={(event) => event.key === "Enter" && saveKey()}
-        />
+        <div class="key-field">
+          <input
+            type={keyVisible ? "text" : "password"}
+            bind:value={keyDraft}
+            placeholder={keyStatus?.kind === "present"
+              ? `stored — ends in ${keyStatus.last4}`
+              : "sk-…"}
+            autocomplete="off"
+            spellcheck="false"
+            onkeydown={(event) => event.key === "Enter" && saveKey()}
+          />
+          <button
+            class="icon reveal"
+            aria-label={keyVisible ? "Hide the key" : "Show the key"}
+            aria-pressed={keyVisible}
+            onclick={() => (keyVisible = !keyVisible)}
+          >
+            {#if keyVisible}
+              <EyeOff size={15} aria-hidden="true" />
+            {:else}
+              <Eye size={15} aria-hidden="true" />
+            {/if}
+          </button>
+        </div>
         <button class="primary" disabled={keyDraft.trim() === ""} onclick={saveKey}>Save</button>
         {#if keyStatus?.kind === "present"}
           <button class="danger" onclick={removeKey}>Remove</button>
@@ -431,7 +488,9 @@
           oninput={() => commitConfig()}
           spellcheck="false"
         />
-        <p class="hint">Any OpenAI-compatible endpoint. Requests go to <code>/v1/chat/completions</code>.</p>
+        <p class="hint">
+          Any OpenAI-compatible endpoint. Requests go to <code>/v1/chat/completions</code>.
+        </p>
       </label>
     {/if}
 
@@ -477,11 +536,16 @@
 
       <label>
         <span>Theme</span>
-        <select class="theme" bind:value={config.theme} onchange={() => commitConfig(true)}>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="system">Follow Windows</option>
-        </select>
+        <div class="narrow">
+          <Select
+            value={config.theme}
+            options={THEME_CHOICES}
+            onchange={(value) => {
+              config!.theme = value as Theme;
+              commitConfig(true);
+            }}
+          />
+        </div>
         <p class="hint">
           Applies to the Launcher, the Popover and this window at once. Beckon starts light unless
           you say otherwise — “Follow Windows” is the only setting that reads the system preference.
@@ -497,20 +561,17 @@
       <div class="grid">
         <label>
           <span>Model</span>
-          <!-- `value` + `onchange`, never `bind:` — binding would write back
-               whatever the select settled on before the catalog arrived, which
-               is exactly how a configured model gets silently replaced. -->
-          <select
+          <!-- Controlled, never `bind:` — binding would write back whatever the
+               list settled on before the catalog arrived, which is exactly how
+               a configured model gets silently replaced. -->
+          <Select
             value={config.defaults.model}
-            onchange={(event) => {
-              config!.defaults.model = event.currentTarget.value;
+            options={modelChoices(config.defaults.model)}
+            onchange={(value) => {
+              config!.defaults.model = value;
               commitConfig(true);
             }}
-          >
-            {#each modelOptions(config.defaults.model) as option (option.id)}
-              <option value={option.id}>{option.label}</option>
-            {/each}
-          </select>
+          />
         </label>
 
         <label>
@@ -547,7 +608,8 @@
       {/if}
 
       <div class="row">
-        <button onclick={refreshModels} disabled={modelsLoading}>
+        <button class="with-icon" onclick={refreshModels} disabled={modelsLoading}>
+          <RefreshCw class={modelsLoading ? "spinning" : ""} size={14} aria-hidden="true" />
           {modelsLoading ? "Loading models…" : "Refresh models"}
         </button>
         {#if models?.live}
@@ -569,8 +631,12 @@
     <div class="section-head">
       <h2>Actions</h2>
       <div class="row">
-        <button onclick={addAction}>New Action</button>
-        <button onclick={() => revealConfigDir()}>Open folder</button>
+        <button class="with-icon" onclick={addAction}>
+          <Plus size={14} aria-hidden="true" /> New Action
+        </button>
+        <button class="with-icon" onclick={() => revealConfigDir()}>
+          <FolderOpen size={14} aria-hidden="true" /> Open folder
+        </button>
       </div>
     </div>
 
@@ -659,15 +725,14 @@
 
             <label>
               <span>Input source</span>
-              <select
+              <Select
                 value={draft.input_source}
-                onchange={(event) => {
-                  draft!.input_source = event.currentTarget.value as InputSource;
+                options={SOURCE_CHOICES}
+                onchange={(value) => {
+                  draft!.input_source = value as InputSource;
                   commitAction(true);
                 }}
-              >
-                {#each sources as source}<option value={source}>{source}</option>{/each}
-              </select>
+              />
             </label>
 
             <label>
@@ -710,18 +775,20 @@
           <div class="grid">
             <label>
               <span>Model</span>
-              <select
-                value={draft.model.model ?? ""}
-                onchange={(event) => {
-                  draft!.model.model = event.currentTarget.value || null;
+              <Select
+                value={draft.model.model ?? INHERIT}
+                options={[
+                  {
+                    value: INHERIT,
+                    label: `inherit (${config?.defaults.model ?? "default"})`,
+                  },
+                  ...modelChoices(draft.model.model ?? ""),
+                ]}
+                onchange={(value) => {
+                  draft!.model.model = value === INHERIT ? null : value;
                   commitAction(true);
                 }}
-              >
-                <option value="">inherit ({config?.defaults.model ?? "default"})</option>
-                {#each modelOptions(draft.model.model ?? "") as option (option.id)}
-                  <option value={option.id}>{option.label}</option>
-                {/each}
-              </select>
+              />
               {#if draftModelHint}
                 <p class="hint error">{draftModelHint}</p>
               {/if}
@@ -729,14 +796,11 @@
 
             <label>
               <span>Thinking</span>
-              <select
+              <Select
                 value={thinkingChoice(draft.model.thinking)}
-                onchange={(event) => setThinking(event.currentTarget.value)}
-              >
-                <option value="inherit">inherit</option>
-                <option value="on">on</option>
-                <option value="off">off</option>
-              </select>
+                options={THINKING_CHOICES}
+                onchange={setThinking}
+              />
             </label>
 
             <label>
@@ -759,7 +823,9 @@
 
           <div class="row footer-row">
             <span class="hint">Every change is written to disk as you type.</span>
-            <button class="danger" onclick={() => removeAction(selected)}>Delete Action</button>
+            <button class="danger with-icon" onclick={() => removeAction(selected)}>
+              <Trash2 size={14} aria-hidden="true" /> Delete Action
+            </button>
           </div>
         {:else}
           <p class="hint empty">Select an Action to edit it, or create a new one.</p>
@@ -771,22 +837,26 @@
 
 <style>
   main {
-    max-width: 900px;
+    max-width: 880px;
     margin: 0 auto;
-    padding: 24px 28px 48px;
+    padding: var(--space-7) var(--space-6) var(--space-7);
   }
 
   h1 {
-    font-size: 20px;
-    margin: 0 0 20px;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-6);
   }
 
+  /* Section titles are labels, not headlines: small, spaced, dimmed. The size
+     hierarchy is carried by whitespace between the cards instead. */
   h2 {
-    font-size: 14px;
+    font-size: 11px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--text-dim);
-    margin: 0 0 14px;
+    color: var(--text-faint);
+    margin: 0 0 var(--space-4);
   }
 
   h3 {
@@ -795,44 +865,44 @@
   }
 
   h4 {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     color: var(--text-faint);
-    margin: 6px 0 0;
+    margin: var(--space-2) 0 0;
   }
 
   section {
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     background: var(--bg-raised);
-    padding: 18px;
-    margin-bottom: 18px;
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
   }
 
   .section-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   label {
     display: block;
-    margin-bottom: 14px;
+    margin-bottom: var(--space-4);
   }
 
   label > span {
     display: block;
     font-size: 12px;
     color: var(--text-dim);
-    margin-bottom: 5px;
+    margin-bottom: var(--space-1);
   }
 
   label.checkbox {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   label.checkbox input {
@@ -848,52 +918,91 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
-  select.theme {
+  /* The reveal toggle sits inside the field's box rather than beside it, so the
+     row stays one control wide. */
+  .key-field {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .key-field input {
+    padding-right: 36px;
+  }
+
+  .reveal {
+    position: absolute;
+    top: 50%;
+    right: 3px;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    background: none;
+  }
+
+  .narrow {
     max-width: 220px;
+  }
+
+  .with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .with-icon :global(.spinning) {
+    animation: spin 900ms linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(1turn);
+    }
   }
 
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 0 16px;
+    gap: 0 var(--space-4);
     align-items: end;
   }
 
+  /* A tinted strip, not an outlined box: the banner is a notice inside the page
+     rather than a fourth kind of card. */
   .banner {
-    border: 1px solid var(--accent-dim);
-    border-left-width: 3px;
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin-bottom: 18px;
-    background: var(--bg-raised);
+    border-radius: var(--radius);
+    border-left: 2px solid var(--accent);
+    background: var(--accent-soft);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
   }
 
   .banner.bad {
-    border-color: var(--danger);
+    border-left-color: var(--danger);
+    background: var(--danger-soft);
   }
 
   .banner ul {
-    margin: 6px 0;
+    margin: var(--space-2) 0;
     padding-left: 20px;
   }
 
   .actions {
     display: grid;
-    grid-template-columns: minmax(200px, 260px) 1fr;
-    gap: 16px;
+    grid-template-columns: minmax(200px, 250px) 1fr;
+    gap: var(--space-4);
     align-items: start;
   }
 
   .action-list {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 2px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     max-height: 460px;
     overflow-y: auto;
   }
@@ -903,15 +1012,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
     text-align: left;
-    background: none;
+    font-weight: 400;
     border-color: transparent;
   }
 
   .action-row.selected {
-    background: var(--bg-input);
-    border-color: var(--border-strong);
+    background: var(--accent-soft);
+    border-color: transparent;
+    color: var(--text);
   }
 
   .action-row.broken {
@@ -927,6 +1038,7 @@
   }
 
   .action-file {
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-faint);
     width: 100%;
@@ -934,8 +1046,8 @@
 
   .editor {
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
     background: var(--bg);
     min-height: 240px;
   }
@@ -944,37 +1056,31 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin-bottom: 14px;
+    margin-bottom: var(--space-4);
   }
 
   textarea.system {
     min-height: 150px;
-    font-family: ui-monospace, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
   }
 
   textarea.raw {
     min-height: 320px;
-    font-family: ui-monospace, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
   }
 
   .footer-row {
     justify-content: space-between;
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   .empty {
-    padding: 20px 0;
+    padding: var(--space-5) 0;
   }
 
   .ok {
     color: var(--ok);
-  }
-
-  code {
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 12px;
-    color: var(--text-dim);
   }
 </style>

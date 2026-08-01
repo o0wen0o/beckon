@@ -6,49 +6,92 @@
    value an unstyled document falls back to — the same default `Config::theme`
    deserializes to. `theme = "system"` is resolved to a concrete `data-theme`
    by src/lib/theme.ts; there is deliberately no bare `prefers-color-scheme`
-   rule here, because the OS preference must only apply once it is chosen. */
+   rule here, because the OS preference must only apply once it is chosen.
+
+   The palette is near-monochrome with a single blue accent, which is what makes
+   the accent mean something: it marks the one primary action, the focus ring,
+   and the live stream caret, and nothing else. Every foreground/background pair
+   below clears WCAG AA (4.5:1) in both themes — the faint tier used for the
+   11–12px metadata labels is the one that used to fail, so it is no longer as
+   faint as its name suggests. */
+
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
 
 :root {
-  --bg: #f5f6fa;
+  --bg: #fafafa;
   --bg-raised: #ffffff;
-  --bg-input: #eceef4;
-  --border: #d5d8e2;
-  --border-strong: #b3b7c6;
-  --text: #1b1c23;
-  --text-dim: #575b6b;
-  --text-faint: #83879a;
-  --accent: #3564cc;
-  --accent-dim: #d5e0fa;
-  --danger: #c8353a;
-  --warn: #96620d;
-  --ok: #2c7a3f;
-  --radius: 10px;
-  --shadow: 0 12px 32px rgba(24, 28, 48, 0.18);
+  --bg-input: #f4f4f5;
+  --bg-hover: rgba(9, 9, 11, 0.045);
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text: #09090b;
+  --text-dim: #52525b;
+  --text-faint: #65656e;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --danger: #c11f1f;
+  --danger-soft: rgba(193, 31, 31, 0.08);
+  --warn: #8f5c07;
+  --ok: #15803d;
+  --shadow: 0 1px 2px rgba(9, 9, 11, 0.06), 0 16px 40px -12px rgba(9, 9, 11, 0.24);
 
   color-scheme: light;
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
 }
 
 :root[data-theme="dark"] {
-  --bg: #16161d;
-  --bg-raised: #1d1d26;
-  --bg-input: #101017;
-  --border: #2c2c3a;
-  --border-strong: #3b3b4d;
-  --text: #e4e4ef;
-  --text-dim: #9a9aae;
-  --text-faint: #6c6c81;
-  --accent: #7aa2f7;
-  --accent-dim: #3d5a94;
-  --danger: #f77676;
-  --warn: #e0af68;
-  --ok: #8fd67a;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --bg: #09090b;
+  --bg-raised: #131317;
+  --bg-input: #1c1c20;
+  --bg-hover: rgba(250, 250, 250, 0.06);
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --text: #fafafa;
+  --text-dim: #a1a1aa;
+  --text-faint: #8a8a94;
+  --accent: #7ba7fb;
+  --accent-fg: #09090b;
+  --accent-soft: rgba(123, 167, 251, 0.14);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.1);
+  --warn: #e0b048;
+  --ok: #6ee7a0;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -12px rgba(0, 0, 0, 0.7);
 
   color-scheme: dark;
+}
+
+/* Shape, rhythm and motion are theme-independent, so they sit outside the two
+   blocks above: a theme swap must not be able to change the geometry. */
+:root {
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, Consolas, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-window: 14px;
+
+  /* One duration and one curve for the whole app: the rhythm is the thing that
+     reads as deliberate, not any single transition. */
+  --dur-fast: 110ms;
+  --dur: 170ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -66,33 +109,97 @@ body.transparent {
   background: transparent;
 }
 
+::selection {
+  background: var(--accent-soft);
+}
+
+/* --- typography ---------------------------------------------------------- */
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.011em;
+}
+
+/* Anything the eye compares column-wise — hotkeys, elapsed seconds, model ids —
+   gets fixed-width figures so it cannot jitter as the value changes. */
+kbd,
+code,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- controls ------------------------------------------------------------ */
+
+/* Quiet by default. A view gets exactly one filled `.primary`; everything else
+   earns its weight from position and whitespace instead of from a border. */
 button {
   font: inherit;
-  color: inherit;
-  background: var(--bg-raised);
+  font-weight: 500;
+  color: var(--text-dim);
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 6px 12px;
   cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 button:hover:not(:disabled) {
+  background: var(--bg-hover);
   border-color: var(--border-strong);
+  color: var(--text);
+}
+
+button:active:not(:disabled) {
+  background: var(--bg-input);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
 button.primary {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-fg);
 }
 
-button.danger:hover {
+button.primary:hover:not(:disabled),
+button.primary:active:not(:disabled) {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-fg);
+  filter: brightness(1.08);
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
   border-color: var(--danger);
   color: var(--danger);
+}
+
+/* Borderless variants: `.ghost` for text actions, `.icon` for a lone glyph.
+   The icon button keeps a 28px box so the target never shrinks to the glyph. */
+button.ghost,
+button.icon {
+  border-color: transparent;
+}
+
+button.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-sm);
 }
 
 input,
@@ -101,10 +208,23 @@ select {
   font: inherit;
   color: var(--text);
   background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   padding: 7px 10px;
   width: 100%;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+input:hover:not(:focus),
+textarea:hover:not(:focus) {
+  border-color: var(--border-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
 }
 
 textarea {
@@ -112,12 +232,25 @@ textarea {
   min-height: 64px;
 }
 
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* Drawn outside the control, not inset over its own border: an inset ring is
+   invisible on the fields whose border already carries a state colour. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 input:focus,
 textarea:focus,
-select:focus,
-button:focus-visible {
+select:focus {
   outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  outline-offset: 1px;
+  border-color: transparent;
 }
 
 input.invalid,
@@ -125,15 +258,34 @@ textarea.invalid {
   border-color: var(--danger);
 }
 
+/* --- icons --------------------------------------------------------------- */
+
+/* Lucide ships every icon at stroke-width 2, which is drawn for 24px. At the
+   14–17px these windows use it reads as a blob, so one rule thins the whole
+   set: a CSS property beats the presentation attribute the component writes,
+   and the paths inherit it. Set here rather than per call site so the icons
+   cannot drift apart in weight. */
+.lucide {
+  stroke-width: 1.75;
+}
+
+/* --- small pieces -------------------------------------------------------- */
+
 kbd {
-  font-family: inherit;
+  font-family: var(--font-sans);
   font-size: 11px;
+  line-height: 16px;
   color: var(--text-dim);
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  padding: 0 5px;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--text-dim);
 }
 
 .hint {
@@ -147,36 +299,63 @@ kbd {
 
 .badge {
   font-size: 11px;
-  border-radius: 999px;
-  padding: 1px 8px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  padding: 1px 7px;
   border: 1px solid var(--border);
   color: var(--text-dim);
 }
 
 .badge.bad {
-  border-color: var(--danger);
+  border-color: transparent;
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
-/* Frameless surfaces: one rounded card filling the window. */
+/* Frameless surfaces: one rounded card filling the window. Hairline border
+   plus a single soft shadow — the window's only elevation, never stacked. */
 .surface {
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-window);
   box-shadow: var(--shadow);
 }
 
+/* --- scrollbars ---------------------------------------------------------- */
+
 ::-webkit-scrollbar {
   width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-strong);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: content-box;
+}
+
+/* --- motion -------------------------------------------------------------- */
+
+/* Every transition above is decoration on top of a state that is already
+   legible without it, so switching them off changes nothing but the pacing.
+   The Popover's two loops carry meaning — "waiting" and "streaming" — and are
+   given a static substitute there rather than being left to stop mid-cycle. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
