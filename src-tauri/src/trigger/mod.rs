@@ -229,6 +229,15 @@ pub fn hide_popover(app: &AppHandle) {
 }
 
 pub fn hide_launcher(app: &AppHandle) {
+    hide_launcher_window(app);
+    restore_foreground_if_idle(app);
+}
+
+/// Hide the Launcher without deciding who gets the foreground next.
+///
+/// `show_settings` hides it on the way to a window that is also ours, where
+/// handing the foreground back is exactly wrong.
+fn hide_launcher_window(app: &AppHandle) {
     {
         let state = app.state::<AppState>();
         // The cached Selection dies with the Launcher; nothing keeps a copy.
@@ -237,30 +246,39 @@ pub fn hide_launcher(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) {
         let _ = window.hide();
     }
-    restore_foreground_if_idle(app);
 }
 
 /// Show Settings, building the window the first time it is asked for.
+///
+/// The whole flow runs on a spawned thread because of the first open:
+/// `WebviewWindowBuilder::build` deadlocks on Windows when it is reached from
+/// the main thread, and *every* caller is on it — a synchronous command from
+/// the Launcher or the Popover, a tray menu event, a tray click. Everything
+/// else here is dispatched to the event loop regardless, so moving it costs
+/// nothing.
 pub fn show_settings(app: &AppHandle) {
-    let window = match app.get_webview_window(WINDOW_SETTINGS) {
-        Some(window) => window,
-        None => match window::build_settings_window(app) {
-            Ok(window) => window,
-            Err(err) => {
-                log::error!("could not create the Settings window: {err}");
-                return;
-            }
-        },
-    };
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_focus();
-    // The Launcher is a picker on the way to somewhere; going to Settings ends
-    // it. Done here rather than by the caller because the two have to happen in
-    // this order: hiding first would hand the foreground back to whatever
-    // Beckon was summoned over, and Settings would open behind it.
-    hide_launcher(app);
-    // Harmless on the very first open, when the webview is still loading and
-    // nothing is listening: the window does its own load on mount.
-    let _ = app.emit_to(WINDOW_SETTINGS, EVENT_SETTINGS_OPENED, ());
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let window = match app.get_webview_window(WINDOW_SETTINGS) {
+            Some(window) => window,
+            None => match window::build_settings_window(&app) {
+                Ok(window) => window,
+                Err(err) => {
+                    log::error!("could not create the Settings window: {err}");
+                    return;
+                }
+            },
+        };
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        // The Launcher is a picker on the way to somewhere; going to Settings
+        // ends it. `hide_launcher` would restore the app Beckon was summoned
+        // over and pull Settings straight behind it, so this is the one hide
+        // that leaves the foreground alone.
+        hide_launcher_window(&app);
+        // Harmless on the very first open, when the webview is still loading and
+        // nothing is listening: the window does its own load on mount.
+        let _ = app.emit_to(WINDOW_SETTINGS, EVENT_SETTINGS_OPENED, ());
+    });
 }
