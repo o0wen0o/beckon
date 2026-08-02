@@ -2,9 +2,10 @@
 // commits to disk (debounced), and `config-changed` re-renders the form.
 //
 // It owns what is global — the credential, the Launcher hotkey, the theme, the
-// model defaults. The Actions themselves are authored from the Launcher, which
-// is where their list already lives; `src/launcher/actions.svelte.ts` is that
-// half, and `src/lib/saveSlot.svelte.ts` is the write machinery both share.
+// model defaults. The Actions are edited in the same window but by their own
+// store, `./actions.svelte.ts`, because they are many files rather than one;
+// `src/lib/saveSlot.svelte.ts` is the write machinery both share, and that
+// store reads the defaults and the model catalog from this one.
 //
 // All of it lives here rather than in the components, for one reason: a save is
 // echoed straight back at this window. `save_config` calls
@@ -26,7 +27,7 @@ import {
 import { SaveSlot, textFocusHeld } from "../lib/saveSlot.svelte";
 import type { Config, KeyStatus, ModelCatalog } from "../lib/types";
 
-export type SectionRoute = "connection" | "triggering" | "appearance" | "defaults";
+export type SectionRoute = "connection" | "actions" | "triggering" | "appearance" | "defaults";
 
 class SettingsStore {
   config = $state<Config | null>(null);

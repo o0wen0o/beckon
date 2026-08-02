@@ -8,18 +8,7 @@
   // the scrolling list — are exposed as functions rather than bound outward.
   import { flip } from "svelte/animate";
   import { highlight } from "../lib/fuzzy";
-  import { showSettings } from "../lib/ipc";
-  import {
-    Auto,
-    BrandMark,
-    Pencil,
-    Plus,
-    Prompt,
-    Search,
-    Sliders,
-    TextSelect,
-    Warning,
-  } from "../lib/icons";
+  import { Auto, BrandMark, Prompt, Search, Sliders, TextSelect, Warning } from "../lib/icons";
   import type { Action, InputSource } from "../lib/types";
   import { actions } from "./actions.svelte";
 
@@ -29,14 +18,15 @@
     selected = $bindable(),
     selectionChars,
     onrun,
-    onedit,
+    onsettings,
   }: {
     matches: Action[];
     query: string;
     selected: number;
     selectionChars: number;
     onrun: (action: Action) => void;
-    onedit: (action: Action) => void;
+    /** Everything editable — new, edit, repair — is over there (ADR-0003). */
+    onsettings: () => void;
   } = $props();
 
   let input = $state<HTMLInputElement | null>(null);
@@ -113,37 +103,19 @@
         {:else if action.hotkey}
           <kbd>{action.hotkey}</kbd>
         {/if}
-        <!-- Editing is a different verb from running, so it gets its own
-             target rather than a modifier on the row's click. -->
-        <button
-          class="quiet edit"
-          aria-label="Edit {action.name || action.file_name}"
-          title="Edit (Ctrl+E)"
-          onclick={(event) => {
-            event.stopPropagation();
-            onedit(action);
-          }}
-        >
-          <Pencil size={14} />
-        </button>
       </div>
     </li>
   {/each}
 
-  <!-- A file that does not parse is reported, never dropped (ADR-0003), and
-       the way back is the raw editor this row opens. -->
+  <!-- A file that does not parse is reported, never dropped (ADR-0003). It
+       cannot be run, and the raw editor that repairs it is in Settings. -->
   {#each snapshot.errors as error (error.file_name)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <li
-      class="row broken"
-      role="option"
-      aria-selected="false"
-      onclick={() => actions.openRaw(error.file_name)}
-    >
+    <li class="row broken" role="option" aria-selected="false" onclick={onsettings}>
       <span class="rail"></span>
       <div class="text">
         <span class="name mono">{error.file_name}</span>
-        <span class="description">does not parse — click to repair</span>
+        <span class="description">does not parse — repair it in Settings</span>
       </div>
       <div class="meta">
         <span class="badge bad" title={error.message}><Warning size={12} /></span>
@@ -156,8 +128,8 @@
       {#if snapshot.actions.length === 0}
         <BrandMark size={28} />
         <p>No Actions yet.</p>
-        <button class="primary" onclick={() => actions.create()}>
-          <Plus size={14} /> New Action
+        <button class="primary" onclick={onsettings}>
+          <Sliders size={14} /> Add one in Settings
         </button>
       {:else}
         <p>Nothing matches <code>{query}</code>.</p>
@@ -168,23 +140,13 @@
 
 <footer>
   <span class="hint status">
-    {#if actions.slot.error}
-      <span class="error">{actions.slot.error}</span>
-    {:else if selectionChars > 0}
+    {#if selectionChars > 0}
       {selectionChars} characters selected
     {:else}
       No selection
     {/if}
   </span>
-  <button class="quiet" title="New Action (Ctrl+N)" onclick={() => actions.create()}>
-    <Plus size={14} /> New Action
-  </button>
-  <button
-    class="quiet"
-    title="Settings (Ctrl+,)"
-    aria-label="Settings"
-    onclick={() => showSettings()}
-  >
+  <button class="quiet" title="Settings (Ctrl+,)" aria-label="Settings" onclick={onsettings}>
     <Sliders size={15} />
   </button>
 </footer>
@@ -324,19 +286,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     padding: 1px var(--space-2);
-  }
-
-  /* Present only where the pointer already is: a pencil on every row would
-     compete with the hotkey badge that actually identifies the Action. */
-  .edit {
-    padding: var(--space-1);
-    opacity: 0;
-  }
-
-  .row:hover .edit,
-  .row.selected .edit,
-  .edit:focus-visible {
-    opacity: 1;
   }
 
   .empty {

@@ -16,6 +16,7 @@ export { default as Copy } from "./Copy.svelte";
 export { default as Folder } from "./Folder.svelte";
 export { default as Info } from "./Info.svelte";
 export { default as Keyboard } from "./Keyboard.svelte";
+export { default as ListIcon } from "./ListIcon.svelte";
 export { default as Palette } from "./Palette.svelte";
 export { default as Pencil } from "./Pencil.svelte";
 export { default as Plug } from "./Plug.svelte";

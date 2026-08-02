@@ -1,14 +1,16 @@
 <script lang="ts">
-  // Four sections and nothing else: the Actions used to sit here as a second
-  // list, which made "pick a section" and "pick an Action" the same gesture for
-  // two things that are not alike. Authoring an Action now happens in the
-  // Launcher, beside the list it is picked from.
-  import { BrandMark, Folder, Keyboard, Palette, Plug, Sliders } from "../lib/icons";
+  // One entry per section, Actions included — a single "Actions" item, not one
+  // per file: the list belongs in the pane, where a row has room for its
+  // Input Source and its hotkey. A nav column of Actions would make "pick a
+  // section" and "pick an Action" the same gesture for two unlike things.
+  import { BrandMark, Folder, Keyboard, ListIcon, Palette, Plug, Sliders } from "../lib/icons";
   import { revealConfigDir } from "../lib/ipc";
+  import { actionStore } from "./actions.svelte";
   import { settings, type SectionRoute } from "./store.svelte";
 
   const SECTIONS: { id: SectionRoute; label: string; icon: typeof Plug }[] = [
     { id: "connection", label: "Connection", icon: Plug },
+    { id: "actions", label: "Actions", icon: ListIcon },
     { id: "triggering", label: "Triggering", icon: Keyboard },
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "defaults", label: "Model defaults", icon: Sliders },
@@ -27,6 +29,9 @@
           : settings.keyStatus?.kind === "no-credential"
             ? "warn"
             : null,
+      // A file that does not parse, or a Direct Hotkey that lost its conflict:
+      // both are only repairable from inside this section.
+      actions: actionStore.flagged ? "bad" : null,
       triggering: settings.startupErrors.length > 0 ? "bad" : null,
       appearance: null,
       defaults: settings.models !== null && !settings.models.live ? "warn" : null,

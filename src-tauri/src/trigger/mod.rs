@@ -233,11 +233,6 @@ pub fn hide_launcher(app: &AppHandle) {
         let state = app.state::<AppState>();
         // The cached Selection dies with the Launcher; nothing keeps a copy.
         *state.pending_selection.lock().expect("selection lock") = None;
-        // Whatever the Launcher was editing is gone with it: the flag must not
-        // survive to suppress the next summon's hide-on-blur.
-        state
-            .launcher_modal
-            .store(false, std::sync::atomic::Ordering::Relaxed);
     }
     if let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) {
         let _ = window.hide();
@@ -260,6 +255,11 @@ pub fn show_settings(app: &AppHandle) {
     let _ = window.unminimize();
     let _ = window.show();
     let _ = window.set_focus();
+    // The Launcher is a picker on the way to somewhere; going to Settings ends
+    // it. Done here rather than by the caller because the two have to happen in
+    // this order: hiding first would hand the foreground back to whatever
+    // Beckon was summoned over, and Settings would open behind it.
+    hide_launcher(app);
     // Harmless on the very first open, when the webview is still loading and
     // nothing is listening: the window does its own load on mount.
     let _ = app.emit_to(WINDOW_SETTINGS, EVENT_SETTINGS_OPENED, ());

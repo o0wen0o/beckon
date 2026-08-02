@@ -68,16 +68,6 @@ pub fn show_settings(app: AppHandle) {
     trigger::show_settings(&app);
 }
 
-/// The Launcher is showing the Action editor: stop hiding it on focus loss.
-/// Cleared by `hide_launcher` too, so a Launcher hidden any other way cannot
-/// leave the flag set.
-#[tauri::command]
-pub fn set_launcher_modal(state: State<AppState>, active: bool) {
-    state
-        .launcher_modal
-        .store(active, std::sync::atomic::Ordering::Relaxed);
-}
-
 /// The Popover's Copy button. A user-requested write, so it is *not* restored
 /// (ADR-0002) — this is the only way a result leaves Beckon.
 #[tauri::command]

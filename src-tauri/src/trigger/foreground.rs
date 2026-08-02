@@ -28,8 +28,12 @@ fn is_ours(app: &AppHandle, hwnd: isize) -> bool {
 }
 
 /// Hand focus back once nothing of ours is on screen.
+///
+/// Settings counts. The Launcher hides itself on the way there, and restoring
+/// the previous app in that instant is what pulls the Settings window that was
+/// just shown straight back behind whatever Beckon was summoned over.
 pub(super) fn restore_foreground_if_idle(app: &AppHandle) {
-    let still_showing = [WINDOW_LAUNCHER, WINDOW_POPOVER]
+    let still_showing = [WINDOW_LAUNCHER, WINDOW_POPOVER, WINDOW_SETTINGS]
         .iter()
         .filter_map(|label| app.get_webview_window(label))
         .any(|window| window.is_visible().unwrap_or(false));

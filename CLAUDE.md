@@ -51,8 +51,8 @@ Every reveal is announced **before** the window is shown: `launcher:opened`, `po
 Each surface is a shell plus its views, and the state behind them lives in a `.svelte.ts` singleton — one per window, which is safe precisely because the window is created once (ADR-0007):
 
 - **Popover** — [Popover.svelte](src/popover/Popover.svelte) (shell, window keys, the scroller) over [PopoverHeader](src/popover/PopoverHeader.svelte), [TurnCard](src/popover/TurnCard.svelte) and [Composer](src/popover/Composer.svelte), backed by [popover/exchange.svelte.ts](src/popover/exchange.svelte.ts). Every state a turn can be in is decided in the store and rendered in `TurnCard`; a state machine half-implemented in markup is the failure mode this split exists to prevent.
-- **Launcher** — [Launcher.svelte](src/launcher/Launcher.svelte) (shell, window keys, the delete dialog) over [ActionList](src/launcher/ActionList.svelte) and [EditorPane](src/launcher/EditorPane.svelte), backed by [launcher/actions.svelte.ts](src/launcher/actions.svelte.ts).
-- **Settings** — [Settings.svelte](src/settings/Settings.svelte) over [SettingsNav](src/settings/SettingsNav.svelte) and [sections/](src/settings/sections/), backed by [settings/store.svelte.ts](src/settings/store.svelte.ts).
+- **Launcher** — [Launcher.svelte](src/launcher/Launcher.svelte) (shell, window keys) over [ActionList](src/launcher/ActionList.svelte), backed by [launcher/actions.svelte.ts](src/launcher/actions.svelte.ts). A picker only: it reads the registry and writes nothing, so it can keep dying with its focus.
+- **Settings** — [Settings.svelte](src/settings/Settings.svelte) (shell, subscriptions, the delete dialog) over [SettingsNav](src/settings/SettingsNav.svelte) and [sections/](src/settings/sections/), backed by two stores: [settings/store.svelte.ts](src/settings/store.svelte.ts) for the global config and [settings/actions.svelte.ts](src/settings/actions.svelte.ts) for the Actions. The Actions section ([sections/actions/](src/settings/sections/actions/)) is one nav entry holding the whole list, and the list and the editor are two views of that one pane.
 
 Where a shell has to reach into a child's DOM — focusing the query box, focusing or resetting the composer, scrolling the selected row into view — the child exports a function and the shell holds it with `bind:this`. The store never touches the DOM; it calls the `onStream` / `onIdle` / `onReset` hooks the shell installs on mount.
 
@@ -104,9 +104,9 @@ Rules that break subtly if ignored:
 - The API key is only in the Windows Credential Manager (service `Beckon`, ADR-0005). "No credential", "read error" and "key rejected" must stay three distinguishable outcomes all the way to the UI.
 - A missing config file or missing field is a default, never an error; a *corrupt* config is reported, never overwritten.
 
-### Editing surfaces are editors, not owners ([src/settings/](src/settings/), [src/launcher/](src/launcher/))
+### The editing surface is an editor, not an owner ([src/settings/](src/settings/))
 
-There is no Save button and there must never be one (ADR-0003). The work is split by *what* is edited, not by window chrome: Settings owns the global config (credential, Launcher hotkey, theme, model defaults); the **Launcher** owns the Actions, because that is where their list already is. Both drive [src/lib/saveSlot.svelte.ts](src/lib/saveSlot.svelte.ts) from their own store — [settings/store.svelte.ts](src/settings/store.svelte.ts), [launcher/actions.svelte.ts](src/launcher/actions.svelte.ts) — and components receive values and callbacks, never calling `saveConfig` / `saveAction` themselves.
+There is no Save button and there must never be one (ADR-0003). **Settings is the only place anything is authored** — the global config (credential, Launcher hotkey, theme, model defaults) *and* the Actions; the Launcher is a picker that writes nothing. Two stores, one per kind of file, both driving [src/lib/saveSlot.svelte.ts](src/lib/saveSlot.svelte.ts): [settings/store.svelte.ts](src/settings/store.svelte.ts) for `config.toml`, [settings/actions.svelte.ts](src/settings/actions.svelte.ts) for `actions\*.toml`. Components receive values and callbacks, never calling `saveConfig` / `saveAction` themselves. The Action store reads `defaults` and the model catalog off the config store rather than fetching its own — two copies in one window could only drift.
 
 - **Saving echoes back at the window that saved.** `save_config` → `reload_config` → `config-changed` (and `save_action` → `actions-changed`), broadcast to every window including the one that caused it. So the events being defended against are mostly our own writes arriving mid-keystroke, not the file watcher.
 - A snapshot is refused while a text field in the pane has focus **or** a write is pending, and is then *held* and applied when both clear — dropping it would leave the form permanently stale after an external edit.
@@ -114,11 +114,11 @@ There is no Save button and there must never be one (ADR-0003). The work is spli
 - Settings' navigation column sits **outside** the pane element, so changing section fires `focusout` and flushes the slot. No route change can strand an unwritten edit.
 - The model `<select>` uses `value=` + `onchange`, **never `bind:`**, and refuses to write `""` where no inherit option exists. Both halves stop a configured model being silently rewritten before the catalog lands.
 - `save_action` re-probes the Direct Hotkey and refuses the *whole* write if it cannot be registered — so while an outside app holds an Action's hotkey, even renaming it fails. The editor says so and offers to clear the hotkey.
-- Both windows are reused (ADR-0007): `settings:opened` clears the last visit's typed API key and test result, `launcher:opened` closes whatever the last summon left in the editor. `onMount` cannot do it, and Settings' first open misses the event because the window is still being built — so that component always loads itself too.
+- The window is reused (ADR-0007): `settings:opened` clears the last visit's typed API key and test result and closes whatever Action it left open in the editor. `onMount` cannot do it, and the first open misses the event because the window is still being built — so `Settings.svelte` always loads itself too.
 - An Action's `[model]` overrides render as `OverrideField`: opening the row *is* the override, and it collapses again when focus leaves. The collapse is presentation only — the write already happened.
 - A field's explanation lives behind the info icon (`InfoHint`), never as a permanent line: only warnings and errors earn one, because those are conditions to act on.
 
-The Launcher hosting a form has one Rust consequence: `WindowEvent::Focused(false)` normally hides it, and `state.launcher_modal` (set by `set_launcher_modal`, cleared by `hide_launcher`) is what suspends that while the editor is open.
+Keeping the forms out of the Launcher is what lets `WindowEvent::Focused(false)` hide it unconditionally: there is nothing unwritten inside it to lose, and no dropdown or dialog of its own to survive.
 
 ### Platform isolation ([src-tauri/src/platform/](src-tauri/src/platform/))
 

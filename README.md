@@ -13,8 +13,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - An Action can also be bound to a Direct Hotkey — press it and go straight to the result with zero interaction
 - Simulated Ctrl+C to grab the Selection, with the clipboard restored afterwards
 - Popover near the cursor: takes focus, streams output, supports follow-up turns, closes on Esc
-- Full settings window: API key, global hotkey, theme, global model defaults
-- Adding, editing and deleting Actions from the Launcher, beside the list they are picked from
+- Full settings window: API key, global hotkey, theme, global model defaults, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
 - Actions stored as TOML files, with a file watcher that reloads them automatically on external changes
 - OpenAI-compatible API, with a configurable `base_url`
 

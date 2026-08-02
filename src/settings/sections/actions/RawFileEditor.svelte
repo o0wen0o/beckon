@@ -1,12 +1,12 @@
 <script lang="ts">
   // A file that fails to parse is never dropped (ADR-0003) — it is reported and
   // stays editable as text, which is the only way back from a bad hand-edit.
-  import Callout from "../lib/ui/Callout.svelte";
-  import { actions } from "./actions.svelte";
+  import Callout from "../../../lib/ui/Callout.svelte";
+  import { actionStore } from "../../actions.svelte";
 
-  const raw = $derived(actions.raw);
+  const raw = $derived(actionStore.raw);
   const parseError = $derived(
-    actions.snapshot.errors.find((error) => error.file_name === raw?.file)?.message,
+    actionStore.snapshot.errors.find((error) => error.file_name === raw?.file)?.message,
   );
 </script>
 
@@ -15,14 +15,14 @@
     <Callout tone="danger"><p>{parseError}</p></Callout>
   {/if}
 
-  <textarea class="raw" bind:value={actions.raw!.text} spellcheck="false"></textarea>
+  <textarea class="raw" bind:value={actionStore.raw!.text} spellcheck="false"></textarea>
 
   {#if raw.error}
     <p class="hint error">{raw.error}</p>
   {/if}
 
   <div class="row">
-    <button class="primary" onclick={() => actions.saveRaw()}>Save file</button>
+    <button class="primary" onclick={() => actionStore.saveRaw()}>Save file</button>
     <span class="hint">It reloads the moment it parses.</span>
   </div>
 {/if}
