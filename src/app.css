@@ -381,6 +381,26 @@ code {
 
 /* --- motion --------------------------------------------------------------- */
 
+/* The two looping forms, here rather than in a component because each is used
+   by more than one: `breathe` is the header's state dot *and* the streaming
+   caret, which have to pulse together or the window looks like two things are
+   happening. Keyframes a component declares itself get scoped to it, so a
+   shared one has nowhere else to live. */
+@keyframes breathe {
+  to {
+    opacity: 0.4;
+  }
+}
+
+@keyframes travel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+
 /* One block disables the lot. The Popover's waiting indicator opts back in
    with a static treatment of its own: it is the only evidence a request is
    still alive, so it cannot simply vanish. */

@@ -4,23 +4,23 @@
 //! is shown** (needs ADR-0006): once the Launcher has focus, the foreground
 //! window is Beckon, and a Ctrl+C sent then would copy from the wrong process.
 //!
-//! The two hot-path windows — Launcher and Popover — are created hidden at
-//! startup and only shown/hidden here (ADR-0007): WebView creation costs far
-//! too much to pay per keypress. ADR-0004 is satisfied by destroying the
-//! *Exchange* on hide, which is what [`hide_popover`] does.
-//!
-//! Settings is the exception: nothing about it is latency-sensitive, and a third
-//! live WebView is the most expensive thing in a resident tool. It is built on
-//! first use and kept afterwards.
+//! This file is the flow and nothing else. [`window`] owns creating, sizing and
+//! placing the three windows; [`foreground`] owns remembering and handing back
+//! the window that had focus before us.
 
-use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
-};
+mod foreground;
+mod window;
+
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::action::InputSource;
 use crate::exchange;
 use crate::platform;
 use crate::state::{AppState, PopoverPhase, PopoverView};
+
+use self::foreground::{remember_foreground, restore_foreground_if_idle};
+use self::window::{center_on_active_monitor, reveal, size_and_place_at_cursor, POPOVER_HINT_H};
+use self::window::{POPOVER_H, POPOVER_W};
 
 pub const WINDOW_LAUNCHER: &str = "launcher";
 pub const WINDOW_POPOVER: &str = "popover";
@@ -33,15 +33,6 @@ pub const EVENT_LAUNCHER_OPENED: &str = "launcher:opened";
 /// Settings was shown. The window is reused (ADR-0007), so a fresh open is an
 /// event, not a mount — this is what clears the last visit's transient state.
 pub const EVENT_SETTINGS_OPENED: &str = "settings:opened";
-
-/// The Popover's normal size. Mirrored in `tauri.conf.json` so the very first
-/// paint is not at the wrong size.
-const POPOVER_W: f64 = 620.0;
-const POPOVER_H: f64 = 500.0;
-/// `empty-selection` issues no request and offers no input, so it can never
-/// grow — which is what makes a smaller window safe here and nowhere else.
-/// A two-line hint does not need 500px of empty Popover.
-const POPOVER_HINT_H: f64 = 220.0;
 
 /// Global hotkey: toggle the Launcher, grabbing the Selection on the way up.
 pub fn launcher_hotkey(app: &AppHandle) {
@@ -258,7 +249,7 @@ pub fn hide_launcher(app: &AppHandle) {
 pub fn show_settings(app: &AppHandle) {
     let window = match app.get_webview_window(WINDOW_SETTINGS) {
         Some(window) => window,
-        None => match build_settings_window(app) {
+        None => match window::build_settings_window(app) {
             Ok(window) => window,
             Err(err) => {
                 log::error!("could not create the Settings window: {err}");
@@ -272,113 +263,4 @@ pub fn show_settings(app: &AppHandle) {
     // Harmless on the very first open, when the webview is still loading and
     // nothing is listening: the window does its own load on mount.
     let _ = app.emit_to(WINDOW_SETTINGS, EVENT_SETTINGS_OPENED, ());
-}
-
-fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-    tauri::WebviewWindowBuilder::new(
-        app,
-        WINDOW_SETTINGS,
-        WebviewUrl::App("settings.html".into()),
-    )
-    .title("Beckon Settings")
-    // 240px of that width is the navigation column; the rest is the pane the
-    // Action editor lives in, which is the widest thing in the product.
-    .inner_size(980.0, 760.0)
-    .min_inner_size(780.0, 560.0)
-    .center()
-    .resizable(true)
-    .visible(false)
-    .build()
-}
-
-fn reveal(window: &WebviewWindow) {
-    let _ = window.show();
-    let _ = window.set_focus();
-}
-
-fn remember_foreground(app: &AppHandle) {
-    let Some(hwnd) = platform::focus::foreground_window() else {
-        return;
-    };
-    // Do not remember one of our own windows: closing the Popover would then
-    // "restore" focus to the Launcher we just hid.
-    if is_ours(app, hwnd) {
-        return;
-    }
-    let state = app.state::<AppState>();
-    *state.previous_foreground.lock().expect("foreground lock") = Some(hwnd);
-}
-
-fn is_ours(app: &AppHandle, hwnd: isize) -> bool {
-    [WINDOW_LAUNCHER, WINDOW_POPOVER, WINDOW_SETTINGS]
-        .iter()
-        .filter_map(|label| app.get_webview_window(label))
-        .any(|window| platform::focus::window_handle(&window) == Some(hwnd))
-}
-
-/// Hand focus back once nothing of ours is on screen.
-fn restore_foreground_if_idle(app: &AppHandle) {
-    let still_showing = [WINDOW_LAUNCHER, WINDOW_POPOVER]
-        .iter()
-        .filter_map(|label| app.get_webview_window(label))
-        .any(|window| window.is_visible().unwrap_or(false));
-    if still_showing {
-        return;
-    }
-
-    let state = app.state::<AppState>();
-    let handle = state
-        .previous_foreground
-        .lock()
-        .expect("foreground lock")
-        .take();
-    if let Some(handle) = handle {
-        platform::focus::restore_foreground(handle);
-    }
-}
-
-/// Size the Popover, then place it cursor-adjacent (README), clamped to the
-/// work area.
-///
-/// The physical size is derived from the logical one rather than read back with
-/// `outer_size()`. This runs on the hotkey thread, so `set_size` is dispatched
-/// to the event loop and an immediate read can still return the old rect —
-/// which would place a hint-sized window using the full-sized bounds.
-fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, height: f64) {
-    let size = LogicalSize::new(width, height);
-    let _ = window.set_size(size);
-
-    let Some(cursor) = platform::cursor::cursor_position() else {
-        return;
-    };
-    let Some(area) = platform::cursor::work_area_at(cursor.0, cursor.1) else {
-        return;
-    };
-    let Ok(scale) = window.scale_factor() else {
-        return;
-    };
-    let physical = size.to_physical::<i32>(scale);
-    let (x, y) = platform::place_near_cursor(cursor, (physical.width, physical.height), area);
-    let _ = window.set_position(PhysicalPosition::new(x, y));
-}
-
-/// The Launcher is centred on the monitor the cursor is on: the README only
-/// promises the *Popover* is cursor-adjacent, and a centred Launcher is what
-/// every comparable tool does.
-fn center_on_active_monitor(window: &WebviewWindow) {
-    let Some(cursor) = platform::cursor::cursor_position() else {
-        let _ = window.center();
-        return;
-    };
-    let Some(area) = platform::cursor::work_area_at(cursor.0, cursor.1) else {
-        let _ = window.center();
-        return;
-    };
-    let Ok(size) = window.outer_size() else {
-        return;
-    };
-    let x = area.x + (area.width - size.width as i32) / 2;
-    // Slightly above centre: a list grows downward, so this keeps the eye still.
-    let y = area.y + (area.height - size.height as i32) / 3;
-    let _ = window.set_position(PhysicalPosition::new(x.max(area.x), y.max(area.y)));
 }

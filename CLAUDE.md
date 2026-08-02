@@ -48,6 +48,14 @@ Window permissions live in [src-tauri/capabilities/default.json](src-tauri/capab
 
 Every reveal is announced **before** the window is shown: `launcher:opened`, `popover:view`, `settings:opened`. The windows are reused and re-read their state asynchronously, so revealing first paints the *previous* trigger's contents for a few frames. `hide_popover` emits too, for the same reason.
 
+Each surface is a shell plus its views, and the state behind them lives in a `.svelte.ts` singleton — one per window, which is safe precisely because the window is created once (ADR-0007):
+
+- **Popover** — [Popover.svelte](src/popover/Popover.svelte) (shell, window keys, the scroller) over [PopoverHeader](src/popover/PopoverHeader.svelte), [TurnCard](src/popover/TurnCard.svelte) and [Composer](src/popover/Composer.svelte), backed by [popover/exchange.svelte.ts](src/popover/exchange.svelte.ts). Every state a turn can be in is decided in the store and rendered in `TurnCard`; a state machine half-implemented in markup is the failure mode this split exists to prevent.
+- **Launcher** — [Launcher.svelte](src/launcher/Launcher.svelte) (shell, window keys, the delete dialog) over [ActionList](src/launcher/ActionList.svelte) and [EditorPane](src/launcher/EditorPane.svelte), backed by [launcher/actions.svelte.ts](src/launcher/actions.svelte.ts).
+- **Settings** — [Settings.svelte](src/settings/Settings.svelte) over [SettingsNav](src/settings/SettingsNav.svelte) and [sections/](src/settings/sections/), backed by [settings/store.svelte.ts](src/settings/store.svelte.ts).
+
+Where a shell has to reach into a child's DOM — focusing the query box, focusing or resetting the composer, scrolling the selected row into view — the child exports a function and the shell holds it with `bind:this`. The store never touches the DOM; it calls the `onStream` / `onIdle` / `onReset` hooks the shell installs on mount.
+
 ### The design system ([src/app.css](src/app.css))
 
 One file, four layers: brand primitives → semantic palette (light base, `[data-theme="dark"]` override) → theme-invariant scales (space, type, radius, motion, z) → element base. Components name **no** colour, size or duration of their own; a new hardcoded `12px` or hex is a bug.
@@ -60,9 +68,9 @@ One file, four layers: brand primitives → semantic palette (light base, `[data
 
 Icons are hand-rolled inline SVG in [src/lib/icons/](src/lib/icons/) — 24×24 grid, `currentColor`, `aria-hidden` always, so the accessible name lives on the control. Shared controls are in [src/lib/ui/](src/lib/ui/).
 
-### Trigger flow ([src-tauri/src/trigger.rs](src-tauri/src/trigger.rs))
+### Trigger flow ([src-tauri/src/trigger/](src-tauri/src/trigger/))
 
-`hotkey → grab → resolve input_source → show window`. Order is load-bearing:
+`mod.rs` is the flow itself; `window.rs` sizes, places and builds windows; `foreground.rs` remembers whose window was in front. `hotkey → grab → resolve input_source → show window`. Order is load-bearing:
 
 - The grab happens **before any Beckon window is shown** (ADR-0006). Once the Launcher has focus, Beckon is the foreground window and a Ctrl+C would copy from the wrong process.
 - The hotkey handler spawns a thread: the grab polls the clipboard for up to ~300 ms and must not block the event pump.
@@ -70,15 +78,15 @@ Icons are hand-rolled inline SVG in [src/lib/icons/](src/lib/icons/) — 24×24 
 - The Launcher hotkey grabs eagerly into `pending_selection`; `pick_from_launcher` consumes it. Hiding the Launcher drops it.
 - An empty grab is **not an error**: `selection` → `EmptySelection` hint and no request, `auto` → `NeedsInput`, `prompt` ignores the grab entirely.
 
-### Exchange = one Popover's conversation ([src-tauri/src/exchange.rs](src-tauri/src/exchange.rs))
+### Exchange = one Popover's conversation ([src-tauri/src/exchange/](src-tauri/src/exchange/))
 
-In-memory only, never persisted (ADR-0004); `discard_all` on hide or on a replacing trigger. Follow-ups resend the full untruncated history. Each turn installs a fresh `CancellationToken` (a cancelled one stays cancelled). Partial text from an interrupted turn *is* committed to history, since it is what the user can see.
+`mod.rs` is the bookkeeping (`ExchangeManager`, `TurnPlan`), `events.rs` the wire to the Popover, `turn.rs` the spawned task that runs one turn and drives that wire — so the emit calls have one home and the state machine's shape is readable in one file. In-memory only, never persisted (ADR-0004); `discard_all` on hide or on a replacing trigger. Follow-ups resend the full untruncated history. Each turn installs a fresh `CancellationToken` (a cancelled one stays cancelled). Partial text from an interrupted turn *is* committed to history, since it is what the user can see.
 
 The Popover's state machine is driven by events, not return values: `exchange:first-token` (fires once; thinking text counts, because the UI must distinguish "waiting" from "streaming"), `exchange:delta` coalesced onto a 16 ms tick, then exactly one of `exchange:done` / `exchange:error` / `exchange:interrupted` — or silence on cancel, which the UI already knows about.
 
 ### LLM layer ([src-tauri/src/llm/](src-tauri/src/llm/))
 
-`sse.rs` is a pure frame parser, `deepseek.rs` is the only place provider quirks live, `models.rs` is the model catalog, `client.rs` does the request. **No HTTP timeout, on purpose** (README): a dead network must error immediately rather than spin, and a long thinking pause must not look like a hang. `thinking` is mapped explicitly and an unknown model is a hard error — omitting the field would silently leave DeepSeek thinking on. `LlmError::kind()` is the stable discriminant the frontend switches on.
+`sse.rs` is a pure frame parser, `wire.rs` holds every response shape plus the pure functions over them, `error.rs` is the one error type, `deepseek.rs` is the only place provider quirks live, `models.rs` is the model catalog, and `client.rs` is only the requests — so everything but `client.rs` is testable without a network. **No HTTP timeout, on purpose** (README): a dead network must error immediately rather than spin, and a long thinking pause must not look like a hang. `thinking` is mapped explicitly and an unknown model is a hard error — omitting the field would silently leave DeepSeek thinking on. `LlmError::kind()` is the stable discriminant the frontend switches on.
 
 `models::CATALOG` is read by **both** `deepseek::thinking_wire` and the Settings model dropdown (`get_models`), so the set of models offered and the set Beckon knows how to send cannot drift. Adding a model means adding a row there and nothing else. `get_models` prefers the endpoint's own `/v1/models` list and **never fails**: no credential, a rejected key, an offline machine or an empty list all fall back to the documented catalog and report the cause by kind, because an empty dropdown would be worse than the failure it reports. Whatever the config already names is always among the options — an unrecognised model is surfaced, never rewritten. Retired ids (`deepseek-chat`, `deepseek-reasoner`) stay in the catalog so an old config keeps working, but are not offered.
 
@@ -124,7 +132,7 @@ There are three sources, not one. `assets/logo.svg` is the app icon; it uses gra
 
 ### Adding an IPC command
 
-`#[tauri::command]` in [src-tauri/src/commands.rs](src-tauri/src/commands.rs) (validate + delegate, keep it thin) → register in `generate_handler!` in [src-tauri/src/main.rs](src-tauri/src/main.rs) → typed wrapper in [src/lib/ipc.ts](src/lib/ipc.ts) → payload type in [src/lib/types.ts](src/lib/types.ts). Any `file_name` arriving over IPC goes through `sanitize_file_name`. Errors are `String` for plain messages, `Failure { kind, message }` when the UI must react by cause.
+`#[tauri::command]` in the matching file under [src-tauri/src/commands/](src-tauri/src/commands/) — `config`, `actions`, `secrets`, `models`, `windows` (validate + delegate, keep it thin; `commands/mod.rs` re-exports them flat, so the handler list never learns which file it landed in) → register in `generate_handler!` in [src-tauri/src/main.rs](src-tauri/src/main.rs) → typed wrapper in [src/lib/ipc.ts](src/lib/ipc.ts) → payload type in [src/lib/types.ts](src/lib/types.ts). Any `file_name` arriving over IPC goes through `sanitize_file_name`. Errors are `String` for plain messages, `Failure { kind, message }` when the UI must react by cause.
 
 ## GitNexus
 
@@ -133,7 +141,7 @@ This repo is indexed by GitNexus; MCP tools (`impact`, `context`, `query`, `dete
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (1060 symbols, 2271 relationships, 86 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (1142 symbols, 2493 relationships, 92 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
