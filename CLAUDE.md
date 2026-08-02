@@ -46,6 +46,20 @@ Tests are `#[cfg(test)]` modules beside the code. Everything platform- or networ
 
 Window permissions live in [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json) — a new `window.*` API call from the frontend needs its permission added there.
 
+Every reveal is announced **before** the window is shown: `launcher:opened`, `popover:view`, `settings:opened`. The windows are reused and re-read their state asynchronously, so revealing first paints the *previous* trigger's contents for a few frames. `hide_popover` emits too, for the same reason.
+
+### The design system ([src/app.css](src/app.css))
+
+One file, four layers: brand primitives → semantic palette (light base, `[data-theme="dark"]` override) → theme-invariant scales (space, type, radius, motion, z) → element base. Components name **no** colour, size or duration of their own; a new hardcoded `12px` or hex is a bug.
+
+- The palette is derived from [assets/logo.svg](assets/logo.svg). Brand cyan is 1.4:1 on white, so light mode uses the same hue darkened until it passes AA, and full-strength brand is reserved for dark surfaces and non-text use. Every ratio in the comments is measured — re-measure when changing one.
+- `--border` is decorative and exempt from contrast rules; `--border-strong` bounds interactive controls and must clear 3:1 (WCAG 1.4.11).
+- The gradient is a light source, not a paint bucket: rails, the streaming caret, the waiting rail, one primary button. Never behind prose, never on the focus ring, never on a semantic colour.
+- `.surface` owns the frameless card and sets `--surface-radius`; children that meet its edge read that variable instead of repeating a number. It carries no `box-shadow` — the card fills the window rect, so the shadow you see is DWM's.
+- Motion is `transform`/`opacity` only, and one `prefers-reduced-motion` block disables the lot. The Popover's looping indicators opt back in with a *static* form: a frozen travelling rail reads as a stalled request.
+
+Icons are hand-rolled inline SVG in [src/lib/icons/](src/lib/icons/) — 24×24 grid, `currentColor`, `aria-hidden` always, so the accessible name lives on the control. Shared controls are in [src/lib/ui/](src/lib/ui/).
+
 ### Trigger flow ([src-tauri/src/trigger.rs](src-tauri/src/trigger.rs))
 
 `hotkey → grab → resolve input_source → show window`. Order is load-bearing:
@@ -77,10 +91,26 @@ Rules that break subtly if ignored:
 - An Action's **identity is its filename stem**; `name` is display only. Renaming `name` must not move the file.
 - Mark `state.self_writes.mark(&path)` *before* any write, or the watcher echoes your own write back as an external change.
 - Writes go through `atomic::write_atomic`; the watcher ignores dotfiles/temp files and reloads the whole directory rather than interpreting event kinds.
-- A file that fails to parse is skipped and reported (`Registry::errors`), never fatal; the raw text stays editable in Settings via `read_action_raw` / `write_action_raw`.
+- A file that fails to parse is skipped and reported (`Registry::errors`), never fatal; the raw text stays editable from the Launcher's list via `read_action_raw` / `write_action_raw`.
 - Hotkey registration is **derived state**: `hotkey::apply` unregisters everything and rebuilds from config + registry. Conflicts resolve by filename order, losers land in `hotkey_errors` and are flagged red. Failures are never silent — tray error icon + one-time balloon.
 - The API key is only in the Windows Credential Manager (service `Beckon`, ADR-0005). "No credential", "read error" and "key rejected" must stay three distinguishable outcomes all the way to the UI.
 - A missing config file or missing field is a default, never an error; a *corrupt* config is reported, never overwritten.
+
+### Editing surfaces are editors, not owners ([src/settings/](src/settings/), [src/launcher/](src/launcher/))
+
+There is no Save button and there must never be one (ADR-0003). The work is split by *what* is edited, not by window chrome: Settings owns the global config (credential, Launcher hotkey, theme, model defaults); the **Launcher** owns the Actions, because that is where their list already is. Both drive [src/lib/saveSlot.svelte.ts](src/lib/saveSlot.svelte.ts) from their own store — [settings/store.svelte.ts](src/settings/store.svelte.ts), [launcher/actions.svelte.ts](src/launcher/actions.svelte.ts) — and components receive values and callbacks, never calling `saveConfig` / `saveAction` themselves.
+
+- **Saving echoes back at the window that saved.** `save_config` → `reload_config` → `config-changed` (and `save_action` → `actions-changed`), broadcast to every window including the one that caused it. So the events being defended against are mostly our own writes arriving mid-keystroke, not the file watcher.
+- A snapshot is refused while a text field in the pane has focus **or** a write is pending, and is then *held* and applied when both clear — dropping it would leave the form permanently stale after an external edit.
+- Focus is read from the DOM when the event arrives, not tracked in per-field flags. The flags this replaced covered two of eleven inputs, so every field added later silently opted out.
+- Settings' navigation column sits **outside** the pane element, so changing section fires `focusout` and flushes the slot. No route change can strand an unwritten edit.
+- The model `<select>` uses `value=` + `onchange`, **never `bind:`**, and refuses to write `""` where no inherit option exists. Both halves stop a configured model being silently rewritten before the catalog lands.
+- `save_action` re-probes the Direct Hotkey and refuses the *whole* write if it cannot be registered — so while an outside app holds an Action's hotkey, even renaming it fails. The editor says so and offers to clear the hotkey.
+- Both windows are reused (ADR-0007): `settings:opened` clears the last visit's typed API key and test result, `launcher:opened` closes whatever the last summon left in the editor. `onMount` cannot do it, and Settings' first open misses the event because the window is still being built — so that component always loads itself too.
+- An Action's `[model]` overrides render as `OverrideField`: opening the row *is* the override, and it collapses again when focus leaves. The collapse is presentation only — the write already happened.
+- A field's explanation lives behind the info icon (`InfoHint`), never as a permanent line: only warnings and errors earn one, because those are conditions to act on.
+
+The Launcher hosting a form has one Rust consequence: `WindowEvent::Focused(false)` normally hides it, and `state.launcher_modal` (set by `set_launcher_modal`, cleared by `hide_launcher`) is what suspends that while the editor is open.
 
 ### Platform isolation ([src-tauri/src/platform/](src-tauri/src/platform/))
 
@@ -99,3 +129,48 @@ There are three sources, not one. `assets/logo.svg` is the app icon; it uses gra
 ## GitNexus
 
 This repo is indexed by GitNexus; MCP tools (`impact`, `context`, `query`, `detect_changes`) are available. Their usage rules live in the untracked local `AGENTS.md` / `.claude/`.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **beckon** (1060 symbols, 2271 relationships, 86 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/beckon/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/beckon/clusters` | All functional areas |
+| `gitnexus://repo/beckon/processes` | All execution flows |
+| `gitnexus://repo/beckon/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

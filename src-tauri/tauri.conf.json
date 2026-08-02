@@ -19,8 +19,8 @@
         "label": "launcher",
         "title": "Beckon Launcher",
         "url": "launcher.html",
-        "width": 620,
-        "height": 460,
+        "width": 680,
+        "height": 480,
         "center": true,
         "visible": false,
         "decorations": false,
@@ -28,20 +28,22 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
+        "maximizable": false,
         "shadow": true
       },
       {
         "label": "popover",
         "title": "Beckon",
         "url": "popover.html",
-        "width": 560,
-        "height": 420,
+        "width": 620,
+        "height": 500,
         "visible": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
+        "maximizable": false,
         "shadow": true
       }
     ]

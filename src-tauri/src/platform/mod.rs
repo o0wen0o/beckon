@@ -94,18 +94,32 @@ mod tests {
         height: 1040,
     };
 
+    /// The Popover's real size (`trigger::POPOVER_W` × `POPOVER_H`). This
+    /// function is pure, so a stale number here would never fail a test — it
+    /// would just quietly stop describing the app.
+    const POPOVER: (i32, i32) = (620, 500);
+    /// The `empty-selection` Popover, which is deliberately shorter.
+    const POPOVER_HINT: (i32, i32) = (620, 220);
+
     #[test]
     fn sits_below_right_of_the_cursor_when_it_fits() {
-        assert_eq!(
-            place_near_cursor((100, 100), (560, 420), SCREEN),
-            (112, 112)
-        );
+        assert_eq!(place_near_cursor((100, 100), POPOVER, SCREEN), (112, 112));
     }
 
     #[test]
     fn flips_instead_of_overflowing_the_edges() {
-        let (x, y) = place_near_cursor((1900, 1030), (560, 420), SCREEN);
-        assert_eq!((x, y), (1900 - 12 - 560, 1030 - 12 - 420));
+        let (x, y) = place_near_cursor((1900, 1030), POPOVER, SCREEN);
+        assert_eq!((x, y), (1900 - 12 - 620, 1030 - 12 - 500));
+    }
+
+    /// The shorter hint window still fits below a cursor where the full one
+    /// would have had to flip.
+    #[test]
+    fn the_hint_sized_popover_fits_where_the_full_one_would_flip() {
+        let (_, tall) = place_near_cursor((100, 600), POPOVER, SCREEN);
+        let (_, short) = place_near_cursor((100, 600), POPOVER_HINT, SCREEN);
+        assert_eq!(tall, 600 - 12 - 500);
+        assert_eq!(short, 612);
     }
 
     #[test]
@@ -122,9 +136,9 @@ mod tests {
             width: 1280,
             height: 1000,
         };
-        let (x, y) = place_near_cursor((3100, 700), (560, 420), right);
-        assert!(x >= right.x && x + 560 <= right.x + right.width);
-        assert!(y >= right.y && y + 420 <= right.y + right.height);
+        let (x, y) = place_near_cursor((3100, 700), POPOVER, right);
+        assert!(x >= right.x && x + POPOVER.0 <= right.x + right.width);
+        assert!(y >= right.y && y + POPOVER.1 <= right.y + right.height);
     }
 
     #[test]
@@ -135,9 +149,6 @@ mod tests {
             width: 1920,
             height: 1040,
         };
-        assert_eq!(
-            place_near_cursor((-1800, 100), (560, 420), left),
-            (-1788, 112)
-        );
+        assert_eq!(place_near_cursor((-1800, 100), POPOVER, left), (-1788, 112));
     }
 }

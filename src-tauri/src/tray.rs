@@ -64,9 +64,10 @@ pub fn set_error(app: &AppHandle, summary: &str) {
     {
         let state = app.state::<AppState>();
         let mut errors = state.startup_errors.lock().expect("startup errors lock");
-        if !errors.iter().any(|e| e == summary) {
-            errors.push(summary.to_string());
-        }
+        // Replace, never append: `summary` is already the complete list of
+        // what is currently broken. Appending kept the previous summary around
+        // after the user had fixed it, so Settings reported repairs as faults.
+        *errors = vec![summary.to_string()];
         if state.balloon_shown.swap(true, Ordering::SeqCst) {
             return;
         }

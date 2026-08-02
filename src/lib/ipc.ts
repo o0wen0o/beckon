@@ -67,6 +67,9 @@ export const retryExchange = (exchangeId: string) => invoke<void>("retry_exchang
 export const hidePopover = () => invoke<void>("hide_popover");
 export const hideLauncher = () => invoke<void>("hide_launcher");
 export const showSettings = () => invoke<void>("show_settings");
+/** The Launcher is editing an Action: suspend its hide-on-blur until it is not. */
+export const setLauncherModal = (active: boolean) =>
+  invoke<void>("set_launcher_modal", { active });
 export const copyToClipboard = (text: string) => invoke<void>("copy_to_clipboard", { text });
 
 // --- events ---------------------------------------------------------------
@@ -76,6 +79,7 @@ export const onActionsChanged = (fn: (snapshot: RegistrySnapshot) => void) =>
 export const onConfigChanged = (fn: (config: Config) => void) =>
   listen<Config>("config-changed", (event) => fn(event.payload));
 export const onPopoverView = (fn: () => void) => listen("popover:view", () => fn());
+export const onSettingsOpened = (fn: () => void) => listen("settings:opened", () => fn());
 export const onLauncherOpened = (fn: (selectionChars: number) => void) =>
   listen<{ selection_chars: number }>("launcher:opened", (event) =>
     fn(event.payload.selection_chars),

@@ -24,6 +24,17 @@
     submitInput,
     Subscriptions,
   } from "../lib/ipc";
+  import {
+    BrandMark,
+    Check,
+    ChevronRight,
+    Close,
+    Copy,
+    Retry,
+    Send,
+    TextSelect,
+    Warning,
+  } from "../lib/icons";
   import type { Failure, PopoverView } from "../lib/types";
 
   type Status =
@@ -42,12 +53,16 @@
     /** Set for `interrupted` and `error`. */
     note?: string;
     errorKind?: string;
+    reasoningOpen: boolean;
+    /** Once the user has toggled it, the auto-collapse stops fighting them. */
+    reasoningTouched: boolean;
+    questionExpanded: boolean;
   }
 
   let view = $state<PopoverView | null>(null);
   let turns = $state<Turn[]>([]);
   let draft = $state("");
-  let copied = $state(false);
+  let copiedTurn = $state<number | null>(null);
   let waitingSince = $state(0);
   let now = $state(0);
   let scroller = $state<HTMLDivElement | null>(null);
@@ -77,6 +92,10 @@
           forCurrent(payload.exchange_id, (turn) => {
             turn.answer += payload.content;
             turn.reasoning += payload.reasoning;
+            // Thinking arrives before the answer, so show it while it is all
+            // there is and get out of the way once real text lands — unless
+            // the user has said otherwise by toggling the disclosure.
+            if (!turn.reasoningTouched) turn.reasoningOpen = turn.answer === "";
             if (turn.status === "waiting-first-token") markStreaming(turn);
             scrollToBottom();
           }),
@@ -119,10 +138,18 @@
     };
   });
 
+  /**
+   * The reveal hook. The window outlives every trigger (ADR-0007), so this —
+   * not `onMount` — is where per-Exchange state is reset. Anything added to
+   * this component that survives a hide has to be cleared here; the per-turn
+   * flags come free, because `Turn` objects themselves are rebuilt.
+   */
   async function load() {
     view = await getPopoverView();
     draft = "";
-    copied = false;
+    copiedTurn = null;
+    resetDraftHeight();
+    if (scroller) scroller.scrollTop = 0;
     if (!view) {
       turns = [];
       return;
@@ -138,7 +165,15 @@
   function newTurn(question: string): Turn {
     waitingSince = Date.now();
     now = Date.now();
-    return { question, answer: "", reasoning: "", status: "waiting-first-token" };
+    return {
+      question,
+      answer: "",
+      reasoning: "",
+      status: "waiting-first-token",
+      reasoningOpen: false,
+      reasoningTouched: false,
+      questionExpanded: false,
+    };
   }
 
   function markStreaming(turn: Turn) {
@@ -155,6 +190,11 @@
   }
 
   function scrollToBottom() {
+    if (!scroller) return;
+    // Follow the stream only when the user is already at the bottom: scrolling
+    // up to re-read something must not be yanked back by the next delta.
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (distance > 48) return;
     requestAnimationFrame(() => {
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     });
@@ -164,10 +204,23 @@
     requestAnimationFrame(() => draftBox?.focus());
   }
 
+  /** Grow with the text up to five rows, then scroll inside the box. */
+  function growDraft() {
+    if (!draftBox) return;
+    draftBox.style.height = "auto";
+    draftBox.style.height = `${Math.min(draftBox.scrollHeight, 120)}px`;
+  }
+
+  function resetDraftHeight() {
+    // Clearing `draft` does not shrink an element that was grown inline.
+    if (draftBox) draftBox.style.height = "";
+  }
+
   async function send() {
     const text = draft.trim();
     if (text === "" || busy) return;
     draft = "";
+    resetDraftHeight();
 
     if (view && view.exchange_id && turns.length > 0) {
       turns = [...turns, newTurn(text)];
@@ -216,11 +269,13 @@
     }
   }
 
-  async function copy(text: string) {
+  async function copy(text: string, index: number) {
     // A user-requested clipboard write: not restored (ADR-0002).
     await copyToClipboard(text);
-    copied = true;
-    setTimeout(() => (copied = false), 1600);
+    copiedTurn = index;
+    setTimeout(() => {
+      if (copiedTurn === index) copiedTurn = null;
+    }, 1600);
   }
 
   function onKeydown(event: KeyboardEvent) {
@@ -246,7 +301,7 @@
       const answer = current?.answer;
       if (answer) {
         event.preventDefault();
-        void copy(answer);
+        void copy(answer, turns.length - 1);
       }
     }
   }
@@ -257,17 +312,59 @@
       void send();
     }
   }
+
+  function toggleReasoning(turn: Turn) {
+    turn.reasoningTouched = true;
+    turn.reasoningOpen = !turn.reasoningOpen;
+  }
+
+  /** Failures the user can actually do something about in Settings. */
+  function settlesInSettings(kind: string | undefined) {
+    return (
+      kind === "no-credential" || kind === "read-error" || kind === "auth" || kind === "config"
+    );
+  }
+
+  const STATE_LABEL: Partial<Record<Status, string>> = {
+    "waiting-first-token": "Waiting",
+    streaming: "Streaming",
+    interrupted: "Interrupted",
+    cancelled: "Cancelled",
+    error: "Failed",
+  };
 </script>
 
 <svelte:window on:keydown={onKeydown} />
 
 <div class="surface">
-  <header data-tauri-drag-region>
+  <header data-tauri-drag-region class:live={current?.status === "streaming"}>
+    <span class="mark"><BrandMark size={16} /></span>
     <span class="title">{view?.action_name ?? "Beckon"}</span>
+
+    {#if current && STATE_LABEL[current.status]}
+      <span class="state" data-state={current.status}>
+        <span class="dot"></span>
+        {STATE_LABEL[current.status]}
+      </span>
+    {/if}
+
     <span class="model">
       {view?.model.model}{#if view?.model.thinking}<span class="thinking-badge">thinking</span>{/if}
     </span>
-    <button class="close" title="Close (Esc)" onclick={() => hidePopover()}>✕</button>
+
+    {#if current?.answer}
+      <button
+        class="icon-button"
+        aria-label="Copy answer"
+        title="Copy answer"
+        onclick={() => copy(current.answer, turns.length - 1)}
+      >
+        {#if copiedTurn === turns.length - 1}<Check size={14} />{:else}<Copy size={14} />{/if}
+      </button>
+    {/if}
+    <button class="icon-button" aria-label="Close" title="Close" onclick={() => hidePopover()}>
+      <Close size={14} />
+    </button>
   </header>
 
   <div class="body" bind:this={scroller}>
@@ -275,13 +372,15 @@
       <p class="hint">Nothing to show.</p>
     {:else if view.phase === "empty-selection" && turns.length === 0}
       <div class="notice">
-        <p><strong>{view.action_name}</strong> works on selected text, and nothing was selected.</p>
+        <TextSelect size={22} />
+        <p><strong>{view.action_name}</strong> works on a Selection, and nothing was selected.</p>
         <p class="hint">
           Select some text and press the hotkey again. Elevated windows cannot be read at all.
         </p>
       </div>
     {:else if turns.length === 0}
       <div class="notice">
+        <BrandMark size={26} />
         <p class="hint">Type what you want to send to <strong>{view.action_name}</strong>.</p>
       </div>
     {/if}
@@ -289,51 +388,70 @@
     {#each turns as turn, index (index)}
       <article class="turn">
         {#if turn.question}
-          <div class="question">{turn.question}</div>
+          <div class="question" class:expanded={turn.questionExpanded}>{turn.question}</div>
+          {#if turn.question.length > 160}
+            <button class="link" onclick={() => (turn.questionExpanded = !turn.questionExpanded)}>
+              {turn.questionExpanded ? "Show less" : "Show all"}
+            </button>
+          {/if}
         {/if}
 
         {#if turn.reasoning}
-          <details class="reasoning" open={turn.answer === ""}>
-            <summary>Thinking</summary>
-            <div class="reasoning-text">{turn.reasoning}</div>
-          </details>
+          <div class="reasoning" class:open={turn.reasoningOpen}>
+            <button
+              class="reasoning-summary"
+              aria-expanded={turn.reasoningOpen}
+              onclick={() => toggleReasoning(turn)}
+            >
+              <span class="chevron"><ChevronRight size={12} /></span>
+              Thinking
+            </button>
+            {#if turn.reasoningOpen}
+              <div class="reasoning-text">{turn.reasoning}</div>
+            {/if}
+          </div>
         {/if}
 
         {#if turn.status === "waiting-first-token"}
           <div class="waiting">
-            <span class="pulse"></span>
-            <span>Sent — waiting for the first token{waitedSeconds > 0 ? ` · ${waitedSeconds}s` : ""}</span>
+            <div class="waiting-rail"></div>
+            <span class="waiting-text">
+              Sent to {view?.model.model} — waiting for the first token{waitedSeconds > 0
+                ? ` · ${waitedSeconds}s`
+                : ""}
+            </span>
           </div>
         {/if}
 
         {#if turn.answer}
-          <div class="answer" class:streaming={turn.status === "streaming"}>{turn.answer}</div>
-        {/if}
-
-        {#if turn.status === "streaming"}
-          <div class="status-line">Streaming…</div>
+          <div
+            class="answer"
+            class:streaming={turn.status === "streaming"}
+            class:partial={turn.status === "interrupted" || turn.status === "cancelled"}
+          >
+            {turn.answer}
+          </div>
         {/if}
 
         {#if turn.status === "interrupted"}
-          <div class="status-line interrupted">
+          <p class="status-line warn">
+            <Warning size={12} />
             {turn.answer ? "Interrupted" : "Interrupted before any output"}{turn.note
               ? ` — ${turn.note}`
               : ""}
-          </div>
+          </p>
         {/if}
 
         {#if turn.status === "cancelled"}
-          <div class="status-line interrupted">
-            Cancelled. <kbd>Esc</kbd> again closes the Popover.
-          </div>
+          <p class="status-line warn">Cancelled.</p>
         {/if}
 
         {#if turn.status === "error"}
           <div class="failure">
-            <p class="error">{turn.note}</p>
+            <p class="failure-message"><Warning size={14} /> {turn.note}</p>
             <div class="failure-actions">
-              <button onclick={() => retry()}>Retry</button>
-              {#if turn.errorKind === "no-credential" || turn.errorKind === "read-error" || turn.errorKind === "auth" || turn.errorKind === "config"}
+              <button class="primary" onclick={() => retry()}><Retry size={14} /> Retry</button>
+              {#if settlesInSettings(turn.errorKind)}
                 <button onclick={() => showSettings()}>Open Settings</button>
               {/if}
             </div>
@@ -342,10 +460,13 @@
 
         {#if turn.answer && (turn.status === "done" || turn.status === "interrupted" || turn.status === "cancelled")}
           <div class="turn-actions">
-            <button class="primary copy" onclick={() => copy(turn.answer)}>
-              {copied && index === turns.length - 1 ? "Copied ✓" : "Copy"}
+            <button class="copy" onclick={() => copy(turn.answer, index)}>
+              {#if copiedTurn === index}
+                <Check size={13} /> Copied
+              {:else}
+                <Copy size={13} /> Copy
+              {/if}
             </button>
-            <span class="hint"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></span>
           </div>
         {/if}
       </article>
@@ -354,22 +475,19 @@
 
   {#if view && (view.phase === "needs-input" || canFollowUp)}
     <footer>
-      <textarea
-        bind:this={draftBox}
-        bind:value={draft}
-        onkeydown={onDraftKeydown}
-        rows="2"
-        placeholder={turns.length === 0 ? "Your input…" : "Ask a follow-up…"}
-      ></textarea>
-      <button class="primary" disabled={draft.trim() === "" || busy} onclick={() => send()}>
-        Send
-      </button>
-    </footer>
-  {:else if busy}
-    <footer class="busy-footer">
-      <span class="hint">
-        <kbd>Esc</kbd> cancels the request; <kbd>Esc</kbd> again closes the Popover.
-      </span>
+      <div class="composer">
+        <textarea
+          bind:this={draftBox}
+          bind:value={draft}
+          oninput={growDraft}
+          onkeydown={onDraftKeydown}
+          rows="1"
+          placeholder={turns.length === 0 ? "Your input…" : "Ask a follow-up…"}
+        ></textarea>
+        <button class="primary send" disabled={draft.trim() === "" || busy} onclick={() => send()}>
+          <Send size={14} /> Send
+        </button>
+      </div>
     </footer>
   {/if}
 </div>
@@ -378,195 +496,390 @@
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 8px 8px 14px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--bg-raised);
-    border-radius: 12px 12px 0 0;
+    border-radius: var(--surface-radius) var(--surface-radius) 0 0;
+    background-clip: padding-box;
     cursor: default;
     user-select: none;
   }
 
+  /* A whole-window "alive" signal, readable from the corner of the eye. */
+  header.live {
+    border-bottom-color: transparent;
+    box-shadow: inset 0 -1px 0 0 var(--brand-to);
+  }
+
+  .mark {
+    display: flex;
+  }
+
   .title {
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-weight: var(--weight-semibold);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex: none;
+    font-family: var(--font-small);
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  }
+
+  .state[data-state="waiting-first-token"] .dot,
+  .state[data-state="streaming"] .dot {
+    animation: breathe 1400ms ease-in-out infinite alternate;
+  }
+
+  .state[data-state="interrupted"] .dot,
+  .state[data-state="cancelled"] .dot {
+    background: var(--warn);
+  }
+
+  .state[data-state="error"] .dot {
+    background: var(--danger);
+  }
+
+  @keyframes breathe {
+    to {
+      opacity: 0.4;
+    }
   }
 
   .model {
-    font-size: 11px;
-    color: var(--text-faint);
+    margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1);
+    flex: none;
+    font-family: var(--font-small);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
   }
 
   .thinking-badge {
     border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    padding: 0 var(--space-2);
     color: var(--warn);
   }
 
-  .close {
-    margin-left: auto;
+  .icon-button {
+    flex: none;
     border: none;
     background: none;
     color: var(--text-dim);
-    padding: 2px 8px;
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
+  }
+
+  .icon-button:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: transparent;
+    color: var(--text);
   }
 
   .body {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-4);
+  }
+
+  .notice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: center;
+    padding: var(--space-4) var(--space-2);
+    color: var(--text-dim);
   }
 
   .notice p {
-    margin: 0 0 6px;
+    margin: 0;
   }
 
   .turn {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
+  /* Clamped, not scrollable: a scroller inside the body's scroller is a trap. */
   .question {
-    font-size: 12px;
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
     color: var(--text-dim);
-    background: var(--bg-input);
+    background: var(--bg-sunken);
     border-left: 2px solid var(--border-strong);
-    border-radius: 0 6px 6px 0;
-    padding: 6px 10px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: var(--space-2) var(--space-3);
     white-space: pre-wrap;
-    max-height: 5.5em;
-    overflow-y: auto;
   }
 
+  .question:not(.expanded) {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+
+  .link {
+    align-self: flex-start;
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    text-decoration: underline;
+  }
+
+  .link:hover:not(:disabled) {
+    background: none;
+    border-color: transparent;
+    color: var(--accent);
+  }
+
+  /* The only prose in the product, so it gets its own leading. */
   .answer {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    line-height: 1.6;
   }
 
-  /* A caret that only exists while tokens are arriving: the visible difference
-     between "streaming" and "done". */
+  .answer.partial {
+    border-left: 2px solid var(--warn);
+    padding-left: var(--space-3);
+  }
+
+  /* Not a blinking text caret — a blink says "type here". A steady bar that
+     breathes says "output is arriving". */
   .answer.streaming::after {
     content: "";
     display: inline-block;
-    width: 7px;
-    height: 1em;
+    width: 8px;
+    height: 1.05em;
     margin-left: 2px;
     vertical-align: text-bottom;
-    background: var(--accent);
-    animation: blink 1s steps(2, start) infinite;
+    border-radius: 2px;
+    background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+    box-shadow: 0 0 10px -2px var(--accent-glow);
+    animation: breathe 1200ms ease-in-out infinite alternate;
   }
 
-  @keyframes blink {
-    to {
-      visibility: hidden;
-    }
-  }
-
-  /* Not a generic spinner: it says what it is waiting for. */
+  /* Three independent proofs the request is alive: a moving highlight, a
+     counting integer, and the model it went to. The counter is the one that
+     survives reduced motion. */
   .waiting {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .waiting-rail {
+    position: relative;
+    height: 2px;
+    border-radius: var(--radius-pill);
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .waiting-rail::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, var(--brand-from), var(--brand-to));
+    animation: travel 1500ms linear infinite;
+  }
+
+  @keyframes travel {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(350%);
+    }
+  }
+
+  .waiting-text {
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
     color: var(--text-dim);
-    font-size: 13px;
-  }
-
-  .pulse {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 1.1s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 0.25;
-      transform: scale(0.8);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.2);
-    }
+    font-variant-numeric: tabular-nums;
   }
 
   .status-line {
-    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0;
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
     color: var(--text-faint);
   }
 
-  .status-line.interrupted {
+  .status-line.warn {
     color: var(--warn);
   }
 
   .reasoning {
-    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-sunken);
+    font-size: var(--text-sm);
     color: var(--text-dim);
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
   }
 
-  .reasoning summary {
-    cursor: default;
+  .reasoning-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    width: 100%;
+    border: none;
+    background: none;
+    padding: var(--space-1) var(--space-2);
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
     color: var(--text-faint);
+    justify-content: flex-start;
+  }
+
+  .reasoning-summary:hover:not(:disabled) {
+    background: none;
+    border-color: transparent;
+    color: var(--text-dim);
+  }
+
+  .chevron {
+    display: flex;
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+
+  .reasoning.open .chevron {
+    transform: rotate(90deg);
   }
 
   .reasoning-text {
     white-space: pre-wrap;
-    margin-top: 6px;
-    max-height: 8em;
+    max-height: 10em;
     overflow-y: auto;
+    padding: 0 var(--space-2) var(--space-2);
   }
 
   .failure {
     border: 1px solid var(--danger);
-    border-radius: 8px;
-    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
   }
 
-  .failure p {
-    margin: 0 0 8px;
+  .failure-message {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 0;
+    color: var(--danger);
   }
 
   .failure-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .turn-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-3);
   }
 
+  /* Small, and quiet: the answer is the content, and the header carries the
+     same action for the turn on screen. Fixed width so the Copied swap cannot
+     reflow the row. */
   .copy {
-    min-width: 92px;
+    min-width: 88px;
+    padding: var(--space-1) var(--space-2);
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+
+  .copy:hover:not(:disabled) {
+    color: var(--text);
   }
 
   footer {
     display: flex;
-    gap: 8px;
-    align-items: flex-end;
-    padding: 10px 12px;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3);
     border-top: 1px solid var(--border);
     background: var(--bg-raised);
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 var(--surface-radius) var(--surface-radius);
+    background-clip: padding-box;
   }
 
-  footer textarea {
-    min-height: 44px;
+  .composer {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-2);
   }
 
-  .busy-footer {
-    justify-content: center;
+  /* One row deep to start, and exactly as tall as the button beside it — both
+     read `--control-h`, so the pair cannot drift apart. It grows with the text
+     from there, and the button stays put at the bottom of the row. */
+  .composer textarea {
+    min-height: var(--control-h);
+    height: var(--control-h);
+    max-height: 120px;
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+    resize: none;
+  }
+
+  .send {
+    flex: none;
+    height: var(--control-h);
+  }
+
+  /* The looping indicators need a static form, not a frozen frame: freezing
+     the travelling rail mid-slide would read as a stalled progress bar. */
+  @media (prefers-reduced-motion: reduce) {
+    .waiting-rail::after {
+      animation: none;
+      transform: none;
+      width: 100%;
+      opacity: 0.7;
+    }
+
+    .answer.streaming::after,
+    .state .dot {
+      animation: none;
+      opacity: 1;
+    }
   }
 </style>

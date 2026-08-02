@@ -13,7 +13,9 @@
 //! live WebView is the most expensive thing in a resident tool. It is built on
 //! first use and kept afterwards.
 
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
+};
 
 use crate::action::InputSource;
 use crate::exchange;
@@ -28,6 +30,18 @@ pub const WINDOW_SETTINGS: &str = "settings";
 pub const EVENT_POPOVER_VIEW: &str = "popover:view";
 /// The Launcher was summoned; payload says whether a Selection came with it.
 pub const EVENT_LAUNCHER_OPENED: &str = "launcher:opened";
+/// Settings was shown. The window is reused (ADR-0007), so a fresh open is an
+/// event, not a mount — this is what clears the last visit's transient state.
+pub const EVENT_SETTINGS_OPENED: &str = "settings:opened";
+
+/// The Popover's normal size. Mirrored in `tauri.conf.json` so the very first
+/// paint is not at the wrong size.
+const POPOVER_W: f64 = 620.0;
+const POPOVER_H: f64 = 500.0;
+/// `empty-selection` issues no request and offers no input, so it can never
+/// grow — which is what makes a smaller window safe here and nowhere else.
+/// A two-line hint does not need 500px of empty Popover.
+const POPOVER_HINT_H: f64 = 220.0;
 
 /// Global hotkey: toggle the Launcher, grabbing the Selection on the way up.
 pub fn launcher_hotkey(app: &AppHandle) {
@@ -47,13 +61,15 @@ pub fn launcher_hotkey(app: &AppHandle) {
         *state.pending_selection.lock().expect("selection lock") = selection;
     }
 
-    center_on_active_monitor(&window);
-    reveal(&window);
+    // Emit before revealing: the window is reused, so it is still showing the
+    // last summon's query and match list until this lands.
     let _ = app.emit_to(
         WINDOW_LAUNCHER,
         EVENT_LAUNCHER_OPENED,
         serde_json::json!({ "selection_chars": selection_chars }),
     );
+    center_on_active_monitor(&window);
+    reveal(&window);
 }
 
 /// Direct Hotkey: straight to the result, zero interaction.
@@ -135,11 +151,20 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
 
     *state.popover_view.lock().expect("popover view lock") = Some(view);
 
+    // Emit before revealing. The window is reused and `load()` re-reads the
+    // view asynchronously, so revealing first puts the *previous* Exchange's
+    // answer on screen under the new Action's name for a few frames.
+    let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_VIEW, ());
+
     if let Some(window) = app.get_webview_window(WINDOW_POPOVER) {
-        place_at_cursor(&window);
+        let height = if phase == PopoverPhase::EmptySelection {
+            POPOVER_HINT_H
+        } else {
+            POPOVER_H
+        };
+        size_and_place_at_cursor(&window, POPOVER_W, height);
         reveal(&window);
     }
-    let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_VIEW, ());
 }
 
 /// Start a turn for a Popover that was waiting for typed input.
@@ -205,6 +230,10 @@ pub fn hide_popover(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WINDOW_POPOVER) {
         let _ = window.hide();
     }
+    // The view is gone, so tell the window: it keeps rendering the Exchange it
+    // last saw otherwise, and a hidden window that still holds an answer shows
+    // it again for a few frames on the next trigger.
+    let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_VIEW, ());
     restore_foreground_if_idle(app);
 }
 
@@ -213,6 +242,11 @@ pub fn hide_launcher(app: &AppHandle) {
         let state = app.state::<AppState>();
         // The cached Selection dies with the Launcher; nothing keeps a copy.
         *state.pending_selection.lock().expect("selection lock") = None;
+        // Whatever the Launcher was editing is gone with it: the flag must not
+        // survive to suppress the next summon's hide-on-blur.
+        state
+            .launcher_modal
+            .store(false, std::sync::atomic::Ordering::Relaxed);
     }
     if let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) {
         let _ = window.hide();
@@ -235,6 +269,9 @@ pub fn show_settings(app: &AppHandle) {
     let _ = window.unminimize();
     let _ = window.show();
     let _ = window.set_focus();
+    // Harmless on the very first open, when the webview is still loading and
+    // nothing is listening: the window does its own load on mount.
+    let _ = app.emit_to(WINDOW_SETTINGS, EVENT_SETTINGS_OPENED, ());
 }
 
 fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
@@ -244,8 +281,10 @@ fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         WebviewUrl::App("settings.html".into()),
     )
     .title("Beckon Settings")
-    .inner_size(940.0, 720.0)
-    .min_inner_size(720.0, 520.0)
+    // 240px of that width is the navigation column; the rest is the pane the
+    // Action editor lives in, which is the widest thing in the product.
+    .inner_size(980.0, 760.0)
+    .min_inner_size(780.0, 560.0)
     .center()
     .resizable(true)
     .visible(false)
@@ -298,18 +337,28 @@ fn restore_foreground_if_idle(app: &AppHandle) {
     }
 }
 
-/// The Popover is cursor-adjacent (README), clamped to the work area.
-fn place_at_cursor(window: &WebviewWindow) {
+/// Size the Popover, then place it cursor-adjacent (README), clamped to the
+/// work area.
+///
+/// The physical size is derived from the logical one rather than read back with
+/// `outer_size()`. This runs on the hotkey thread, so `set_size` is dispatched
+/// to the event loop and an immediate read can still return the old rect —
+/// which would place a hint-sized window using the full-sized bounds.
+fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, height: f64) {
+    let size = LogicalSize::new(width, height);
+    let _ = window.set_size(size);
+
     let Some(cursor) = platform::cursor::cursor_position() else {
         return;
     };
     let Some(area) = platform::cursor::work_area_at(cursor.0, cursor.1) else {
         return;
     };
-    let Ok(size) = window.outer_size() else {
+    let Ok(scale) = window.scale_factor() else {
         return;
     };
-    let (x, y) = platform::place_near_cursor(cursor, (size.width as i32, size.height as i32), area);
+    let physical = size.to_physical::<i32>(scale);
+    let (x, y) = platform::place_near_cursor(cursor, (physical.width, physical.height), area);
     let _ = window.set_position(PhysicalPosition::new(x, y));
 }
 

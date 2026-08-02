@@ -87,6 +87,7 @@ fn main() {
             commands::hide_popover,
             commands::hide_launcher,
             commands::show_settings,
+            commands::set_launcher_modal,
             commands::copy_to_clipboard,
         ])
         .setup(move |app| setup(app, autostart_wanted))
@@ -107,9 +108,17 @@ fn main() {
                 }
                 // A Launcher that outlives its focus is a bug; the Popover
                 // instead stays until Esc, so a follow-up survives a glance at
-                // another app.
+                // another app. The exception is the Action editor the Launcher
+                // hosts: an editing window has to survive a click elsewhere.
                 WindowEvent::Focused(false) if window.label() == trigger::WINDOW_LAUNCHER => {
-                    trigger::hide_launcher(window.app_handle());
+                    let app = window.app_handle();
+                    let editing = app
+                        .state::<AppState>()
+                        .launcher_modal
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    if !editing {
+                        trigger::hide_launcher(app);
+                    }
                 }
                 _ => {}
             }

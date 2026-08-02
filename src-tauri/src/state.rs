@@ -89,6 +89,11 @@ pub struct AppState {
     pub watcher: Mutex<Option<WatcherGuard>>,
     /// The startup hotkey-failure balloon fires once only (README).
     pub balloon_shown: AtomicBool,
+    /// The Launcher is editing an Action, so it must survive losing focus.
+    /// A Launcher normally dies with its focus; the Action editor it now hosts
+    /// opens dialogs and dropdowns, and a form that vanishes mid-edit is worse
+    /// than a picker that outstays its welcome.
+    pub launcher_modal: AtomicBool,
     /// Errors that put the tray icon into its error state.
     pub startup_errors: Mutex<Vec<String>>,
 }
@@ -108,6 +113,7 @@ impl AppState {
             popover_view: Mutex::new(None),
             watcher: Mutex::new(None),
             balloon_shown: AtomicBool::new(false),
+            launcher_modal: AtomicBool::new(false),
             startup_errors: Mutex::new(Vec::new()),
         }
     }

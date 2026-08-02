@@ -25,6 +25,7 @@ temperature = 1.3
 
 pub const ASK: &str = r#"name = "Quick ask"
 input_source = "prompt"
+hotkey = "Ctrl+Alt+A"
 
 [prompt]
 system = "Answer concisely. Unless asked, do not enumerate bullet points and do not preamble at length."
@@ -57,7 +58,11 @@ mod tests {
 
         let ask = Action::parse("ask.toml", ASK).unwrap();
         assert_eq!(ask.file.input_source, InputSource::Prompt);
+        assert_eq!(ask.file.hotkey.as_deref(), Some("Ctrl+Alt+A"));
         assert_eq!(ask.file.model.thinking, Some(true));
+
+        // Both examples ship a Direct Hotkey, so they must not collide.
+        assert_ne!(translate.file.hotkey, ask.file.hotkey);
     }
 
     #[test]

@@ -2,7 +2,8 @@
   // A hotkey recorder that registers what it records **immediately**: if the
   // combination is taken, it goes red on the spot and the value is refused
   // (README). Nothing unregisterable can reach disk through this component.
-  import { describeError, probeHotkey } from "../lib/ipc";
+  import { Keyboard } from "../icons";
+  import { describeError, probeHotkey } from "../ipc";
 
   interface Props {
     value: string | null;
@@ -114,6 +115,7 @@
     onkeydown={onKeydown}
     onblur={stop}
   >
+    <Keyboard size={14} />
     {#if recording}
       Press a combination…
     {:else}
@@ -134,11 +136,12 @@
   .recorder {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .recorder > button:first-child {
     min-width: 190px;
+    justify-content: flex-start;
     font-variant-numeric: tabular-nums;
   }
 
@@ -157,6 +160,12 @@
     background: none;
     color: var(--text-dim);
     text-decoration: underline;
-    padding: 2px 4px;
+    padding: 2px var(--space-1);
+  }
+
+  .link:hover:not(:disabled) {
+    background: none;
+    border-color: transparent;
+    color: var(--accent);
   }
 </style>
