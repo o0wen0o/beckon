@@ -45,6 +45,9 @@
 
   /* --- semantic ---------------------------------------------------------- */
   --danger: #b3261e; /* 5.5 */
+  /* Hovered/pressed on a danger *fill*, so it is measured the other way round:
+     8.1 against --bg-raised, which is the label sitting on top of it. */
+  --danger-strong: #8c1d18;
   --warn: #8a5300; /* 5.4 */
   --ok: #177038; /* 5.2 */
 
@@ -80,6 +83,8 @@
   --brand-on: #0b1622;
 
   --danger: #f2777a; /* 5.6 */
+  /* Brighter, not darker: on dark the fill is the light half of the pair. */
+  --danger-strong: #f79a9c;
   --warn: #e3b341; /* 7.8 */
   --ok: #4ade80; /* 8.7 */
 
@@ -137,6 +142,17 @@
      composer is a textarea and a button on the same line, and "same height"
      cannot be re-derived from padding in two places. */
   --control-h: 38px;
+
+  /* One row height for the two Action lists — the Launcher's and Settings'. A
+     description is optional, so without a floor the rhythm changes wherever one
+     is missing, and the lists are meant to read as the same list. */
+  --row-h: 46px;
+
+  /* A single-line control holding a short value — a model id, a base URL, a
+     recorded combination — stops here rather than stretching to the pane's
+     width. `width: 100%` is still the default: this is the cap, so a field
+     inside a narrow column keeps filling it. */
+  --input-max: 420px;
 
   --dur-fast: 120ms;
   --dur-base: 180ms;
@@ -221,6 +237,17 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--brand-to), var(--brand-from));
   border-color: transparent;
+}
+
+/* A gradient at half opacity is a muddy version of the brand rather than an
+   unavailable control — it reads as a rendering fault. So the fill is dropped
+   entirely and the button falls back to the disabled treatment every other
+   control already has. */
+button.primary:disabled {
+  background: var(--bg-sunken);
+  border-color: var(--border-strong);
+  color: var(--text-faint);
+  opacity: 1;
 }
 
 button.quiet {
@@ -367,15 +394,18 @@ code {
   width: 10px;
 }
 
+/* `--border-strong`, not `--border`: the thumb is the only thing saying there
+   is more content, and a decorative line is 1.2:1 against the dark surfaces it
+   sits on — invisible exactly when it is needed. */
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-strong);
   border-radius: var(--radius-pill);
   border: 3px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
+  background: var(--accent);
   background-clip: content-box;
 }
 

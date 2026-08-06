@@ -7,9 +7,16 @@
   interface Props {
     busy: boolean;
     error: string | null;
+    /**
+     * What this pane actually promises, when it is not the usual promise. The
+     * raw file editor has a Save button of its own (a file that does not parse
+     * cannot be written on every keystroke), and the standing line would sit
+     * directly beneath it saying the opposite.
+     */
+    note?: string | null;
   }
 
-  let { busy, error }: Props = $props();
+  let { busy, error, note = null }: Props = $props();
 </script>
 
 <div class="status" class:bad={error !== null} role="status" aria-live="polite">
@@ -21,7 +28,7 @@
     <span>Saving…</span>
   {:else}
     <span class="icon"><Check size={13} /></span>
-    <span>Changes are written to disk as you make them.</span>
+    <span>{note ?? "Changes are written to disk as you make them."}</span>
   {/if}
 </div>
 

@@ -7,10 +7,19 @@
     label: string;
     id?: string;
     describedBy?: string;
+    /**
+     * Show the switch's *state* — On / Off — instead of repeating `label`.
+     *
+     * Inside a `Field` the label is already above the control, so printing it
+     * again beside the switch says the same thing twice ("Autostart" over
+     * "Start with Windows") and leaves the switch itself unlabelled in the one
+     * way that matters: whether it is on. `label` stays the accessible name.
+     */
+    showState?: boolean;
     onchange: (checked: boolean) => void;
   }
 
-  let { checked, label, id, describedBy, onchange }: Props = $props();
+  let { checked, label, id, describedBy, showState = false, onchange }: Props = $props();
 </script>
 
 <button
@@ -19,11 +28,16 @@
   class="toggle"
   aria-checked={checked}
   aria-describedby={describedBy}
+  aria-label={showState ? label : undefined}
   {id}
   onclick={() => onchange(!checked)}
 >
   <span class="track" class:on={checked}><span class="thumb"></span></span>
-  <span class="text">{label}</span>
+  <!-- aria-hidden when it is the state: the switch already announces checked,
+       and a screen reader reading "On" after "on" is noise. -->
+  <span class="text" class:state={showState} aria-hidden={showState ? "true" : undefined}>
+    {showState ? (checked ? "On" : "Off") : label}
+  </span>
 </button>
 
 <style>
@@ -79,5 +93,15 @@
   .text {
     font-size: var(--text-base);
     color: var(--text);
+  }
+
+  /* Two characters that swap under a moving thumb: fixed width, or the row
+     twitches sideways every time the switch is thrown. */
+  .text.state {
+    min-width: 2.2em;
+    text-align: left;
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
   }
 </style>

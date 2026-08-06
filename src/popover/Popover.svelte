@@ -73,7 +73,10 @@
 <div class="surface">
   <PopoverHeader onclose={() => hidePopover()} />
 
-  <div class="body" bind:this={scroller}>
+  <!-- With no turns yet the body holds one short notice. Left at the top it
+       leaves the rest of the window empty above the composer, which reads as an
+       answer that failed to arrive rather than as a window waiting for input. -->
+  <div class="body" class:vacant={exchange.turns.length === 0} bind:this={scroller}>
     {#if view === null}
       <p class="hint">Nothing to show.</p>
     {:else if view.phase === "empty-selection" && exchange.turns.length === 0}
@@ -116,6 +119,10 @@
     gap: var(--space-4);
   }
 
+  .body.vacant {
+    justify-content: center;
+  }
+
   .notice {
     display: flex;
     flex-direction: column;
@@ -124,6 +131,12 @@
     text-align: center;
     padding: var(--space-4) var(--space-2);
     color: var(--text-dim);
+  }
+
+  /* The Popover's width is set for prose; a hint sentence set to the same
+     measure straggles across the window. */
+  .notice p {
+    max-width: 46ch;
   }
 
   .notice p {

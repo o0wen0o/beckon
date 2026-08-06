@@ -65,6 +65,7 @@ fn main() {
             commands::get_config,
             commands::save_config,
             commands::reveal_config_dir,
+            commands::open_api_key_page,
             commands::get_startup_errors,
             commands::get_actions,
             commands::save_action,

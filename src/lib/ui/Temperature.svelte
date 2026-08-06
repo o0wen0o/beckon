@@ -24,18 +24,28 @@
 </script>
 
 <div class="temperature">
+  <!-- The scale is nested with the slider, not laid beside the number box: the
+       ticks name positions *on the track*, so spanning the whole row put "2 ·
+       loose" under the number input and "1" left of the track's midpoint. -->
   <div class="row">
-    <input
-      class="slider"
-      type="range"
-      min="0"
-      max="2"
-      step="0.1"
-      {value}
-      aria-label="Temperature"
-      aria-describedby={describedBy}
-      oninput={(event) => commit(event.currentTarget.value)}
-    />
+    <div class="track">
+      <input
+        class="slider"
+        type="range"
+        min="0"
+        max="2"
+        step="0.1"
+        {value}
+        aria-label="Temperature"
+        aria-describedby={describedBy}
+        oninput={(event) => commit(event.currentTarget.value)}
+      />
+      <div class="scale" aria-hidden="true">
+        <span>0 · precise</span>
+        <span>1</span>
+        <span>2 · loose</span>
+      </div>
+    </div>
     <input
       class="number"
       type="number"
@@ -47,28 +57,33 @@
       oninput={(event) => commit(event.currentTarget.value)}
     />
   </div>
-  <div class="scale" aria-hidden="true">
-    <span>0 · precise</span>
-    <span>1</span>
-    <span>2 · loose</span>
-  </div>
 </div>
 
 <style>
   .temperature {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
+    max-width: var(--input-max);
   }
 
   .row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--space-3);
   }
 
-  .slider {
+  /* The slider and its ticks are one column, so the ticks measure the track. */
+  .track {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    /* Centres the ~18px thumb against the number box beside it, which is a
+       full `--control-h` tall. */
+    padding-top: calc((var(--control-h) - 18px) / 2);
+  }
+
+  .slider {
+    width: 100%;
     padding: 0;
     border: none;
     background: none;

@@ -6,7 +6,15 @@
   //
   // There is no Save button and there must never be one (ADR-0003); the write
   // is scheduled by the store as the fields change.
-  import { ArrowLeft, Auto, Plus, Prompt, TextSelect, Warning } from "../../../lib/icons";
+  import {
+    ArrowLeft,
+    Auto,
+    ChevronRight,
+    Plus,
+    Prompt,
+    TextSelect,
+    Warning,
+  } from "../../../lib/icons";
   import type { InputSource } from "../../../lib/types";
   import { actionStore } from "../../actions.svelte";
   import ActionEditor from "./ActionEditor.svelte";
@@ -50,9 +58,11 @@
     </button>
     <div class="editor-title">
       <span class="name">{title}</span>
-      <!-- The filename is the identity (ADR-0003): renaming never moves it. -->
+      <!-- The filename is the identity (ADR-0003): renaming never moves it. In
+           the raw editor the heading *is* the filename, so repeating it here
+           would print the same string twice, one line apart. -->
       <span class="file">
-        {editing.file}{editing.kind === "raw" ? " — does not parse, edited as text" : ""}
+        {editing.kind === "raw" ? "does not parse — edited as text" : editing.file}
       </span>
     </div>
   </header>
@@ -89,17 +99,26 @@
               <span class="description">{action.description}</span>
             {/if}
           </span>
+          <!-- Two fixed slots, not a shrink-to-fit row: with the hotkey chip
+               optional, an ordinary flex row parks each Input Source pill at a
+               different x and the column reads as a ragged edge. -->
           <span class="meta">
             <span class="source" title="Input Source: {sourceLabel(action.input_source)}">
               <SourceIcon size={13} />
               {sourceLabel(action.input_source)}
             </span>
-            {#if conflict}
-              <span class="badge bad" title={conflict}><Warning size={12} /> {action.hotkey}</span>
-            {:else if action.hotkey}
-              <kbd>{action.hotkey}</kbd>
-            {/if}
+            <span class="hotkey-slot">
+              {#if conflict}
+                <span class="badge bad" title={conflict}><Warning size={12} /> {action.hotkey}</span>
+              {:else if action.hotkey}
+                <kbd>{action.hotkey}</kbd>
+              {/if}
+            </span>
           </span>
+          <!-- The rows are the only way into the editor, and a name over a
+               description reads as a list of facts unless something says it
+               opens. -->
+          <span class="go"><ChevronRight size={16} /></span>
         </button>
       </li>
     {/each}
@@ -112,11 +131,15 @@
           <span class="rail"></span>
           <span class="text">
             <span class="name mono">{error.file_name}</span>
-            <span class="description">does not parse — open to repair</span>
+            <!-- The parse error itself, not a tooltip holding it: this row is
+                 the only report that the file exists, and a `title` is invisible
+                 to everything except a resting mouse. -->
+            <span class="description bad">{error.message}</span>
           </span>
           <span class="meta">
-            <span class="badge bad" title={error.message}><Warning size={12} /></span>
+            <span class="badge bad"><Warning size={12} /> Repair</span>
           </span>
+          <span class="go"><ChevronRight size={16} /></span>
         </button>
       </li>
     {/each}
@@ -165,6 +188,28 @@
     border-color: transparent;
   }
 
+  /* Equal rows: a description is optional, and without a floor the list's
+     rhythm changes every time one is missing. The Launcher's list reads the
+     same token, so the two lists of Actions stay one list. */
+  .row {
+    min-height: var(--row-h);
+  }
+
+  .go {
+    flex: none;
+    display: flex;
+    color: var(--text-faint);
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+
+  .row:hover .go,
+  .row:focus-visible .go {
+    color: var(--accent);
+    transform: translateX(2px);
+  }
+
   /* The brand rail. Decorative: the row's tint is what says "hovered". */
   .rail {
     position: absolute;
@@ -210,10 +255,22 @@
     text-overflow: ellipsis;
   }
 
+  .description.bad {
+    color: var(--danger);
+  }
+
   .meta {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+  }
+
+  /* Reserved whether or not this Action has a hotkey, so the pills line up. */
+  .hotkey-slot {
+    display: flex;
+    justify-content: flex-end;
+    flex: none;
+    min-width: 96px;
   }
 
   .source {

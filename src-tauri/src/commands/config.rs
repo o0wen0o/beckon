@@ -46,6 +46,18 @@ pub fn reveal_config_dir(app: AppHandle, state: State<AppState>) -> Result<(), S
         .map_err(|e| e.to_string())
 }
 
+/// Open the page a DeepSeek key comes from.
+///
+/// The URL is a constant rather than an argument: a first run with no key and no
+/// way to get one is a dead end, but "open whatever the webview asks for" is a
+/// far larger surface than that gap is worth.
+#[tauri::command]
+pub fn open_api_key_page(app: AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_url("https://platform.deepseek.com/api_keys", None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn get_startup_errors(state: State<AppState>) -> Vec<String> {
     state

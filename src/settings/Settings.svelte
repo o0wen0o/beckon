@@ -95,6 +95,9 @@
   <StatusBar
     busy={settings.configSlot.busy || actionStore.slot.busy}
     error={settings.saveError ?? actionStore.slot.error}
+    note={actionStore.editing?.kind === "raw"
+      ? "This file does not parse, so it is written with the button above — not as you type."
+      : null}
   />
 </div>
 

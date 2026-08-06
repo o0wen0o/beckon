@@ -2,7 +2,7 @@
   // The Popover's title bar: what is running, how it is going, and the two
   // things you can do to the window. It is also the drag region, so nothing in
   // it may take focus except the buttons.
-  import { BrandMark, Check, Close, Copy } from "../lib/icons";
+  import { BrandMark, Check, Close, Copy, Warning } from "../lib/icons";
   import { exchange, type Status } from "./exchange.svelte";
 
   const STATE_LABEL: Partial<Record<Status, string>> = {
@@ -35,6 +35,15 @@
         >thinking</span
       >{/if}
   </span>
+
+  <!-- Esc cancels a live request, and nothing said so: the window offered only
+       a close button, so the choice between "stop this" and "throw it away" was
+       invisible unless you already knew the shortcut. -->
+  {#if exchange.busy}
+    <button class="stop" title="Stop the request (Esc)" onclick={() => exchange.cancel()}>
+      <Warning size={13} /> Stop
+    </button>
+  {/if}
 
   {#if current?.answer}
     <button
@@ -126,10 +135,25 @@
     color: var(--text-faint);
   }
 
+  /* `--accent`, not `--warn`: thinking being on is a capability in use, not a
+     condition to act on, and the amber read as "something is wrong here". */
   .thinking-badge {
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-pill);
     padding: 0 var(--space-2);
+    color: var(--accent);
+  }
+
+  .stop {
+    flex: none;
+    padding: 2px var(--space-2);
+    font-family: var(--font-small);
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+  }
+
+  .stop:hover:not(:disabled) {
+    border-color: var(--warn);
     color: var(--warn);
   }
 

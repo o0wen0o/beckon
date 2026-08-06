@@ -35,12 +35,16 @@
     {/snippet}
   </Field>
 
-  <Field label="Autostart" hint="Beckon lives in the tray; starting with Windows is the point.">
+  <Field
+    label="Start with Windows"
+    hint="Beckon lives in the tray; starting with Windows is the point."
+  >
     {#snippet control({ id, describedBy })}
       <Toggle
         {id}
         {describedBy}
         label="Start with Windows"
+        showState
         checked={config.autostart}
         onchange={(on) => settings.editConfig((draft) => (draft.autostart = on), true)}
       />

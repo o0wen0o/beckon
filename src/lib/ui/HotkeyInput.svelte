@@ -2,7 +2,7 @@
   // A hotkey recorder that registers what it records **immediately**: if the
   // combination is taken, it goes red on the spot and the value is refused
   // (README). Nothing unregisterable can reach disk through this component.
-  import { Keyboard } from "../icons";
+  import { Close, Keyboard } from "../icons";
   import { describeError, probeHotkey } from "../ipc";
 
   interface Props {
@@ -108,7 +108,11 @@
 </script>
 
 <div class="recorder">
+  <!-- The button carries what it does, not just what it holds: styled like a
+       field, it reads as a value someone else typed and nothing suggests that
+       clicking is how a combination is recorded. -->
   <button
+    class="record"
     class:recording
     class:invalid={error !== null}
     onclick={() => (recording ? stop() : start())}
@@ -117,14 +121,17 @@
   >
     <Keyboard size={14} />
     {#if recording}
-      Press a combination…
+      <span class="value">Press a combination…</span>
     {:else}
-      {value ?? "Not set"}
+      <span class="value" class:unset={!value}>{value ?? "Not set"}</span>
+      <span class="verb">{value ? "Change" : "Record"}</span>
     {/if}
   </button>
 
   {#if clearable && value && !recording}
-    <button class="link" onclick={clear}>clear</button>
+    <button class="quiet clear" aria-label="Clear the Direct Hotkey" onclick={clear}>
+      <Close size={13} /> Clear
+    </button>
   {/if}
 </div>
 
@@ -139,10 +146,36 @@
     gap: var(--space-2);
   }
 
-  .recorder > button:first-child {
-    min-width: 190px;
+  .record {
+    min-width: 230px;
+    max-width: var(--input-max);
     justify-content: flex-start;
     font-variant-numeric: tabular-nums;
+  }
+
+  .value {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .value.unset {
+    color: var(--text-faint);
+  }
+
+  /* The affordance, quiet enough not to compete with the combination itself. */
+  .verb {
+    flex: none;
+    font-family: var(--font-small);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+
+  .record:hover:not(:disabled) .verb {
+    color: var(--accent);
   }
 
   .recording {
@@ -155,17 +188,9 @@
     color: var(--danger);
   }
 
-  .link {
-    border: none;
-    background: none;
-    color: var(--text-dim);
-    text-decoration: underline;
-    padding: 2px var(--space-1);
-  }
-
-  .link:hover:not(:disabled) {
-    background: none;
-    border-color: transparent;
-    color: var(--accent);
+  .clear {
+    flex: none;
+    font-family: var(--font-small);
+    font-size: var(--text-sm);
   }
 </style>

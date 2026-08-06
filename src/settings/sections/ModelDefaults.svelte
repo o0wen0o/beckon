@@ -4,7 +4,7 @@
   import ModelSelect from "../../lib/ui/ModelSelect.svelte";
   import Temperature from "../../lib/ui/Temperature.svelte";
   import Toggle from "../../lib/ui/Toggle.svelte";
-  import { describeFailure } from "../failures";
+  import { describeFailure } from "../../lib/failures";
   import { modelOption, modelOptions, thinkingWarning, unknownModelHint } from "../../lib/models";
   import { settings } from "../store.svelte";
 
@@ -47,7 +47,7 @@
   </Field>
 
   <Field
-    label="Thinking"
+    label="Think before answering"
     warning={thinkingHint}
     hint="DeepSeek thinks by default. Leaving it on adds seconds of latency to translation-shaped Actions, which is why this is off unless you ask for it."
   >
@@ -56,6 +56,7 @@
         {id}
         {describedBy}
         label="Think before answering"
+        showState
         checked={config.defaults.thinking}
         onchange={(on) => settings.editConfig((draft) => (draft.defaults.thinking = on), true)}
       />

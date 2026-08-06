@@ -22,6 +22,8 @@ import type {
 export const getConfig = () => invoke<Config>("get_config");
 export const saveConfig = (config: Config) => invoke<void>("save_config", { config });
 export const revealConfigDir = () => invoke<void>("reveal_config_dir");
+/** Opens a constant URL — the page a DeepSeek key comes from. */
+export const openApiKeyPage = () => invoke<void>("open_api_key_page");
 export const getStartupErrors = () => invoke<string[]>("get_startup_errors");
 
 // --- actions --------------------------------------------------------------

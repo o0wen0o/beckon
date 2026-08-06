@@ -18,10 +18,24 @@
     error?: string | null;
     /** Amber. Not a failure — something worth knowing. Coexists with the hint. */
     warning?: string | null;
+    /**
+     * Which way the hint bubble hangs. A bubble is absolutely positioned but
+     * still laid out, so one that hangs off the right of a scrolling pane adds
+     * to its `scrollWidth` and leaves a horizontal scrollbar behind while
+     * showing nothing at all. A field in a right-hand column passes `"end"`.
+     */
+    hintAlign?: "start" | "end";
     control: Snippet<[{ id: string; describedBy: string | undefined }]>;
   }
 
-  let { label, hint, error = null, warning = null, control }: Props = $props();
+  let {
+    label,
+    hint,
+    error = null,
+    warning = null,
+    hintAlign = "start",
+    control,
+  }: Props = $props();
 
   const id = $props.id();
   const descriptionId = `${id}-description`;
@@ -38,7 +52,7 @@
 <div class="field">
   <div class="label-row">
     <label class="label" for={id}>{label}</label>
-    {#if hint}<InfoHint text={hint} id={hintId} />{/if}
+    {#if hint}<InfoHint text={hint} id={hintId} align={hintAlign} />{/if}
   </div>
   {@render control({ id, describedBy: described })}
 

@@ -5,11 +5,23 @@
   //
   // Output is plain text with preserved whitespace: acceptable for the MVP, and
   // it cannot inject anything into the WebView.
+  import { describeFailure } from "../lib/failures";
   import { Check, ChevronRight, Copy, Retry, Warning } from "../lib/icons";
   import { showSettings } from "../lib/ipc";
   import { exchange, settlesInSettings, type Turn } from "./exchange.svelte";
 
   let { turn, index }: { turn: Turn; index: number } = $props();
+
+  /**
+   * The cause named first, then the provider's own words — the same sentence
+   * Settings builds. Printing `note` bare handed the user a raw reqwest chain
+   * for a `network` failure while Settings said "Could not reach the API".
+   */
+  const failure = $derived(
+    turn.status === "error"
+      ? describeFailure({ kind: turn.errorKind ?? "error", message: turn.note ?? "" })
+      : null,
+  );
 
   const settled = $derived(
     turn.status === "done" || turn.status === "interrupted" || turn.status === "cancelled",
@@ -81,7 +93,7 @@
 
   {#if turn.status === "error"}
     <div class="failure">
-      <p class="failure-message"><Warning size={14} /> {turn.note}</p>
+      <p class="failure-message"><Warning size={14} /> {failure}</p>
       <div class="failure-actions">
         <button class="primary" onclick={() => exchange.retry()}><Retry size={14} /> Retry</button>
         {#if settlesInSettings(turn.errorKind)}
@@ -109,6 +121,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+  }
+
+  /* A follow-up is a new question, and a gap alone does not say where the last
+     answer stopped — a long answer runs straight into the next question. */
+  .turn + :global(.turn) {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
   }
 
   /* Clamped, not scrollable: a scroller inside the body's scroller is a trap. */

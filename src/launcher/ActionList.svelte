@@ -93,16 +93,20 @@
           <span class="description">{action.description}</span>
         {/if}
       </div>
+      <!-- Two fixed slots: the hotkey chip is optional, and a shrink-to-fit row
+           lands every Input Source pill at a different x down the list. -->
       <div class="meta">
         <span class="source" title="Input Source: {sourceLabel(action.input_source)}">
           <SourceIcon size={13} />
           {sourceLabel(action.input_source)}
         </span>
-        {#if conflict}
-          <span class="badge bad" title={conflict}><Warning size={12} /> {action.hotkey}</span>
-        {:else if action.hotkey}
-          <kbd>{action.hotkey}</kbd>
-        {/if}
+        <span class="hotkey-slot">
+          {#if conflict}
+            <span class="badge bad" title={conflict}><Warning size={12} /> {action.hotkey}</span>
+          {:else if action.hotkey}
+            <kbd>{action.hotkey}</kbd>
+          {/if}
+        </span>
       </div>
     </li>
   {/each}
@@ -118,7 +122,9 @@
         <span class="description">does not parse — repair it in Settings</span>
       </div>
       <div class="meta">
-        <span class="badge bad" title={error.message}><Warning size={12} /></span>
+        <!-- The icon alone said nothing: this row cannot be run, and the label
+             is what tells you the click goes somewhere useful. -->
+        <span class="badge bad" title={error.message}><Warning size={12} /> Repair</span>
       </div>
     </li>
   {/each}
@@ -132,7 +138,8 @@
           <Sliders size={14} /> Add one in Settings
         </button>
       {:else}
-        <p>Nothing matches <code>{query}</code>.</p>
+        <p>Nothing matches <code class="query-echo">{query}</code>.</p>
+        <p class="hint">Backspace to widen the search.</p>
       {/if}
     </li>
   {/if}
@@ -146,6 +153,14 @@
       No selection
     {/if}
   </span>
+  <!-- The window is keyboard-first and summoned by a hotkey, so the keys it
+       answers to are the one thing worth spending footer space on. Dropped once
+       there is nothing to move through. -->
+  {#if matches.length > 0}
+    <span class="keys" aria-hidden="true">
+      <kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> run <kbd>Esc</kbd> close
+    </span>
+  {/if}
   <button class="quiet" title="Settings (Ctrl+,)" aria-label="Settings" onclick={onsettings}>
     <Sliders size={15} />
   </button>
@@ -198,6 +213,11 @@
     padding: var(--space-2);
     list-style: none;
     overflow-y: auto;
+    /* The gutter is always there, so arrowing past the fold does not shift the
+       whole list sideways by the width of a scrollbar. */
+    scrollbar-gutter: stable;
+    display: flex;
+    flex-direction: column;
   }
 
   .row {
@@ -205,6 +225,10 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    /* A description is optional; without a floor the rows change height down
+       the list and a clipped last row reads as a rendering fault. */
+    min-height: var(--row-h);
+    flex: none;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     cursor: default;
@@ -276,6 +300,14 @@
     gap: var(--space-2);
   }
 
+  /* Reserved whether or not this Action has a hotkey, so the pills line up. */
+  .hotkey-slot {
+    display: flex;
+    justify-content: flex-end;
+    flex: none;
+    min-width: 96px;
+  }
+
   .source {
     display: inline-flex;
     align-items: center;
@@ -288,12 +320,17 @@
     padding: 1px var(--space-2);
   }
 
+  /* Centred in what is left of the window rather than parked under the query
+     box: the list is the window's whole body, so an empty one that hugs the top
+     leaves a void that reads as content failing to load. */
   .empty {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: var(--space-3);
-    padding: var(--space-8) var(--space-3);
+    padding: var(--space-6) var(--space-3);
     text-align: center;
     color: var(--text-dim);
   }
@@ -302,14 +339,53 @@
     margin: 0;
   }
 
+  /* The query, quoted back — `code` alone is the same colour as the sentence
+     around it, so the thing that matched nothing did not stand out. */
+  .query-echo {
+    color: var(--text);
+    background: var(--bg-sunken);
+    border-radius: var(--radius-sm);
+    padding: 1px var(--space-1);
+  }
+
   footer {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-3);
     padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
     border-top: 1px solid var(--border);
     background: var(--bg-raised);
     border-radius: 0 0 var(--surface-radius) var(--surface-radius);
+  }
+
+  /* The scroll cue. The list is flush against the footer, so a row cut off at
+     the fold looks like a clipped row rather than a scrollable one; this fades
+     it out instead. Decorative, and the scrollbar still carries the position. */
+  footer::before {
+    content: "";
+    position: absolute;
+    left: 1px;
+    right: 1px;
+    bottom: 100%;
+    height: var(--space-4);
+    pointer-events: none;
+    background: linear-gradient(transparent, var(--bg));
+  }
+
+  .keys {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex: none;
+    font-family: var(--font-small);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+
+  .keys kbd {
+    border-bottom-width: 1px;
+    font-size: var(--text-xs);
   }
 
   /* The Selection count is status; the buttons are the window's own controls,

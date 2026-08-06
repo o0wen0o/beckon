@@ -53,3 +53,11 @@
     </optgroup>
   {/if}
 </select>
+
+<style>
+  /* A model id is a dozen characters; stretched across the pane the closed
+     select reads as an empty text field with a chevron parked far to the right. */
+  select {
+    max-width: var(--input-max);
+  }
+</style>

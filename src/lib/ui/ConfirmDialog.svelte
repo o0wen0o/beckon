@@ -103,8 +103,18 @@
     margin-top: var(--space-4);
   }
 
+  /* Filled, not outlined: this is the button that does the irreversible thing,
+     and an outline reads as the quieter of the two choices on offer. */
   .buttons .danger {
+    background: var(--danger);
     border-color: var(--danger);
-    color: var(--danger);
+    color: var(--bg-raised);
+    font-weight: var(--weight-medium);
+  }
+
+  .buttons .danger:hover:not(:disabled) {
+    background: var(--danger-strong);
+    border-color: var(--danger-strong);
+    color: var(--bg-raised);
   }
 </style>

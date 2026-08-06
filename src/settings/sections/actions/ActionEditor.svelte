@@ -90,7 +90,13 @@
       {/snippet}
     </Field>
 
-    <Field label="Description" hint="Shown under the name in the Launcher, and searched.">
+    <!-- Right-hand column: the hint bubble hangs leftwards, or its (invisible)
+         box overflows the pane and leaves a horizontal scrollbar behind. -->
+    <Field
+      label="Description"
+      hint="Shown under the name in the Launcher, and searched."
+      hintAlign="end"
+    >
       {#snippet control({ id, describedBy })}
         <input
           {id}
@@ -119,7 +125,11 @@
       {/snippet}
     </Field>
 
-    <Field label="Direct Hotkey" hint="Optional. Without one, the Action is Launcher-only.">
+    <Field
+      label="Direct Hotkey"
+      hint="Optional. Without one, the Action is Launcher-only."
+      hintAlign="end"
+    >
       {#snippet control()}
         <HotkeyInput
           value={draft.hotkey ?? null}
@@ -203,6 +213,7 @@
       {#snippet control()}
         <Toggle
           label="Think before answering"
+          showState
           checked={draft.model.thinking ?? defaults.thinking}
           onchange={(value) => actionStore.editDraft((next) => (next.model.thinking = value), true)}
         />
@@ -230,7 +241,10 @@
     </OverrideField>
   </div>
 
+  <!-- Above a divider rather than floating at the end of the form: it deletes a
+       file, so it must not read as the last field's neighbour. -->
   <div class="footer-row">
+    <span class="hint">Deleting removes <code>{action.file_name}</code> from disk.</span>
     <button class="danger" onclick={() => (actionStore.pendingDelete = action)}>
       Delete Action
     </button>
@@ -264,6 +278,24 @@
 
   .footer-row {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+  }
+
+  /* Destructive up front, not only once the pointer is over it: hover is not a
+     state a keyboard user passes through. */
+  .footer-row .danger {
+    flex: none;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .footer-row .danger:hover:not(:disabled) {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--bg-raised);
   }
 </style>
