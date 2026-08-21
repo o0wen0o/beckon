@@ -19,13 +19,13 @@ import * as React from "react";
 import { Label } from "@/components/ui/label";
 
 /**
- * The two measures a control is allowed to take. A text field stretched across
- * the pane reads as an empty box with a cursor in the corner, so the value
- * column holds the control to a measure and lets the explanation under it run
- * to the prose width instead. `wide` is for a control that shares its line with
+ * The two measures a control is allowed to take, named rather than numbered:
+ * the values are `--container-control` and `--container-control-wide`, so a
+ * control that has to cap itself (`ModelSelect`, `Temperature`) reaches the same
+ * number this row does. `wide` is for a control that shares its line with
  * buttons.
  */
-const MEASURE = { field: "max-w-85", wide: "max-w-105" } as const;
+const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;
 
 interface FieldProps {
   label: string;
@@ -58,10 +58,10 @@ export function Field({
     undefined;
 
   return (
-    <div className="flex items-baseline gap-5 border-b py-3.25">
+    <div className="flex items-baseline gap-ledger-gap border-b py-3.25">
       <Label
         htmlFor={id}
-        className="text-muted-foreground w-42 flex-none justify-end text-right text-quiet font-normal"
+        className="text-muted-foreground w-ledger-label flex-none justify-end text-right text-quiet font-normal"
       >
         {label}
       </Label>

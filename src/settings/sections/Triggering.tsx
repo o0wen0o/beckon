@@ -2,8 +2,8 @@ import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { HotkeyInput } from "@/components/HotkeyInput";
+import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
-import { Switch } from "@/components/ui/switch";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
@@ -50,29 +50,13 @@ export function Triggering() {
             hint="Beckon lives in the tray; starting with Windows is the point."
           >
             {({ id, describedBy }) => (
-              // A switch rather than a checkbox: these settings take effect
-              // immediately, and a checkbox reads as "will be applied when you
-              // save" — which there is no way to do here (ADR-0003).
-              <div className="flex items-center gap-2 self-start">
-                <Switch
-                  id={id}
-                  aria-describedby={describedBy}
-                  aria-label="Start with Windows"
-                  checked={config.autostart}
-                  onCheckedChange={(on) =>
-                    store.editConfig((draft) => (draft.autostart = on), true)
-                  }
-                />
-                {/* aria-hidden: the switch already announces checked, and a
-                    screen reader reading "On" after "on" is noise. Fixed width,
-                    or the row twitches every time it is thrown. */}
-                <span
-                  aria-hidden
-                  className="text-muted-foreground min-w-5.5 text-left text-meta"
-                >
-                  {config.autostart ? "On" : "Off"}
-                </span>
-              </div>
+              <OnOffSwitch
+                id={id}
+                describedBy={describedBy}
+                label="Start with Windows"
+                checked={config.autostart}
+                onChange={(on) => store.editConfig((draft) => (draft.autostart = on), true)}
+              />
             )}
           </Field>
         </FieldGroup>

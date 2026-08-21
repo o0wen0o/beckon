@@ -23,7 +23,6 @@ interface OverrideFieldProps {
   children: React.ReactNode;
   hint?: string;
   error?: string | null;
-  warning?: string | null;
 }
 
 export function OverrideField({
@@ -35,7 +34,6 @@ export function OverrideField({
   children,
   hint,
   error = null,
-  warning = null,
 }: OverrideFieldProps) {
   const [expanded, setExpanded] = React.useState(false);
   const root = React.useRef<HTMLDivElement | null>(null);
@@ -122,11 +120,7 @@ export function OverrideField({
         </button>
       )}
 
-      {error ? (
-        <p className="text-destructive mx-2 mb-1 text-note">{error}</p>
-      ) : warning ? (
-        <p className="mx-2 mb-1 text-warning text-note">{warning}</p>
-      ) : null}
+      {error ? <p className="text-destructive mx-2 mb-1 text-note">{error}</p> : null}
     </div>
   );
 }

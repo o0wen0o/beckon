@@ -7,22 +7,19 @@
 // The selected row is ink-filled with paper text. That inversion is the only
 // fill in the window, which is what makes "selected" unmistakable without a
 // tint, a rail or a hue.
-import { TriangleAlertIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Kbd } from "@/components/Kbd";
+import { HotkeyCell, RepairCell, SourceCell } from "@/components/ActionCells";
 import { highlight } from "@/lib/fuzzy";
-import { SOURCE_ICON, sourceLabel } from "@/lib/inputSource";
 import type { Action } from "@/lib/types";
 
 const ROW =
   "group flex h-13 w-full cursor-default items-center gap-3.5 border-b px-4 text-left transition-colors duration-150 ease-out aria-selected:bg-primary aria-selected:text-primary-foreground motion-reduce:transition-none";
 
-/** Two greys, the same two the Actions list in Settings uses: a description is
- *  body copy about the row, an Input Source is a label about it. Inside the
- *  selected row they become two strengths of the paper text — the muted greys
- *  are tuned against the background and read as smudges on the fill. */
+/** A description is body copy about the row; the Input Source column beside it
+ *  is a label about it, and carries the quieter of the two greys from
+ *  `SourceCell`. Inside the selected row both become strengths of the paper text
+ *  — the muted greys are tuned against the background and read as smudges on
+ *  the fill. */
 const DESC = "text-muted-foreground group-aria-selected:text-primary-foreground/80";
-const META = "text-muted-quiet group-aria-selected:text-primary-foreground/65";
 
 interface ActionRowProps {
   action: Action;
@@ -44,8 +41,6 @@ export function ActionRow({
   onRun,
   ref,
 }: ActionRowProps) {
-  const SourceIcon = SOURCE_ICON[action.input_source];
-
   return (
     // A listbox, not a menu: the query box keeps focus and the window drives
     // the list from the keyboard, so the mouse here is a convenience.
@@ -74,29 +69,8 @@ export function ActionRow({
         ) : null}
       </span>
 
-      <span
-        title={`Input Source: ${sourceLabel(action.input_source)}`}
-        className={`flex w-23 flex-none items-center gap-1.5 text-meta ${META}`}
-      >
-        <SourceIcon className="size-3" />
-        {sourceLabel(action.input_source)}
-      </span>
-
-      <span className="flex w-28 flex-none justify-end">
-        {conflict ? (
-          <Badge
-            variant="outline"
-            title={conflict}
-            className="border-destructive/60 text-destructive group-aria-selected:border-current group-aria-selected:text-primary-foreground gap-1 font-mono font-normal"
-          >
-            <TriangleAlertIcon className="size-3" /> {action.hotkey}
-          </Badge>
-        ) : action.hotkey ? (
-          <Kbd className="group-aria-selected:border-current/30 group-aria-selected:bg-transparent group-aria-selected:text-primary-foreground/70">
-            {action.hotkey}
-          </Kbd>
-        ) : null}
-      </span>
+      <SourceCell source={action.input_source} />
+      <HotkeyCell hotkey={action.hotkey} conflict={conflict} />
     </li>
   );
 }
@@ -113,15 +87,8 @@ export function BrokenRow({ file, message, onOpen }: BrokenRowProps) {
             invisible to everything except a resting mouse. */}
         <span className="text-destructive truncate text-meta">{message}</span>
       </span>
-      <span className="w-23 flex-none" />
-      <span className="flex w-28 flex-none justify-end">
-        <Badge
-          variant="outline"
-          className="border-destructive/60 text-destructive gap-1 text-meta font-normal"
-        >
-          <TriangleAlertIcon className="size-3" /> Repair
-        </Badge>
-      </span>
+      <SourceCell />
+      <RepairCell />
     </li>
   );
 }

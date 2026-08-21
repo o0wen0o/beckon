@@ -7,6 +7,7 @@ import { onActionsChanged, onConfigChanged, onSettingsOpened, Subscriptions } fr
 import { PaneProvider } from "@/lib/pane";
 import { useStore } from "@/lib/useStore";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PaneEnter } from "@/components/PaneEnter";
 import { StatusBar } from "@/components/StatusBar";
 import { SettingsNav } from "./SettingsNav";
 import { actionStore } from "./actions";
@@ -15,7 +16,18 @@ import { Appearance } from "./sections/Appearance";
 import { Connection } from "./sections/Connection";
 import { ModelDefaults } from "./sections/ModelDefaults";
 import { Triggering } from "./sections/Triggering";
-import { settings } from "./store";
+import { settings, type SectionRoute } from "./store";
+
+/** One pane per route, as a lookup rather than a ternary chain: the mapped type
+ *  is what makes a section added later a compile error here instead of silently
+ *  rendering whatever the chain's last `else` happened to be. */
+const PANES: Record<SectionRoute, React.ComponentType> = {
+  connection: Connection,
+  actions: Actions,
+  triggering: Triggering,
+  appearance: Appearance,
+  defaults: ModelDefaults,
+};
 
 export function Settings() {
   const store = useStore(settings);
@@ -85,6 +97,10 @@ export function Settings() {
   }, [flush]);
 
   const pendingDelete = actions.pendingDelete;
+  const Pane = PANES[store.route];
+  /** What is on screen, which is the route except inside Actions, where opening
+   *  a file is a view change the route does not see. */
+  const paneKey = `${store.route}:${actions.editing?.file ?? ""}`;
 
   return (
     <PaneProvider value={pane}>
@@ -100,28 +116,16 @@ export function Settings() {
             onBlur={flush}
             className="min-w-0 flex-1 overflow-y-auto px-7.5 pt-6.5 pb-10"
           >
-            {/* Keyed on the route so the wrapper remounts and the animation
-                actually re-runs. The pane rises 4px as it fades: the nav item
-                fills on the same 150–200ms curve, so the click reads as one
-                movement from the column into the pane rather than as two
-                unrelated repaints. Nothing here waits on it — the content is
-                already laid out, only its opacity and offset animate. */}
-            <div
-              key={store.route}
-              className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-out motion-reduce:animate-none"
-            >
-              {store.route === "connection" ? (
-                <Connection />
-              ) : store.route === "actions" ? (
-                <Actions />
-              ) : store.route === "triggering" ? (
-                <Triggering />
-              ) : store.route === "appearance" ? (
-                <Appearance />
-              ) : (
-                <ModelDefaults />
-              )}
-            </div>
+            {/* Keyed on the whole view, not just the route: the Actions section
+                swaps between its list and its editor without the route moving,
+                and the pane rising 4px as it fades is what makes that read as
+                one movement from the nav column into the pane. Keying it here
+                rather than inside the section is what keeps the entrance to one
+                per change — as a wrapper in both places, arriving at Actions ran
+                the two of them at once. */}
+            <PaneEnter key={paneKey}>
+              <Pane />
+            </PaneEnter>
           </main>
         </div>
 

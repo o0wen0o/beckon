@@ -92,7 +92,7 @@ export function Connection() {
                   buttons live on the same line, so holding the whole line to
                   420px is what keeps this row inside the value column instead
                   of running past every other control on the pane. */}
-              <div className="flex max-w-105 items-center gap-2">
+              <div className="flex max-w-control-wide items-center gap-2">
                 <Input
                   id={id}
                   aria-describedby={describedBy}

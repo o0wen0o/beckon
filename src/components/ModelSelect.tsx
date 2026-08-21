@@ -1,5 +1,6 @@
 // The one surface whose entire hazard is focus and re-render, so the two rules
 // that stop a configured model being silently rewritten are both here.
+import * as React from "react";
 import type { ModelOption } from "@/lib/types";
 import {
   Select,
@@ -36,8 +37,15 @@ export function ModelSelect({
   describedBy,
   onChange,
 }: ModelSelectProps) {
-  const known = options.filter((option) => option.origin !== "configured");
-  const configured = options.filter((option) => option.origin === "configured");
+  // Split once per list rather than twice per render: the panes this sits in
+  // re-render on every keystroke, and the split is the same both times.
+  const [known, configured] = React.useMemo(
+    () => [
+      options.filter((option) => option.origin !== "configured"),
+      options.filter((option) => option.origin === "configured"),
+    ],
+    [options],
+  );
 
   /**
    * `value=` + `onValueChange`, never a two-way binding. A binding would write
@@ -60,8 +68,9 @@ export function ModelSelect({
       {/* Held to the same measure as a text field rather than shrunk to its own
           content: shadcn's trigger is `w-fit`, which parks a twelve-character
           model id in a box narrower than everything else in the value column
-          and breaks the one line the ledger draws. */}
-      <SelectTrigger id={id} aria-describedby={describedBy} className="w-full max-w-85">
+          and breaks the one line the ledger draws. The measure is `Field`'s own
+          token, not a number repeated here. */}
+      <SelectTrigger id={id} aria-describedby={describedBy} className="w-full max-w-control">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -1,13 +1,14 @@
+import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { ModelSelect } from "@/components/ModelSelect";
+import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
 import { Temperature } from "@/components/Temperature";
 import { describeFailure } from "@/lib/failures";
-import { modelOption, modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
+import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
@@ -21,15 +22,19 @@ export function ModelDefaults() {
   const store = useStore(settings);
   const config = store.config;
 
-  const modelHint = unknownModelHint(config?.defaults.model ?? null, store.models);
-  const modelInfo = config
-    ? (modelOption(config.defaults.model, store.models)?.description ?? "")
-    : "";
+  const catalog = store.models;
+  const model = config?.defaults.model ?? null;
+
+  // One option list, derived from once. Four separate calls built it
+  // independently and three of them then scanned it for the same id — on every
+  // render, which on this pane is every step of the temperature slider.
+  const options = React.useMemo(() => modelOptions(model ?? "", catalog), [model, catalog]);
+  const modelHint = unknownModelHint(model, catalog);
+  const modelInfo = options.find((option) => option.id === model)?.description ?? "";
   const thinkingHint = config
-    ? thinkingWarning(config.defaults.model, config.defaults.thinking, store.models)
+    ? thinkingWarning(config.defaults.model, config.defaults.thinking, catalog)
     : null;
 
-  const catalog = store.models;
   const catalogNotice =
     !catalog || catalog.live || !catalog.fallback
       ? null
@@ -57,7 +62,7 @@ export function ModelDefaults() {
                   id={id}
                   describedBy={describedBy}
                   value={config.defaults.model}
-                  options={modelOptions(config.defaults.model, store.models)}
+                  options={options}
                   onChange={(model) =>
                     store.editConfig((draft) => (draft.defaults.model = model), true)
                   }
@@ -67,23 +72,15 @@ export function ModelDefaults() {
 
             <Field label="Think before answering" warning={thinkingHint} hint={THINKING_HINT}>
               {({ id, describedBy }) => (
-                <div className="flex items-center gap-2 self-start">
-                  <Switch
-                    id={id}
-                    aria-describedby={describedBy}
-                    aria-label="Think before answering"
-                    checked={config.defaults.thinking}
-                    onCheckedChange={(on) =>
-                      store.editConfig((draft) => (draft.defaults.thinking = on), true)
-                    }
-                  />
-                  <span
-                    aria-hidden
-                    className="text-muted-foreground min-w-5.5 text-left text-meta"
-                  >
-                    {config.defaults.thinking ? "On" : "Off"}
-                  </span>
-                </div>
+                <OnOffSwitch
+                  id={id}
+                  describedBy={describedBy}
+                  label="Think before answering"
+                  checked={config.defaults.thinking}
+                  onChange={(on) =>
+                    store.editConfig((draft) => (draft.defaults.thinking = on), true)
+                  }
+                />
               )}
             </Field>
 

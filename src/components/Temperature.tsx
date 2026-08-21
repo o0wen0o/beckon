@@ -24,7 +24,7 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
   }
 
   return (
-    <div className="max-w-85">
+    <div className="max-w-control">
       {/* The scale is nested with the slider, not laid beside the number box:
           the ticks name positions *on the track*, so spanning the whole row put
           "2 · loose" under the number input and "1" left of the midpoint. */}

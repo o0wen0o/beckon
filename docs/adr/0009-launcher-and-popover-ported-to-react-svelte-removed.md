@@ -35,7 +35,7 @@ ADR-0008 flagged this as the one animation with no Tailwind equivalent. It is re
 
 The old rail travelled, and travel had to be disabled under `prefers-reduced-motion` with a *static* substitute, because a frozen travelling bar reads as a stalled request. A pulse has no such failure mode — frozen, it is simply a bar — so the reduced-motion branch is `motion-reduce:animate-none` like everything else, and the seconds counter beside it is what still proves the wait is progressing. Same for the streaming caret, which was `breathe` and is now `animate-pulse` at the same reading.
 
-So the two surfaces add **no** tokens, no keyframes and no CSS. `src/globals.css` is the whole design system for all three windows.
+So the two surfaces add no keyframes and no CSS, and one token: `--text-query`, the one step *above* body, with one consumer — the Launcher's query box, which is that window's subject sitting in a 56px bar where body size reads as timid. It is in the scale rather than borrowed from Tailwind's `text-base` so the scale still lists every size the product uses. `src/globals.css` is the whole design system for all three windows, and that is the only line either surface added to it.
 
 ## What did not change
 

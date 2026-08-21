@@ -61,6 +61,17 @@ export function settlesInSettings(kind: string | undefined) {
   return kind === "no-credential" || kind === "read-error" || kind === "auth" || kind === "config";
 }
 
+/** A turn that will not change again, so its answer can be offered for copying. */
+export function isSettled(status: Status) {
+  return status === "done" || status === "interrupted" || status === "cancelled";
+}
+
+/**
+ * The standing notice a conversation carries when it has no turns yet. Only one
+ * of them is an alarm, which is what the Popover renders as a `Callout`.
+ */
+export type Notice = "none" | "no-view" | "empty-selection" | "awaiting-input";
+
 class ExchangeStore extends Notifier {
   view: PopoverView | null = null;
   turns: Turn[] = [];
@@ -94,6 +105,30 @@ class ExchangeStore extends Notifier {
 
   get waitedSeconds() {
     return this.#waited;
+  }
+
+  /** Whether the composer belongs on screen: the Action asked for typed input,
+   *  or the Exchange has settled and a follow-up is possible. */
+  get composing() {
+    return this.view !== null && (this.view.phase === "needs-input" || this.canFollowUp);
+  }
+
+  /**
+   * `PopoverPhase` is resolved in Rust precisely so the rule lives in one place;
+   * choosing the notice from it in a JSX ternary chain put a second copy of that
+   * rule in the one file no test can reach.
+   */
+  get notice(): Notice {
+    if (this.view === null) return "no-view";
+    if (this.turns.length > 0) return "none";
+    return this.view.phase === "empty-selection" ? "empty-selection" : "awaiting-input";
+  }
+
+  /** What the bar along the bottom says a live turn is doing. `busy` decides
+   *  whether the bar is there at all; this is the same register, so it is
+   *  resolved beside it rather than re-split in markup. */
+  get runLabel() {
+    return this.current?.status === "streaming" ? "Streaming" : "Waiting";
   }
 
   // --- lifecycle ----------------------------------------------------------
@@ -289,10 +324,12 @@ class ExchangeStore extends Notifier {
     this.#waited = 0;
   }
 
+  /** Both callers are inside `#forCurrent`, which publishes once the event has
+   *  landed — so this must not publish too, or every first token re-renders the
+   *  window twice. */
   #markStreaming(turn: Turn) {
     turn.status = "streaming";
     this.#waitingSince = 0;
-    this.notify();
   }
 
   /** Apply an event only if it belongs to the Exchange on screen. */

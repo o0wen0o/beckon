@@ -6,7 +6,7 @@
    It is the design system for all three windows (ADR-0009). The notes below say
    "the pane" because Settings is where each decision was made and is the widest
    surface it has to hold, but the Launcher and the Popover read the same tokens
-   and add none.
+   and added one between them: `--text-query`, noted where it is defined.
 
    The base colour is shadcn's `neutral`, and the surface is monochrome: the
    accent is not a hue, it is *inversion*. A selected nav item and a selected
@@ -121,6 +121,16 @@
      shorter than the measure on purpose: it has to read as a caption to the
      heading rather than as the section's first paragraph. */
   --container-lede: 58ch;
+  /* The two measures a control is allowed to take, and the reason they are
+     tokens: a text field stretched across the pane reads as an empty box with a
+     cursor in one corner, so the value column holds a control to a measure —
+     and a control that caps *itself* at a number written into its own class
+     string is a second place deciding the same thing. `Field` names the measure
+     for the row; `ModelSelect` and `Temperature` name it because they are
+     dropped into rows that do not. The wide one is for a control sharing its
+     line with buttons. */
+  --container-control: 21.25rem;
+  --container-control-wide: 26.25rem;
 
   /* Tracking belongs to the type scale, not to a component. The eyebrow is set
      open because it is uppercase at 10.5px, where default tracking closes the
@@ -129,6 +139,21 @@
      reads as letters touching. */
   --tracking-eyebrow: 0.11em;
   --tracking-title: -0.018em;
+
+  /* The ledger's grid, in the one place both halves of it can be read at once:
+     `Field` draws the label column and the gap, and the Action's override rows
+     indent past both to line up with the controls above them. As two numbers in
+     two files that indent was arithmetic done in a comment, and the block was
+     the only thing on the pane out of line the moment either number moved. */
+  --spacing-ledger-label: 10.5rem;
+  --spacing-ledger-gap: 1.25rem;
+
+  /* Motion is 150–200ms `ease-out` across all three windows, so the house curve
+     is the default rather than a string each component repeats: a bare
+     `transition-colors` added later lands on it instead of on Tailwind's own
+     `ease`, which is the drift these two lines exist to stop. */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: var(--ease-out);
 
   /* Two faces, not three. Segoe UI Variable ships a Small optical size for
      text at or below 12px, and using it on every hint meant the pane changed

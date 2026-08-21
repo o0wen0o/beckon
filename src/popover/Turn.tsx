@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { describeFailure } from "@/lib/failures";
 import { showSettings } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
-import { exchange, settlesInSettings, type Turn } from "./exchange";
+import { exchange, isSettled, settlesInSettings, type Turn } from "./exchange";
 
 /** Long enough that the clamp is doing something, i.e. worth offering to undo. */
 const CLAMP_AT = 160;
@@ -36,8 +36,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
       ? describeFailure({ kind: turn.errorKind ?? "error", message: turn.note ?? "" })
       : null;
 
-  const settled =
-    turn.status === "done" || turn.status === "interrupted" || turn.status === "cancelled";
+  const settled = isSettled(turn.status);
   const copied = exchange.copiedTurn === index;
 
   return (
@@ -72,30 +71,23 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         ) : null}
 
         {turn.reasoning ? (
-          turn.reasoningOpen ? (
-            <>
+          <>
+            {turn.reasoningOpen ? (
               <p className="text-muted-foreground max-h-40 overflow-y-auto whitespace-pre-wrap text-quiet">
                 {turn.reasoning}
               </p>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="-ml-2"
-                onClick={() => exchange.toggleReasoning(turn)}
-              >
-                Hide
-              </Button>
-            </>
-          ) : (
+            ) : null}
+            {/* One button with two labels, not one per arm: the affordance is
+                the same object either way. */}
             <Button
               variant="ghost"
               size="xs"
               className="-ml-2"
               onClick={() => exchange.toggleReasoning(turn)}
             >
-              Show what it thought
+              {turn.reasoningOpen ? "Hide" : "Show what it thought"}
             </Button>
-          )
+          </>
         ) : null}
 
         {turn.status === "waiting-first-token" ? (

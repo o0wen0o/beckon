@@ -6,27 +6,28 @@
 // There is no Save button and there must never be one (ADR-0003); the write is
 // scheduled by the store as the fields change.
 import * as React from "react";
-import {
-  ArrowLeftIcon,
-  ChevronRightIcon,
-  PlusIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Kbd } from "@/components/Kbd";
+import { ArrowLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
+import { HotkeyCell, RepairCell, SourceCell } from "@/components/ActionCells";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/FieldGroup";
 import { PaneHeader } from "@/components/PaneHeader";
-import { SOURCE_ICON, sourceLabel } from "@/lib/inputSource";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { ActionEditor } from "./ActionEditor";
 import { RawFileEditor } from "./RawFileEditor";
 
 /** The ledger row, shared by the Actions and the files that will not parse: the
- *  same four columns, so a broken file sits in the list rather than beside it. */
+ *  same four columns, so a broken file sits in the list rather than beside it.
+ *  The two columns it ends with are `ActionCells`, which the Launcher's list
+ *  draws too. */
 const ROW =
   "group hover:bg-accent focus-visible:ring-ring/50 flex w-full items-center gap-3.5 border-b px-2 py-2.5 text-left transition-colors duration-150 ease-out focus-visible:ring-[3px] focus-visible:outline-none motion-reduce:transition-none";
+
+/** The rows are the only way into the editor, and a name over a description
+ *  reads as a list of facts unless something says it opens. One string, because
+ *  as two the error row lost the colour change and kept the nudge. */
+const CHEVRON =
+  "text-muted-quiet group-hover:text-foreground group-focus-visible:text-foreground flex flex-none transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 motion-reduce:transition-none";
 
 export function Actions() {
   const store = useStore(actionStore);
@@ -49,9 +50,10 @@ export function Actions() {
     const title = editing.kind === "raw" ? editing.file : store.draft?.name || editing.file;
 
     return (
-      // The list and the editor are two views of one pane, and each mounts
-      // fresh when the other leaves, so the entrance runs without a key.
-      <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-out motion-reduce:animate-none">
+      // The list and the editor are two views of one pane; the entrance belongs
+      // to the shell, which keys `PaneEnter` on the open file as well as the
+      // route, so this swap animates once rather than twice.
+      <div>
         <header className="mb-6.5 flex items-center gap-3">
           <Button
             variant="ghost"
@@ -89,7 +91,7 @@ export function Actions() {
   }
 
   return (
-    <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-out motion-reduce:animate-none">
+    <div>
       <PaneHeader
         title="Actions"
         action={
@@ -109,7 +111,6 @@ export function Actions() {
           <ul className="flex list-none flex-col p-0">
             {snapshot.actions.map((action) => {
               const conflict = snapshot.hotkey_errors[action.id];
-              const SourceIcon = SOURCE_ICON[action.input_source];
               return (
                 <li key={action.id}>
                   <button
@@ -128,38 +129,9 @@ export function Actions() {
                         )}
                       </span>
                     </span>
-                    {/* Two fixed columns, not a shrink-to-fit row: with the
-                        hotkey chip optional, an ordinary flex row parks each
-                        Input Source at a different x and the list reads as
-                        ragged. */}
-                    <span
-                      title={`Input Source: ${sourceLabel(action.input_source)}`}
-                      className="text-muted-quiet flex w-23 flex-none items-center gap-1.5 text-meta"
-                    >
-                      <SourceIcon className="size-3" />
-                      {sourceLabel(action.input_source)}
-                    </span>
-                    <span className="flex w-28 flex-none justify-end">
-                      {conflict ? (
-                        // Outlined like the working hotkey chip beside it, in
-                        // the danger colour: it is still the Action's hotkey,
-                        // just an inactive one, and a solid red pill reads as a
-                        // button.
-                        <Badge
-                          variant="outline"
-                          title={conflict}
-                          className="border-destructive/60 text-destructive gap-1 font-mono font-normal"
-                        >
-                          <TriangleAlertIcon className="size-3" /> {action.hotkey}
-                        </Badge>
-                      ) : action.hotkey ? (
-                        <Kbd>{action.hotkey}</Kbd>
-                      ) : null}
-                    </span>
-                    {/* The rows are the only way into the editor, and a name
-                        over a description reads as a list of facts unless
-                        something says it opens. */}
-                    <span className="text-muted-quiet group-hover:text-foreground group-focus-visible:text-foreground flex flex-none transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 motion-reduce:transition-none">
+                    <SourceCell source={action.input_source} />
+                    <HotkeyCell hotkey={action.hotkey} conflict={conflict} />
+                    <span className={CHEVRON}>
                       <ChevronRightIcon className="size-4" />
                     </span>
                   </button>
@@ -192,16 +164,9 @@ export function Actions() {
                       {error.message}
                     </span>
                   </span>
-                  <span className="w-23 flex-none" />
-                  <span className="flex w-28 flex-none justify-end">
-                    <Badge
-                      variant="outline"
-                      className="border-destructive/60 text-destructive gap-1 text-meta font-normal"
-                    >
-                      <TriangleAlertIcon className="size-3" /> Repair
-                    </Badge>
-                  </span>
-                  <span className="text-muted-quiet group-hover:text-foreground flex flex-none transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 motion-reduce:transition-none">
+                  <SourceCell />
+                  <RepairCell />
+                  <span className={CHEVRON}>
                     <ChevronRightIcon className="size-4" />
                   </span>
                 </button>

@@ -5,29 +5,30 @@
 // The defaults an override inherits from and the model catalog come from the
 // window's other store — this window already loads both for Model defaults, and
 // a second copy could only drift from it.
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { HotkeyInput } from "@/components/HotkeyInput";
 import { ModelSelect } from "@/components/ModelSelect";
+import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { OverrideField } from "@/components/OverrideField";
 import { Segmented } from "@/components/Segmented";
 import { Temperature } from "@/components/Temperature";
+import { SOURCES as SOURCE_ORDER, sourceLabel } from "@/lib/inputSource";
 import { modelOptions, unknownModelHint } from "@/lib/models";
 import type { Action, InputSource } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { settings } from "../../store";
 
-const SOURCES: { value: InputSource; label: string }[] = [
-  { value: "selection", label: "Selection" },
-  { value: "prompt", label: "Prompt" },
-  { value: "auto", label: "Auto" },
-];
+/** Derived rather than restated: this is the one place an Input Source is
+ *  chosen, so a third hand-written copy of the three values and their labels is
+ *  the copy most likely to disagree with the two lists that display them. */
+const SOURCES = SOURCE_ORDER.map((value) => ({ value, label: sourceLabel(value) }));
 
 const SOURCE_HINT: Record<InputSource, string> = {
   selection: "Uses the Selection only. An empty grab shows a hint and sends nothing.",
@@ -52,9 +53,20 @@ export function ActionEditor({ action }: ActionEditorProps) {
   const defaults = config?.defaults;
   const hotkeyConflict = store.snapshot.hotkey_errors[action.id];
 
+  // Above the guard, because hooks have to be, and memoized because every
+  // keystroke in Name, Description or either prompt field re-renders this form:
+  // without it the option list is rebuilt and re-scanned per character, while
+  // the Model override row is still collapsed and showing none of it.
+  const override = draft?.model.model ?? null;
+  const catalog = settings.models;
+  const modelOverrideOptions = React.useMemo(
+    () => modelOptions(override ?? "", catalog),
+    [override, catalog],
+  );
+  const modelHint = React.useMemo(() => unknownModelHint(override, catalog), [override, catalog]);
+
   if (!draft || !defaults) return null;
 
-  const modelHint = unknownModelHint(draft.model.model ?? null, settings.models);
   const templateWarning =
     draft.prompt.user && !draft.prompt.user.includes("{{input}}")
       ? "This template never includes the input."
@@ -188,13 +200,15 @@ export function ActionEditor({ action }: ActionEditorProps) {
       </FieldGroup>
 
       <FieldGroup title="Model overrides">
-        {/* Indented to the value column, so the override rows line up with the
+        {/* Indented past the label column and its gap — the ledger's own two
+            tokens, added together by CSS rather than by hand, so the block
+            follows `Field` if either ever moves. The rows then line up with the
             controls in the ledger above them rather than with their labels, and
-            held to the same measure as the widest control in it — otherwise the
+            are held to the same measure as the widest control in it — otherwise the
             three of them are the only thing on the pane running past where every
             value stops. */}
-        <div className="pt-3 pl-47">
-          <div className="flex max-w-105 flex-col gap-2">
+        <div className="pt-3 pl-[calc(var(--spacing-ledger-label)+var(--spacing-ledger-gap))]">
+          <div className="flex max-w-control-wide flex-col gap-2">
             <OverrideField
               label="Model"
               inherited={defaults.model}
@@ -209,7 +223,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
               be a render artefact, and ModelSelect refuses to write it. */}
               <ModelSelect
                 value={draft.model.model ?? ""}
-                options={modelOptions(draft.model.model ?? "", settings.models)}
+                options={modelOverrideOptions}
                 onChange={(model) => store.editDraft((next) => (next.model.model = model), true)}
               />
             </OverrideField>
@@ -226,18 +240,11 @@ export function ActionEditor({ action }: ActionEditorProps) {
                 )
               }
             >
-              <div className="flex items-center gap-2">
-                <Switch
-                  aria-label="Think before answering"
-                  checked={draft.model.thinking ?? defaults.thinking}
-                  onCheckedChange={(value) =>
-                    store.editDraft((next) => (next.model.thinking = value), true)
-                  }
-                />
-                <span aria-hidden className="text-muted-foreground min-w-5.5 text-meta">
-                  {(draft.model.thinking ?? defaults.thinking) ? "On" : "Off"}
-                </span>
-              </div>
+              <OnOffSwitch
+                label="Think before answering"
+                checked={draft.model.thinking ?? defaults.thinking}
+                onChange={(value) => store.editDraft((next) => (next.model.thinking = value), true)}
+              />
             </OverrideField>
 
             <OverrideField

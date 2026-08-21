@@ -13,11 +13,9 @@ interface InfoHintProps {
   text: string;
   /** The id the described control points at. */
   id?: string;
-  /** Which side of the icon the bubble hangs on. */
-  align?: "start" | "end";
 }
 
-export function InfoHint({ text, id, align = "start" }: InfoHintProps) {
+export function InfoHint({ text, id }: InfoHintProps) {
   // Hover is the affordance; the click is for everyone hover does not serve —
   // a keyboard reaches it as a button, a touch or a trackpad tap pins it open.
   const [open, setOpen] = React.useState(false);
@@ -36,7 +34,7 @@ export function InfoHint({ text, id, align = "start" }: InfoHintProps) {
           <InfoIcon className="size-3.5" />
         </PopoverTrigger>
         <PopoverContent
-          align={align}
+          align="start"
           aria-hidden
           className="text-muted-foreground w-auto max-w-70 p-3 text-meta leading-relaxed"
         >

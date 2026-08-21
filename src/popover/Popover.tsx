@@ -74,7 +74,6 @@ export function Popover() {
 
   const view = store.view;
   const empty = store.turns.length === 0;
-  const composing = view !== null && (view.phase === "needs-input" || store.canFollowUp);
 
   return (
     // The frameless card fills the window rect exactly, so the drop shadow
@@ -96,24 +95,25 @@ export function Popover() {
         // them and the scroller carries the window's own padding.
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3.5 py-3 scrollbar-gutter-stable"
       >
-        {/* A notice has no side to sit on. Only one of them is an alarm, and it
-            gets the marker the rest of the product uses for one — a rule, not a
-            box; the other two are ordinary prose. */}
-        {view === null ? (
+        {/* Which notice this is comes from the store; a notice has no side to
+            sit on. Only one of them is an alarm, and it gets the marker the rest
+            of the product uses for one — a rule, not a box; the other two are
+            ordinary prose. */}
+        {store.notice === "no-view" ? (
           <p className="text-muted-foreground text-quiet">Nothing to show.</p>
-        ) : view.phase === "empty-selection" && empty ? (
+        ) : store.notice === "empty-selection" ? (
           <Callout tone="warn">
             <p>
-              <strong>{view.action_name}</strong> works on a Selection, and nothing was selected.
+              <strong>{view?.action_name}</strong> works on a Selection, and nothing was selected.
             </p>
             <p className="text-quiet">
               Select some text and press the hotkey again. Elevated windows cannot be read at all.
             </p>
           </Callout>
-        ) : empty ? (
+        ) : store.notice === "awaiting-input" ? (
           <p className="text-muted-foreground text-quiet">
             Type what you want to send to{" "}
-            <strong className="text-foreground font-semibold">{view.action_name}</strong>.
+            <strong className="text-foreground font-semibold">{view?.action_name}</strong>.
           </p>
         ) : null}
 
@@ -129,7 +129,7 @@ export function Popover() {
         <div className="flex h-11 flex-none items-center gap-2 border-t pr-2 pl-3.5">
           <span className="text-muted-quiet flex flex-1 items-center gap-2 text-meta">
             <span className="bg-foreground size-1.5 flex-none animate-pulse rounded-full motion-reduce:animate-none" />
-            {store.current?.status === "streaming" ? "Streaming" : "Waiting"}
+            {store.runLabel}
           </span>
           <Button variant="outline" size="sm" onClick={() => exchange.cancel()}>
             Stop <Kbd className="bg-transparent">Esc</Kbd>
@@ -137,7 +137,7 @@ export function Popover() {
         </div>
       ) : null}
 
-      {composing ? (
+      {store.composing ? (
         <Composer
           // A fresh element per trigger: the draft and the grown height are the
           // browser's, and remounting is what clears both (ADR-0007).

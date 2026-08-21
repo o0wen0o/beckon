@@ -73,25 +73,35 @@ export function Launcher() {
     active.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
 
+  // The list and the cursor, written during render for the window-level handler
+  // to read. The handler's behaviour never changes, so it is registered once:
+  // with `matches` and `selected` as dependencies it was torn down and rebuilt
+  // on every keystroke and every arrow press, on this window's hot path.
+  const latest = React.useRef({ matches, selected });
+  latest.current = { matches, selected };
+
   /** Editing is elsewhere. `show_settings` hides this window itself — doing it
    *  from here first would let the foreground go back to the app underneath,
    *  and Settings would open behind it. */
-  const openSettings = () => void showSettings();
+  const openSettings = React.useCallback(() => void showSettings(), []);
 
-  const run = (index: number) => {
-    const action = matches[index];
+  /** The one way to launch, so the mouse and the keyboard cannot diverge — and
+   *  the keyboard is the primary path in a hotkey-summoned window. */
+  const run = React.useCallback((index: number) => {
+    const action = latest.current.matches[index];
     if (action) void pickAction(action.id);
-  };
+  }, []);
+
+  const move = React.useCallback((delta: number) => {
+    const { matches, selected } = latest.current;
+    if (matches.length === 0) return;
+    setWanted((selected + delta + matches.length) % matches.length);
+  }, []);
 
   // On the window, not on the card: clicking a row leaves focus on the body,
   // and a handler bound to the tree would stop answering Escape the moment the
   // mouse was used once.
   React.useEffect(() => {
-    const move = (delta: number) => {
-      if (matches.length === 0) return;
-      setWanted((selected + delta + matches.length) % matches.length);
-    };
-
     const onKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
         case "Escape":
@@ -108,7 +118,7 @@ export function Launcher() {
           return;
         case "Enter":
           event.preventDefault();
-          if (matches[selected]) void pickAction(matches[selected].id);
+          run(latest.current.selected);
           return;
         case "Tab":
           // Focus never leaves the query box, so Tab is just another arrow.
@@ -118,14 +128,14 @@ export function Launcher() {
         case ",":
           if (event.ctrlKey) {
             event.preventDefault();
-            void showSettings();
+            openSettings();
           }
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [matches, selected]);
+  }, [move, run, openSettings]);
 
   const nothing = matches.length === 0 && snapshot.errors.length === 0;
 
@@ -193,8 +203,10 @@ export function Launcher() {
             ) : (
               <>
                 <p className="text-muted-foreground text-quiet">
-                  Nothing matches{" "}
-                  <code className="bg-muted text-foreground rounded px-1 font-mono">{query}</code>.
+                  {/* Bare mono, the way every other `code` in the product is
+                      set: a box around it is `Kbd`'s job, and a second
+                      slightly-off version of it reads as a key to press. */}
+                  Nothing matches <code className="text-foreground font-mono">{query}</code>.
                 </p>
                 <p className="text-muted-quiet text-note">Backspace to widen the search.</p>
               </>
