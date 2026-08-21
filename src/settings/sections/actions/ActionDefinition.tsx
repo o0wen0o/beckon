@@ -45,7 +45,7 @@ export function ActionDefinition() {
   return (
     // The card's own padding, and the fields spaced by the air a card would have
     // put between them — no inner rule and no inner edge.
-    <div className={`${CARD} flex flex-col gap-5`}>
+    <div className={`${CARD} flex flex-col gap-6`}>
       <Field label="Name" stacked bare warning={nameWarning}>
         {({ id, describedBy }) => (
           <Input

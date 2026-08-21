@@ -52,8 +52,11 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
-  align = "center",
+  // Diverges from shadcn's `item-aligned` default, which parks the open list
+  // over the trigger: the control you are answering has to stay visible while
+  // the list is open. `start` keeps the list's left edge on the trigger's.
+  position = "popper",
+  align = "start",
   container,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content> & {
@@ -81,7 +84,10 @@ function SelectContent({
           className={cn(
             "p-1",
             position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+              // shadcn pins the viewport to the trigger's height here, which
+              // now that popper is the default would clip every list to one
+              // row. The width floor is the part worth keeping.
+              "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
           )}
         >
           {children}

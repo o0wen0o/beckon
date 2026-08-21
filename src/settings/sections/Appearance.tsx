@@ -1,3 +1,4 @@
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { PaneHeader } from "@/components/PaneHeader";
@@ -6,14 +7,14 @@ import type { Theme } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "Follow Windows" },
-];
+const THEMES = [
+  { value: "light", label: "Light", icon: SunIcon },
+  { value: "dark", label: "Dark", icon: MoonIcon },
+  { value: "system", label: "System", icon: MonitorIcon },
+] satisfies { value: Theme; label: string; icon: typeof SunIcon }[];
 
 const THEME_HINT =
-  "Beckon starts light unless you say otherwise. “Follow Windows” is the only setting that reads the system preference, and it follows it live.";
+  "Beckon starts light unless you say otherwise. “System” is the only setting that reads the Windows preference, and it follows it live.";
 
 export function Appearance() {
   const store = useStore(settings);

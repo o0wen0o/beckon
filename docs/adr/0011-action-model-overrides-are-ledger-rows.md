@@ -12,11 +12,13 @@ stands.
 
 **Amended by [ADR-0012](0012-settings-pane-is-cards-not-a-ledger.md):** the pane is cards now, not
 a ledger, so "row" below reads as "card" throughout. Every decision in this ADR survives that —
-the live control showing the effective value, the dot in the reserved label gutter, the revert
+the live control showing the effective value, the dot beside the name, the revert
 control naming the default, the group head's note. What changed is where the revert control sits:
 the card right-aligns its control, so the slot holding the revert is held open at the card's right
 edge rather than after a slot the width of the control measure. The two ledger spacing tokens named
-in the last bullet are deleted.
+in the last bullet are deleted. The dot also left the flow: reserved as a column it indented every
+name in the group past every other name on the pane, so it now hangs in the card's own padding,
+which keeps the names aligned and still cannot shift the row that carries it.
 
 ## What the exception was buying, and what it cost
 
@@ -50,9 +52,9 @@ dragging the slider. One gesture, three control types, and looking costs nothing
 What is left to say is which side of the default a row is on, and that is `Field`'s `override`
 prop, deliberately the least that still tells the truth:
 
-- a 4px ink dot in the label's gutter, on an overridden row only — reserved on every row in the
-  group, since a gutter that exists only when filled shifts the label sideways the moment the row
-  is overridden;
+- a 4px ink dot beside the name, on an overridden row only — hung in the card's padding rather than
+  given a column, since a gutter reserved in the flow indents the whole group and one that exists
+  only when filled would shift the label sideways the moment the row is overridden;
 - a revert control after the slot, on an overridden row only, naming the default in its own
   accessible label (`Use the default (off)`) — which is the one place the default's *value* is
   spelled out, on demand rather than standing;

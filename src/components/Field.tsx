@@ -40,8 +40,8 @@ const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;
  * The control is live either way and shows the *effective* value, so touching
  * it is what overrides: one gesture for a select, a switch and a slider alike.
  * All this adds is which side of the default the row is on, in the least that
- * still tells the truth — a dot in the label's gutter, and a revert control
- * that names the default in its own label.
+ * still tells the truth — a dot hung in the card's padding beside the name,
+ * and a revert control that names the default in its own label.
  */
 interface FieldOverride {
   overridden: boolean;
@@ -119,16 +119,15 @@ export function Field({
       {/* A shade heavier than the prose under it — shadcn's own `font-medium`,
           which this row used to cancel. The name is the one thing on a card
           that has to be findable while scanning past it. */}
-      <Label htmlFor={id} className="col-start-1 row-start-1 gap-1.5">
-        {override ? (
-          // The gutter is reserved on every override row, marked or not: one
-          // that exists only when it is filled shifts the label sideways the
-          // moment the row is overridden.
+      <Label htmlFor={id} className="relative col-start-1 row-start-1 gap-1.5">
+        {override?.overridden ? (
+          // The mark hangs in the card's own padding rather than taking a
+          // column of its own: reserved in the flow it indented every name in
+          // the group past every other name on the pane, and out of the flow it
+          // still cannot shift the one row that carries it.
           <span
             aria-hidden
-            className={`size-1 flex-none rounded-full ${
-              override.overridden ? "bg-foreground" : "bg-transparent"
-            }`}
+            className="bg-foreground absolute top-1/2 -left-2.5 size-1 -translate-y-1/2 rounded-full"
           />
         ) : null}
         {label}
