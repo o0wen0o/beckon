@@ -66,12 +66,17 @@ export function SettingsNav() {
         {SECTIONS.map((section) => {
           const Icon = section.icon;
           const active = store.route === section.id;
+          // Actions is the one section with anything under it: a file open in
+          // the editor, and a screen inside that (ADR-0012). Its nav row is the
+          // way back out, so clicking the current row closes the editor instead
+          // of doing nothing. `close` flushes, so a pending edit is written.
+          const closesEditor = active && section.id === "actions" && actions.editing !== null;
           return (
             <li key={section.id}>
               <button
                 type="button"
                 aria-current={active ? "page" : undefined}
-                onClick={() => store.go(section.id)}
+                onClick={() => (closesEditor ? actionStore.close() : store.go(section.id))}
                 className={[
                   "flex w-full items-center justify-start gap-2.25 rounded-md px-2.25 py-1.5 text-left",
                   "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
