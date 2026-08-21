@@ -18,7 +18,7 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] },
-    "types": ["svelte", "vite/client"]
+    "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.svelte", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
 }

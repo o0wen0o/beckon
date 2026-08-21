@@ -4,20 +4,22 @@
 // no rule about snapshots arriving mid-keystroke, because nothing types here.
 //
 // A module-level singleton, because there is exactly one Launcher window and it
-// is never destroyed (ADR-0007).
+// is never destroyed (ADR-0007). Components reach it through `useStore`.
 import { getActions } from "../lib/ipc";
+import { Notifier } from "../lib/store";
 import type { RegistrySnapshot } from "../lib/types";
 
-class ActionStore {
-  snapshot = $state<RegistrySnapshot>({ actions: [], errors: [], hotkey_errors: {} });
+class ActionStore extends Notifier {
+  snapshot: RegistrySnapshot = { actions: [], errors: [], hotkey_errors: {} };
 
   adoptActions(next: RegistrySnapshot) {
     this.snapshot = next;
+    this.notify();
   }
 
   async refresh() {
-    this.snapshot = await getActions();
+    this.adoptActions(await getActions());
   }
 }
 
-export const actions = new ActionStore();
+export const actionStore = new ActionStore();

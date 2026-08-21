@@ -3,6 +3,11 @@
    library's own file, not hand-authored styling. Components carry no CSS of
    their own — every rule below this comment belongs to shadcn/ui or Tailwind.
 
+   It is the design system for all three windows (ADR-0009). The notes below say
+   "the pane" because Settings is where each decision was made and is the widest
+   surface it has to hold, but the Launcher and the Popover read the same tokens
+   and add none.
+
    The base colour is shadcn's `neutral`, and the surface is monochrome: the
    accent is not a hue, it is *inversion*. A selected nav item and a selected
    segment are ink-filled with paper text, and that fill is the only fill on the
@@ -21,7 +26,7 @@
    - `--input` is split away from `--border` and darkened until it clears 3:1
      (3.36:1 light, 3.14:1 dark). `--border` is decorative; `--input` is the
      sole boundary of a text field, which WCAG 1.4.11 treats as a UI component.
-     This is the `--border` / `--border-strong` split app.css already makes.
+     This is the split the retired app.css made as `--border-strong` (ADR-0009).
    - `--ring` is `--primary` rather than the generated grey. shadcn draws the
      ring at `ring/50`, and the generated `0.708` lands at 1.6:1 that way —
      invisible, on the one affordance a keyboard user has. At `--primary` it is
@@ -94,6 +99,14 @@
   --text-quiet--line-height: 1.125rem;
   --text-note: 0.75rem;
   --text-note--line-height: 1.125rem;
+  /* The one step *above* body, and it has one consumer: the Launcher's
+     query box. A picker's query is the window's subject and it sits in a
+     56px bar, where body size reads as timid — but 15px over 14px is a
+     difference you have to look for, so the step is a whole size. It is a
+     token rather than Tailwind's own 1rem step so that the scale still lists
+     every size the product uses. */
+  --text-query: 1rem;
+  --text-query--line-height: 1.5rem;
   --text-title: 1.4375rem;
   --text-title--line-height: 1.75rem;
 

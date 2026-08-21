@@ -10,31 +10,18 @@ import {
   ArrowLeftIcon,
   ChevronRightIcon,
   PlusIcon,
-  SparklesIcon,
-  TextCursorInputIcon,
-  TextSelectIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/FieldGroup";
 import { PaneHeader } from "@/components/PaneHeader";
-import type { InputSource } from "@/lib/types";
+import { SOURCE_ICON, sourceLabel } from "@/lib/inputSource";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { ActionEditor } from "./ActionEditor";
 import { RawFileEditor } from "./RawFileEditor";
-
-const SOURCE_ICON = {
-  selection: TextSelectIcon,
-  prompt: TextCursorInputIcon,
-  auto: SparklesIcon,
-};
-
-/** Title case for display; the value itself stays the CONTEXT.md term. */
-function sourceLabel(source: InputSource) {
-  return source.charAt(0).toUpperCase() + source.slice(1);
-}
 
 /** The ledger row, shared by the Actions and the files that will not parse: the
  *  same four columns, so a broken file sits in the list rather than beside it. */
@@ -161,14 +148,12 @@ export function Actions() {
                         <Badge
                           variant="outline"
                           title={conflict}
-                          className="border-destructive/60 text-destructive gap-1 text-meta font-normal"
+                          className="border-destructive/60 text-destructive gap-1 font-mono font-normal"
                         >
                           <TriangleAlertIcon className="size-3" /> {action.hotkey}
                         </Badge>
                       ) : action.hotkey ? (
-                        <kbd className="bg-muted text-muted-foreground font-mono rounded border px-1.5 py-0.5 text-meta">
-                          {action.hotkey}
-                        </kbd>
+                        <Kbd>{action.hotkey}</Kbd>
                       ) : null}
                     </span>
                     {/* The rows are the only way into the editor, and a name

@@ -6,11 +6,12 @@
 // only render turns — the state machine cannot be half-implemented in markup.
 //
 // Rust drives it with events, not return values, so this module is mostly a
-// reducer over `exchange:*`. The three `on…` hooks are the DOM work a store has
-// no business doing: scrolling the body, focusing the composer, resetting it.
+// reducer over `exchange:*`. It touches no DOM at all: following the stream and
+// focusing the composer are effects in the components, keyed off what changed
+// here.
 //
 // A module-level singleton, because there is exactly one Popover window and it
-// is never destroyed (ADR-0007).
+// is never destroyed (ADR-0007). Components reach it through `useStore`.
 import {
   cancelExchange,
   copyToClipboard,
@@ -27,6 +28,7 @@ import {
   submitInput,
   Subscriptions,
 } from "../lib/ipc";
+import { Notifier } from "../lib/store";
 import type { Failure, PopoverView } from "../lib/types";
 
 export type Status =
@@ -59,19 +61,21 @@ export function settlesInSettings(kind: string | undefined) {
   return kind === "no-credential" || kind === "read-error" || kind === "auth" || kind === "config";
 }
 
-class ExchangeStore {
-  view = $state<PopoverView | null>(null);
-  turns = $state<Turn[]>([]);
-  copiedTurn = $state<number | null>(null);
+class ExchangeStore extends Notifier {
+  view: PopoverView | null = null;
+  turns: Turn[] = [];
+  copiedTurn: number | null = null;
+  /**
+   * Bumped by every reveal. The window is reused (ADR-0007), so the composer
+   * from the last trigger is still mounted with the last trigger's draft in it
+   * and grown to the last trigger's height; keying it on this remounts it, and
+   * a fresh element is the only reliable way to clear both at once.
+   */
+  epoch = 0;
 
   /** Zero unless a turn is waiting for its first token. */
-  #waitingSince = $state(0);
-  #now = $state(0);
-
-  /** DOM work the store must not do itself. Set by the component on mount. */
-  onStream: () => void = () => {};
-  onIdle: () => void = () => {};
-  onReset: () => void = () => {};
+  #waitingSince = 0;
+  #waited = 0;
 
   get current(): Turn | null {
     return this.turns.length > 0 ? this.turns[this.turns.length - 1] : null;
@@ -89,8 +93,7 @@ class ExchangeStore {
   }
 
   get waitedSeconds() {
-    if (this.#waitingSince === 0) return 0;
-    return Math.max(0, Math.floor((this.#now - this.#waitingSince) / 1000));
+    return this.#waited;
   }
 
   // --- lifecycle ----------------------------------------------------------
@@ -117,7 +120,6 @@ class ExchangeStore {
             // the user has said otherwise by toggling the disclosure.
             if (!turn.reasoningTouched) turn.reasoningOpen = turn.answer === "";
             if (turn.status === "waiting-first-token") this.#markStreaming(turn);
-            this.onStream();
           }),
         ),
       )
@@ -126,7 +128,6 @@ class ExchangeStore {
           this.#forCurrent(payload.exchange_id, (turn) => {
             turn.status = "done";
             this.#waitingSince = 0;
-            this.onIdle();
           }),
         ),
       )
@@ -149,12 +150,19 @@ class ExchangeStore {
 
   /**
    * Only the "waiting for the first token" counter reads the clock, so outside
-   * that wait this would be a write per quarter second for the process's
-   * lifetime — the Popover window is never destroyed (ADR-0007).
+   * that wait this would be a re-render per quarter second for the process's
+   * lifetime — the Popover window is never destroyed (ADR-0007). It publishes
+   * only when the whole second it displays actually changes.
    */
   startClock() {
     const ticker = setInterval(() => {
-      if (this.#waitingSince > 0) this.#now = Date.now();
+      const seconds =
+        this.#waitingSince === 0
+          ? 0
+          : Math.max(0, Math.floor((Date.now() - this.#waitingSince) / 1000));
+      if (seconds === this.#waited) return;
+      this.#waited = seconds;
+      this.notify();
     }, TICK);
     return () => clearInterval(ticker);
   }
@@ -168,17 +176,14 @@ class ExchangeStore {
   async load() {
     this.view = await getPopoverView();
     this.copiedTurn = null;
-    this.onReset();
+    this.epoch += 1;
     if (!this.view) {
       this.turns = [];
+      this.notify();
       return;
     }
-    if (this.view.phase === "running") {
-      this.turns = [this.#newTurn(this.view.input ?? "")];
-    } else {
-      this.turns = [];
-      this.onIdle();
-    }
+    this.turns = this.view.phase === "running" ? [this.#newTurn(this.view.input ?? "")] : [];
+    this.notify();
   }
 
   // --- the user's side ----------------------------------------------------
@@ -188,6 +193,7 @@ class ExchangeStore {
 
     if (this.view && this.view.exchange_id && this.turns.length > 0) {
       this.turns = [...this.turns, this.#newTurn(text)];
+      this.notify();
       try {
         await followUp(this.view.exchange_id, text);
       } catch (error) {
@@ -197,10 +203,12 @@ class ExchangeStore {
     }
 
     this.turns = [this.#newTurn(text)];
+    this.notify();
     try {
       const exchangeId = await submitInput(text);
       if (this.view) {
         this.view = { ...this.view, phase: "running", exchange_id: exchangeId, input: text };
+        this.notify();
       }
     } catch (error) {
       this.#failCurrent(error);
@@ -214,7 +222,8 @@ class ExchangeStore {
     current.note = undefined;
     current.answer = "";
     current.reasoning = "";
-    this.#waitingSince = Date.now();
+    this.#startWaiting();
+    this.notify();
     try {
       await retryExchange(this.view.exchange_id);
     } catch (error) {
@@ -232,6 +241,7 @@ class ExchangeStore {
     if (this.current) {
       this.current.status = "cancelled";
       this.#waitingSince = 0;
+      this.notify();
     }
     return true;
   }
@@ -240,21 +250,29 @@ class ExchangeStore {
     // A user-requested clipboard write: not restored (ADR-0002).
     await copyToClipboard(text);
     this.copiedTurn = index;
+    this.notify();
     setTimeout(() => {
-      if (this.copiedTurn === index) this.copiedTurn = null;
+      if (this.copiedTurn !== index) return;
+      this.copiedTurn = null;
+      this.notify();
     }, 1600);
   }
 
   toggleReasoning(turn: Turn) {
     turn.reasoningTouched = true;
     turn.reasoningOpen = !turn.reasoningOpen;
+    this.notify();
+  }
+
+  expandQuestion(turn: Turn) {
+    turn.questionExpanded = !turn.questionExpanded;
+    this.notify();
   }
 
   // --- internals ----------------------------------------------------------
 
   #newTurn(question: string): Turn {
-    this.#waitingSince = Date.now();
-    this.#now = Date.now();
+    this.#startWaiting();
     return {
       question,
       answer: "",
@@ -266,9 +284,15 @@ class ExchangeStore {
     };
   }
 
+  #startWaiting() {
+    this.#waitingSince = Date.now();
+    this.#waited = 0;
+  }
+
   #markStreaming(turn: Turn) {
     turn.status = "streaming";
     this.#waitingSince = 0;
+    this.notify();
   }
 
   /** Apply an event only if it belongs to the Exchange on screen. */
@@ -277,6 +301,7 @@ class ExchangeStore {
     const turn = this.current;
     if (!turn) return;
     fn(turn);
+    this.notify();
   }
 
   /** The one place a failure lands on a turn, whether it arrived as an event
@@ -290,7 +315,9 @@ class ExchangeStore {
 
   #failCurrent(error: unknown) {
     const turn = this.current;
-    if (turn) this.#applyFailure(turn, describeError(error));
+    if (!turn) return;
+    this.#applyFailure(turn, describeError(error));
+    this.notify();
   }
 }
 

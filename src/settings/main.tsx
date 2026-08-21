@@ -1,4 +1,4 @@
-import { mountReactSurface } from "../lib/boot-react";
+import { mountSurface } from "../lib/boot";
 import { Settings } from "./Settings";
 
-export default await mountReactSurface(<Settings />);
+export default await mountSurface(<Settings />);

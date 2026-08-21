@@ -23,16 +23,12 @@ systemIsDark.addEventListener("change", () => {
  * Put `theme` on the document.
  *
  * The Windows app theme is consulted **only** for `system`. That is the whole
- * reason app.css carries no bare `prefers-color-scheme` rule: a machine set to
- * dark must still get the light default until the user asks for otherwise.
+ * reason globals.css carries no bare `prefers-color-scheme` rule: a machine set
+ * to dark must still get the light default until the user asks for otherwise.
  */
 function paint(theme: Theme) {
   const resolved = theme === "system" ? (systemIsDark.matches ? "dark" : "light") : theme;
-  // Two stamps for one setting, for as long as the surfaces disagree about
-  // their design system: `data-theme` is what src/app.css keys the Svelte
-  // surfaces off, and `.dark` is the class shadcn/ui's own `dark` variant
-  // matches. Both are written here so the resolution stays in one place.
-  document.documentElement.dataset.theme = resolved;
+  // One stamp: `.dark` is the class shadcn/ui's own `dark` variant matches.
   document.documentElement.classList.toggle("dark", resolved === "dark");
 }
 

@@ -3,6 +3,7 @@
 // (README). Nothing unregisterable can reach disk through this component.
 import * as React from "react";
 import { KeyboardIcon, XIcon } from "lucide-react";
+import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
 import { describeError, probeHotkey } from "@/lib/ipc";
 
@@ -51,13 +52,13 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
             keeps this row the same weight as the hotkey chips in the Actions
             list, instead of the widest control on the pane. */}
         {value ? (
-          <kbd
-            className={`bg-muted font-mono rounded border px-1.5 py-0.5 text-meta tabular-nums ${
-              error !== null ? "border-destructive/60 text-destructive" : "text-muted-foreground"
-            }`}
+          <Kbd
+            className={
+              error !== null ? "border-destructive/60 text-destructive tabular-nums" : "tabular-nums"
+            }
           >
             {value}
-          </kbd>
+          </Kbd>
         ) : null}
         <Button
           variant="ghost"
