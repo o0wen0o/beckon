@@ -34,7 +34,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 
 **Triggering and grabbing text**
 
-- The global hotkey defaults to `Ctrl+Alt+Space` on Windows and `Cmd+Shift+Space` on macOS, because the conflicts differ: macOS ships `Ctrl+Option+Space` as "select the next input source". The Windows choice avoids Microsoft Pinyin's `Ctrl+Space` (Chinese/English toggle), `Shift+Space` (full-width/half-width), and `Win+Space` (switch IME), as well as `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools).
+- The global hotkey defaults to `Ctrl+Shift+Space` on Windows and `Cmd+Shift+Space` on macOS: Space with two modifiers on both, and only the first differs, because the platform's own launcher does — Spotlight is `Cmd+Space`. Both avoid the IME chords (`Ctrl+Space` Chinese/English on Microsoft Pinyin and "previous input source" on macOS, `Shift+Space` full-width/half-width, `Win+Space` switch IME), `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools), and any `Ctrl+Alt` combination, which is `AltGr` on an ISO keyboard and so composes characters as well as the modifier state the grab must release before it can copy.
 - If the grab comes back empty, handle it according to the Action's `input_source` — this is **not an error**: `selection` shows a hint and sends no request, `auto` falls through to the input box.
 - The Popover always takes focus. Remember what was in front before showing it — the window on Windows, the application on macOS — and hand focus back on close.
 - On macOS the grab needs Accessibility permission, and the OS refuses it **silently**: the Selection just comes back empty. Settings reads the permission directly and says so, with a link to the pane; the hotkey itself still fires either way.
@@ -76,7 +76,7 @@ An Action's **identity is its filename**; the `name` field is only for display.
 ### config.toml
 
 ```toml
-launcher_hotkey = "Ctrl+Alt+Space"   # "Cmd+Shift+Space" is the macOS default
+launcher_hotkey = "Ctrl+Shift+Space" # "Cmd+Shift+Space" is the macOS default
 autostart = true
 theme = "light"                 # light | dark | system
 

@@ -12,12 +12,16 @@ use crate::atomic::write_atomic;
 
 /// The Launcher's out-of-the-box hotkey.
 ///
-/// It differs per platform because the *conflicts* do: macOS ships
-/// Ctrl+Option+Space as "select the next input source", so the Windows default
-/// would fail to register on a stock Mac and the first thing a new user would
-/// see is the tray's error icon.
+/// Space with two modifiers on both platforms; only the first modifier differs,
+/// because the platform's own launcher does — Spotlight is Cmd+Space, so Cmd is
+/// the key a Mac user reaches for and Ctrl is the Windows equivalent. macOS also
+/// spends Ctrl+Space and Ctrl+Option+Space on input-source switching.
+///
+/// Neither default is a Ctrl+Alt chord: that is AltGr on every ISO keyboard, so
+/// it doubles as a character-composing combination, and it is the modifier state
+/// `selection::grab_selection` has to release before its copy can land at all.
 #[cfg(not(target_os = "macos"))]
-pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Ctrl+Alt+Space";
+pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Ctrl+Shift+Space";
 #[cfg(target_os = "macos")]
 pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Cmd+Shift+Space";
 

@@ -62,10 +62,18 @@ Cmd+Q means what it says.
 ## Consequences
 
 - **The default Launcher hotkey differs per platform**, because the conflicts do: macOS ships
-  Ctrl+Option+Space as "select the next input source", so the Windows default would fail to
-  register on a stock Mac and the first thing a new user would see is the tray's error icon. It is
-  `Cmd+Shift+Space` there. Nothing else about the format changes — `Ctrl`, `Alt`, `Shift` and
-  `Cmd`/`Super` all parse on both platforms, so a `config.toml` stays portable.
+  Ctrl+Option+Space as "select the next input source", so the Windows default of the day —
+  Ctrl+Alt+Space — would fail to register on a stock Mac and the first thing a new user would see
+  is the tray's error icon. It is `Cmd+Shift+Space` there. Nothing else about the format changes —
+  `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super` all parse on both platforms, so a `config.toml` stays
+  portable.
+
+  *Later:* Windows moved to `Ctrl+Shift+Space`, so the two defaults are now the same shape and the
+  registration conflict above no longer applies to either. They still differ, and the reason is
+  now idiom rather than failure — Cmd is the modifier the platform's own launcher answers to
+  (Spotlight is Cmd+Space), and macOS spends Ctrl+Space on input sources. What the move bought is
+  that no default is a Ctrl+Alt chord: on an ISO keyboard that is AltGr, so it composes characters,
+  and it is the modifier state `selection::grab_selection` has to release before its copy can land.
 - **`macOSPrivateApi` is on.** The Launcher and the Popover are frameless cards over a transparent
   `<body>`, and a transparent window is private API on macOS. This forecloses the Mac App Store,
   which was never a target; direct distribution is unaffected.

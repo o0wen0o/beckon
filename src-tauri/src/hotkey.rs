@@ -61,7 +61,7 @@ const MODIFIER_ADVICE: &str = "add Ctrl, Alt or Shift";
 #[cfg(target_os = "macos")]
 const MODIFIER_ADVICE: &str = "add Cmd, Control, Option or Shift";
 
-/// Parse the README's `"Ctrl+Alt+Space"` form.
+/// Parse the README's `"Ctrl+Shift+Space"` form.
 ///
 /// A bare key with no modifier is rejected: registering `T` globally would
 /// swallow the letter everywhere, which no user means to ask for.
@@ -197,8 +197,8 @@ mod tests {
 
     #[test]
     fn parses_the_readme_default() {
-        let shortcut = parse("Ctrl+Alt+Space").unwrap();
-        assert_eq!(shortcut, parse("  ctrl+alt+space  ").unwrap());
+        let shortcut = parse("Ctrl+Shift+Space").unwrap();
+        assert_eq!(shortcut, parse("  ctrl+shift+space  ").unwrap());
     }
 
     #[test]
