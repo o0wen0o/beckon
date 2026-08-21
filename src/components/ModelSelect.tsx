@@ -63,12 +63,19 @@ export function ModelSelect({
 
   return (
     <Select value={value === "" ? INHERIT : value} onValueChange={choose}>
-      {/* Held to the same measure as a text field rather than shrunk to its own
-          content: shadcn's trigger is `w-fit`, which parks a twelve-character
-          model id in a box narrower than everything else in the value column
-          and breaks the one line the ledger draws. The measure is `Field`'s own
-          token, not a number repeated here. */}
-      <SelectTrigger id={id} aria-describedby={describedBy} className="w-full max-w-control">
+      {/* Sized to its own content, with a floor. Stretched to the control
+          measure the chevron parks 200px from the value it belongs to, and the
+          row reads as an empty box with a marker in the far corner; the floor is
+          what that measure was really protecting against — a twelve-character
+          model id in a box visibly narrower than everything else in the value
+          column. The line the ledger draws is the control's left edge, which is
+          the same either way. The ceiling is still `Field`'s own token.
+          (ADR-0011.) */}
+      <SelectTrigger
+        id={id}
+        aria-describedby={describedBy}
+        className="max-w-control w-fit min-w-48"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

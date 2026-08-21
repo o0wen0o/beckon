@@ -29,7 +29,7 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
           the ticks name positions *on the track*, so spanning the whole row put
           "2 · loose" under the number input and "1" left of the midpoint. */}
       <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1 pt-2.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1.75">
           <Slider
             min={0}
             max={2}
@@ -45,6 +45,8 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
             <span>2 · loose</span>
           </div>
         </div>
+        {/* A caption on the slider, not a field of its own: at an input's full
+            height it stood taller than the whole track it annotates. */}
         <Input
           id={id}
           type="number"
@@ -52,7 +54,7 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
           min={0}
           max={2}
           value={value}
-          className="w-19 flex-none tabular-nums"
+          className="h-7 w-17 flex-none text-center tabular-nums"
           onChange={(event) => commit(event.currentTarget.value)}
         />
       </div>

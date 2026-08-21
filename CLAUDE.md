@@ -10,7 +10,7 @@ Read before non-trivial changes:
 
 - [README.md](README.md) — MVP scope, out-of-scope list, decided behavior, config/Action TOML schema.
 - [CONTEXT.md](CONTEXT.md) — the ubiquitous language (Action, Input Source, Selection, Launcher, Direct Hotkey, Popover, Exchange) and the words to avoid. Naming in code and UI follows it.
-- [docs/adr/](docs/adr/) — ADR-0001…0010. Modules cite them by number; a change that contradicts one needs a new ADR, not a quiet edit.
+- [docs/adr/](docs/adr/) — ADR-0001…0011. Modules cite them by number; a change that contradicts one needs a new ADR, not a quiet edit.
 
 ## Commands
 
@@ -64,13 +64,13 @@ All three surfaces are styled from one stylesheet (ADR-0008, ADR-0009, ADR-0010 
 - **globals.css is shadcn/ui's generated file** — `@import "tailwindcss"`, the `dark` variant, the `:root` / `.dark` token blocks, the `@theme inline` bridge, one `@layer base` reset. Nothing else belongs in it.
 - **The accent is inversion, not a hue.** Base colour is `neutral` and the surface is monochrome; a selected nav item or segment is ink-filled with paper text, and that fill is the only fill on the pane. Brand colour lives in `--brand`, whose one consumer is `BrandMark`.
 - **The type scale is ours, not Tailwind's.** `body` is 14px, with `--text-micro` 10.5 (tracked group head), `--text-meta` 11.5 (metadata), `--text-note` 12 (prose about state), `--text-quiet` 13 (row label, pane lede), `--text-title` 23, `--text-query` 16 (the Launcher's query box). Two faces only. Mono is 0.92em wherever it carries no size class, so a mono chip must **not** pin one.
-- **The pane is a ledger**: a fixed right-aligned label column against a value column, every row closed by a hairline, groups headed by a tracked micro-label. `Field` is the row, `FieldGroup` the head plus its rows, `PaneHeader` the title/description/create action. A control takes `--container-control` (340px) or `--container-control-wide` (420px) via `Field`'s `measure`, and the measure wraps the **control only** — the explanation runs to `--container-measure` (62ch). Air goes between `FieldGroup`s, not evenly between fields.
+- **The pane is a ledger**: a fixed right-aligned label column against a value column, every row closed by a hairline, groups headed by a tracked micro-label. `Field` is the row, `FieldGroup` the head plus its rows — and its optional `note`, the one statement about a whole group whose alternative is repeating itself on every row in it — `PaneHeader` the title/description/create action. A control takes `--container-control` (340px) or `--container-control-wide` (420px) via `Field`'s `measure`, and the measure wraps the **control only** — the explanation runs to `--container-measure` (62ch). Air goes between `FieldGroup`s, not evenly between fields.
 - **Motion is 150–200ms `ease-out`, everywhere.** `--default-transition-duration` and `--default-transition-timing-function` are set in `@theme` so that is the default, not a string each component repeats. `PaneEnter` animates opacity and a 4px *vertical* offset only (the pane is `overflow-y-auto`, so a horizontal transform flashes a scrollbar). Every animation carries `motion-reduce:`.
 - Icons are `lucide-react`. `BrandMark` is the exception — identity, not a glyph.
 
 Controls come from `npx shadcn@latest add` into [src/components/ui/](src/components/ui/) — library source, editable, but every edit is a divergence to justify. The current ones: `destructive-outline` and `success-outline` variants added; `outline`/`ghost` set to `font-normal` and `ghost` muted; `switch` rebuilt (off is paper with a bounded edge, since a fill means "on"; 13px knob in a 19px track, and it travels); `input`/`textarea` dropped shadcn's `text-base md:text-sm` iOS zoom guard, which rendered the same field a size larger in the two sub-`md` windows; `xs` retuned for the Popover's quiet buttons; the button base given `duration-150 ease-out` and `active:scale-[0.98]`.
 
-Beckon's own compositions live one level up in [src/components/](src/components/): `Field`, `FieldGroup`, `PaneHeader`, `PaneEnter`, `InfoHint`, `Segmented`, `Callout`, `ConfirmDialog`, `ModelSelect`, `Temperature`, `OnOffSwitch`, `HotkeyInput`, `OverrideField`, `ActionCells`, `StatusBar`, `BrandMark`. Notable contracts:
+Beckon's own compositions live one level up in [src/components/](src/components/): `Field`, `FieldGroup`, `PaneHeader`, `PaneEnter`, `Segmented`, `Callout`, `ConfirmDialog`, `ModelSelect`, `Temperature`, `OnOffSwitch`, `HotkeyInput`, `ActionCells`, `StatusBar`, `BrandMark`. Notable contracts:
 
 - **Radix portals to `document.body`**, so `select` and `popover` are patched to default their container to the pane via [src/lib/pane.tsx](src/lib/pane.tsx) — the pane's `focusout` *is* the save protocol. `alert-dialog` is not patched: the delete confirmation is hosted by the shell, outside the pane. A new portalling component has to pick a side.
 - `Segmented` cancels shadcn's ToggleGroup hover fill: a fill means "selected" and nothing else, hover brightens the label.
@@ -137,8 +137,8 @@ There is no Save button and there must never be one (ADR-0003). **Settings is th
 - `ModelSelect` is controlled — `value=` + `onChange`, **never** a two-way binding — and refuses to write `""` where no inherit option exists. Both halves stop a configured model being silently rewritten before the catalog lands. Radix rejects an item valued `""`, so inherit rides a sentinel mapped at both edges of that one file.
 - `save_action` re-probes the Direct Hotkey and refuses the *whole* write if it cannot be registered — so while an outside app holds an Action's hotkey, even renaming it fails. The editor says so and offers to clear the hotkey.
 - The window is reused (ADR-0007): `settings:opened` clears the last visit's typed API key and test result and closes whatever Action it left open. The first open misses the event because the window is still being built, so `Settings.tsx` always loads itself too.
-- An Action's `[model]` overrides render as `OverrideField`: opening the row *is* the override, and it collapses again when focus leaves. The collapse is presentation only — the write already happened.
-- A field's explanation is a permanent line under the control, not a bubble. `InfoHint` survives only where the room genuinely is not there: `OverrideField`'s collapsed rows.
+- An Action's `[model]` overrides are ledger rows like any other (ADR-0011), via `Field`'s `override` prop. The control is live whether the key is present or absent and shows the **effective** value, so touching it is what overrides — one gesture for a select, a switch and a slider alike. What the prop adds is the least that still tells the truth: a dot in the label's gutter and a revert control naming the default, both on an overridden row only, plus `FieldGroup`'s `note` for the rest. The gutter is reserved on every row in the group, or a label jumps sideways the moment it is overridden; the revert control sits after a slot the width of the control measure, so a group of them lines up in a column.
+- A field's explanation is a permanent line under the control, and there is no exception: the bubble (`InfoHint`) existed for the collapsed override rows alone and went with them.
 
 Keeping the forms out of the Launcher is what lets `WindowEvent::Focused(false)` hide it unconditionally: nothing unwritten inside it to lose, and no dropdown or dialog of its own to survive.
 
@@ -163,7 +163,7 @@ This repo is indexed by GitNexus; the MCP tools (`impact`, `context`, `query`, `
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (1379 symbols, 3398 relationships, 113 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (1383 symbols, 3396 relationships, 114 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

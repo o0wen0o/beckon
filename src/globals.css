@@ -140,11 +140,12 @@
   --tracking-eyebrow: 0.11em;
   --tracking-title: -0.018em;
 
-  /* The ledger's grid, in the one place both halves of it can be read at once:
-     `Field` draws the label column and the gap, and the Action's override rows
-     indent past both to line up with the controls above them. As two numbers in
-     two files that indent was arithmetic done in a comment, and the block was
-     the only thing on the pane out of line the moment either number moved. */
+  /* The ledger's grid: the label column and the gap between it and the value
+     column. `Field` is the only consumer, which is the point — the Action's
+     `[model]` overrides used to be a block indented past both by hand, and that
+     indent was arithmetic in a comment that went out of line the moment either
+     number moved. They are ordinary rows now, and these two numbers are read
+     once. */
   --spacing-ledger-label: 10.5rem;
   --spacing-ledger-gap: 1.25rem;
 
