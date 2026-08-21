@@ -1,0 +1,163 @@
+/* shadcn/ui's generated stylesheet: the `@import`s, the `dark` variant, the
+   token blocks, the `@theme inline` bridge and the `@layer base` reset are the
+   library's own file, not hand-authored styling. Components carry no CSS of
+   their own — every rule below this comment belongs to shadcn/ui or Tailwind.
+
+   The base colour is shadcn's `neutral`, not `slate`, and that is the whole
+   colour scheme in one decision. Slate's greys carry chroma 0.007–0.046 at hue
+   250–265 — the same blue family as the brand — so the brand accents did not
+   read as accents, they read as slightly bluer grey. At chroma 0 the greys stop
+   competing and `--primary` becomes the only chromatic thing in the surface,
+   which is what lets a rail two pixels wide carry the identity.
+
+   Four values deviate from the generated `neutral` set, each measured:
+
+   - `--primary` / `--ring` are the brand cyan→blue of assets/logo.svg.
+     5.76:1 on white, 11.30:1 on the dark background.
+   - `--muted-foreground` is darkened to `0.525` in light mode. The generated
+     `0.556` is 4.73:1 on the background but only 4.34:1 on `--muted`, and that
+     pairing is live in the hotkey chip and in `Segmented`. 0.525 is 5.39:1 and
+     4.94:1.
+   - `--input` is split away from `--border` and darkened until it clears 3:1
+     (3.36:1 light, 3.14:1 dark). `--border` is decorative; `--input` is the
+     sole boundary of a text field, which WCAG 1.4.11 treats as a UI component.
+     This is the `--border` / `--border-strong` split app.css already makes.
+   `--destructive-foreground` is dropped rather than carried: nothing consumes
+   it — shadcn's own destructive button says `text-white` — and the generated
+   value is 2.77:1 on `--destructive` in dark mode, so the one thing it could
+   have been used for would have failed.
+
+   - `--warning` and `--success` are added. They are not shadcn tokens, but the
+     alternative is `text-amber-700 dark:text-amber-400` written out at every
+     use site, and a component naming its own colour is the one thing this file
+     exists to prevent. Light 6.11:1 and 5.67:1; dark 11.23:1 and 11.97:1. */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* The metadata sizes — a filename under a name, "from Model defaults", the
+     unit on a slider. Tailwind's scale stops at `text-xs`/12px, and the step
+     below it was being written as `text-[11px]` at six call sites. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* Segoe UI Variable ships three optical sizes; using the right one is the
+     difference between "system font" and "system font, correctly". */
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-small: "Segoe UI Variable Small", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+:root {
+  /* Windows 11 rounds an undecorated window's corners at ~8px, and a larger
+     CSS radius gets clipped by DWM's, which shows as a nick in each corner. */
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.508 0.128 245.8);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.525 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --warning: oklch(0.5 0.12 75);
+  --success: oklch(0.5 0.12 150);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.64 0 0);
+  --ring: oklch(0.508 0.128 245.8);
+  /* The navigation column is not a second surface — it is the same page with a
+     rule down it. A tint plus a border draws one boundary twice. */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.508 0.128 245.8);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.508 0.128 245.8);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.809 0.115 216.6);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --warning: oklch(0.82 0.13 82);
+  --success: oklch(0.82 0.14 155);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 35%);
+  --ring: oklch(0.809 0.115 216.6);
+  --sidebar: oklch(0.145 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.809 0.115 216.6);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.809 0.115 216.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

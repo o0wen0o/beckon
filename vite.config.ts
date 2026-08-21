@@ -1,10 +1,24 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath } from "node:url";
 
 // Three surfaces, three entry points. Tauri window URLs point at the built HTML
-// files. Inputs are relative to the project root, so no node builtins here.
+// files. Inputs are relative to the project root.
+//
+// Two frameworks on purpose, for the length of the shadcn/ui migration only:
+// Settings is React (shadcn/ui is React-only), Launcher and Popover are still
+// Svelte. Each plugin claims its own extensions, so they do not collide — and
+// the three surfaces never share a component, only `src/lib/*.ts`, which is
+// framework-agnostic.
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [tailwindcss(), svelte(), react()],
+  resolve: {
+    // shadcn/ui's generated components import from `@/…`; components.json
+    // points at the same root.
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
   clearScreen: false,
   server: {
     port: 1420,

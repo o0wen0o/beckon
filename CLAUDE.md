@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Beckon is a Windows-only, tray-resident LLM shortcut built on Tauri v2 (Rust backend + three Svelte 5 webview surfaces). Press a global hotkey → the Selection is grabbed by simulating Ctrl+C → a preset Action's prompt is sent to a DeepSeek/OpenAI-compatible API → the answer streams into a Popover next to the cursor.
+Beckon is a Windows-only, tray-resident LLM shortcut built on Tauri v2 (Rust backend + three webview surfaces — Settings is React on shadcn/ui, the Launcher and Popover are still Svelte 5; ADR-0008). Press a global hotkey → the Selection is grabbed by simulating Ctrl+C → a preset Action's prompt is sent to a DeepSeek/OpenAI-compatible API → the answer streams into a Popover next to the cursor.
 
 Read these before non-trivial changes:
 
 - [README.md](README.md) — MVP scope, out-of-scope list with reasons, decided behavior, config/Action TOML schema.
 - [CONTEXT.md](CONTEXT.md) — the ubiquitous language (Action, Input Source, Selection, Launcher, Direct Hotkey, Popover, Exchange) **and the words to avoid**. Naming in code and UI follows it.
-- [docs/adr/](docs/adr/) — ADR-0001…0007. The code cites them by number in module docs; a change that contradicts one needs a new ADR, not a quiet edit.
+- [docs/adr/](docs/adr/) — ADR-0001…0008. The code cites them by number in module docs; a change that contradicts one needs a new ADR, not a quiet edit.
 - [docs/PLAN.md](docs/PLAN.md) — build phases plus an "Implementation notes / Still needs a human" section (manual selection-grab checklist, autostart-from-installer, end-to-end key test).
 
 ## Commands
@@ -20,7 +20,8 @@ npm install                     # once
 npm run tauri dev               # run the app (spawns vite on :1420, then cargo)
 npm run tauri build             # MSI + NSIS bundle
 npm run dev                     # vite only, no Rust (webviews will fail on invoke)
-npm run check                   # svelte-check + tsc over the frontend
+npm run check                   # svelte-check + tsc over the frontend (both — one framework each)
+npx shadcn@latest add <name>     # pull a shadcn/ui component into src/components/ui
 npm run icons                   # re-rasterize src-tauri/icons from assets/*.svg
 
 cargo test                      # workspace tests (all in src-tauri)
@@ -48,25 +49,38 @@ Window permissions live in [src-tauri/capabilities/default.json](src-tauri/capab
 
 Every reveal is announced **before** the window is shown: `launcher:opened`, `popover:view`, `settings:opened`. The windows are reused and re-read their state asynchronously, so revealing first paints the *previous* trigger's contents for a few frames. `hide_popover` emits too, for the same reason.
 
-Each surface is a shell plus its views, and the state behind them lives in a `.svelte.ts` singleton — one per window, which is safe precisely because the window is created once (ADR-0007):
+Each surface is a shell plus its views, and the state behind them lives in a singleton store — one per window, which is safe precisely because the window is created once (ADR-0007). Two frameworks for the length of the shadcn/ui port (ADR-0008): the Svelte surfaces use `.svelte.ts` runes, Settings uses plain classes over `Notifier` ([lib/store.ts](src/lib/store.ts)) that components subscribe to with `useStore`. Each Vite plugin claims its own extensions, and the surfaces share only `src/lib/*.ts`, which is framework-agnostic.
 
 - **Popover** — [Popover.svelte](src/popover/Popover.svelte) (shell, window keys, the scroller) over [PopoverHeader](src/popover/PopoverHeader.svelte), [TurnCard](src/popover/TurnCard.svelte) and [Composer](src/popover/Composer.svelte), backed by [popover/exchange.svelte.ts](src/popover/exchange.svelte.ts). Every state a turn can be in is decided in the store and rendered in `TurnCard`; a state machine half-implemented in markup is the failure mode this split exists to prevent.
 - **Launcher** — [Launcher.svelte](src/launcher/Launcher.svelte) (shell, window keys) over [ActionList](src/launcher/ActionList.svelte), backed by [launcher/actions.svelte.ts](src/launcher/actions.svelte.ts). A picker only: it reads the registry and writes nothing, so it can keep dying with its focus.
-- **Settings** — [Settings.svelte](src/settings/Settings.svelte) (shell, subscriptions, the delete dialog) over [SettingsNav](src/settings/SettingsNav.svelte) and [sections/](src/settings/sections/), backed by two stores: [settings/store.svelte.ts](src/settings/store.svelte.ts) for the global config and [settings/actions.svelte.ts](src/settings/actions.svelte.ts) for the Actions. The Actions section ([sections/actions/](src/settings/sections/actions/)) is one nav entry holding the whole list, and the list and the editor are two views of that one pane.
+- **Settings** (React) — [Settings.tsx](src/settings/Settings.tsx) (shell, subscriptions, the delete dialog, the pane element) over [SettingsNav](src/settings/SettingsNav.tsx) and [sections/](src/settings/sections/), backed by two stores: [settings/store.ts](src/settings/store.ts) for the global config and [settings/actions.ts](src/settings/actions.ts) for the Actions. The Actions section ([sections/actions/](src/settings/sections/actions/)) is one nav entry holding the whole list, and the list and the editor are two views of that one pane.
 
-Where a shell has to reach into a child's DOM — focusing the query box, focusing or resetting the composer, scrolling the selected row into view — the child exports a function and the shell holds it with `bind:this`. The store never touches the DOM; it calls the `onStream` / `onIdle` / `onReset` hooks the shell installs on mount.
+Where a Svelte shell has to reach into a child's DOM — focusing the query box, focusing or resetting the composer, scrolling the selected row into view — the child exports a function and the shell holds it with `bind:this`. The store never touches the DOM; it calls the `onStream` / `onIdle` / `onReset` hooks the shell installs on mount.
 
-### The design system ([src/app.css](src/app.css))
+### Two design systems, one shrinking ([src/app.css](src/app.css), [src/globals.css](src/globals.css))
 
-One file, four layers: brand primitives → semantic palette (light base, `[data-theme="dark"]` override) → theme-invariant scales (space, type, radius, motion, z) → element base. Components name **no** colour, size or duration of their own; a new hardcoded `12px` or hex is a bug.
+Settings is styled by shadcn/ui and Tailwind utilities (ADR-0008); the Launcher and the Popover are still on the hand-rolled system in `app.css`. Neither surface reads the other's. Both rules are the same rule: a component names **no** colour, size or duration of its own, and a new hardcoded `12px` or hex — in a `.svelte` `<style>` or a `.tsx` `className` — is a bug.
+
+**Settings.** [src/globals.css](src/globals.css) is shadcn/ui's generated file: `@import "tailwindcss"`, the `dark` variant, the `:root` / `.dark` token blocks, the `@theme inline` bridge, one `@layer base` reset. Nothing else belongs in it — the whole point of the port was to stop hand-authoring rules. The base colour is `neutral`, not `slate`, and that is the colour scheme in one decision: slate's greys sit at hue 250–265, the brand's own blue family, so brand accents read as slightly bluer grey rather than as accents. At chroma 0 `--primary` is the only chromatic thing on the surface.
+
+Every value that deviates from the generated set is measured, with the ratio in the comment beside it — that much of app.css's practice does carry over (ADR-0008). Five deviations: `--primary` / `--ring` from the brand; `--muted-foreground` darkened because the generated value is 4.34:1 on `--muted`, which is a live pairing; `--input` split from the decorative `--border` and darkened to clear 3:1, because a text field's box is the control (WCAG 1.4.11) — the same split app.css makes as `--border-strong`; `--warning` / `--success` added, since the alternative is `text-amber-700 dark:text-amber-400` at every use site; and `--destructive-foreground` deleted, unconsumed and 2.77:1 on its own fill in dark. `--text-2xs` is the step below Tailwind's `text-xs` that six call sites were writing as `text-[11px]`.
+
+- Controls come from `npx shadcn@latest add`, into [src/components/ui/](src/components/ui/) — library source, editable, but every edit is a divergence to justify. Beckon's own compositions live one level up in [src/components/](src/components/): `Field`, `InfoHint`, `Segmented`, `Callout`, `ConfirmDialog`, `ModelSelect`, `Temperature`, `HotkeyInput`, `OverrideField`, `StatusBar`, `BrandMark`.
+- **Radix portals to `document.body`, and the pane *is* the save protocol.** `select` and `popover` are patched to default their portal container to the pane via [src/lib/pane.tsx](src/lib/pane.tsx); `alert-dialog` is not, because the delete confirmation is hosted by the shell, outside the pane. Adding another portalling component means deciding which of those two it is.
+- shadcn's ToggleGroup gives the selected item and the hovered item the same `bg-accent`. `Segmented` overrides that, and the fix has to survive both themes: a fill means "selected" and nothing else, hover brightens the label instead. `--accent` equals `--muted` in dark and equals the group's own fill in light, so a hover fill is indistinguishable from either the selected chip or from nothing — it is cancelled outright. The chip and the group also trade fills between themes, so the chip sits *above* the group in both; `bg-background` on the chip in dark would put a 0.145 well inside a 0.269 group and read as the one option switched off. A control where "set" and "under the pointer" look identical is not a styling nit.
+- One destructive treatment, and it is a button variant (`destructive-outline`), not a class string at each call site: red text and edge at rest, fill on hover only. Solid `destructive` belongs to the confirmation dialog alone. Danger has to be legible at rest — a keyboard never passes through hover.
+- Icons are `lucide-react`, which is what shadcn's own components import. `BrandMark` is the one exception — it is the identity, not a glyph.
+
+**Launcher and Popover.** One file, four layers: brand primitives → semantic palette (light base, `[data-theme="dark"]` override) → theme-invariant scales (space, type, radius, motion, z) → element base.
 
 - The palette is derived from [assets/logo.svg](assets/logo.svg). Brand cyan is 1.4:1 on white, so light mode uses the same hue darkened until it passes AA, and full-strength brand is reserved for dark surfaces and non-text use. Every ratio in the comments is measured — re-measure when changing one.
 - `--border` is decorative and exempt from contrast rules; `--border-strong` bounds interactive controls and must clear 3:1 (WCAG 1.4.11).
 - The gradient is a light source, not a paint bucket: rails, the streaming caret, the waiting rail, one primary button. Never behind prose, never on the focus ring, never on a semantic colour.
 - `.surface` owns the frameless card and sets `--surface-radius`; children that meet its edge read that variable instead of repeating a number. It carries no `box-shadow` — the card fills the window rect, so the shadow you see is DWM's.
-- Motion is `transform`/`opacity` only, and one `prefers-reduced-motion` block disables the lot. The Popover's looping indicators opt back in with a *static* form: a frozen travelling rail reads as a stalled request.
+- Motion is `transform`/`opacity` only, and one `prefers-reduced-motion` block disables the lot. The Popover's looping indicators opt back in with a *static* form: a frozen travelling rail reads as a stalled request. This is the one thing with no Tailwind equivalent, and it is why the Popover has not been ported yet.
+- Icons are hand-rolled inline SVG in [src/lib/icons/](src/lib/icons/) — 24×24 grid, `currentColor`, `aria-hidden` always, so the accessible name lives on the control.
 
-Icons are hand-rolled inline SVG in [src/lib/icons/](src/lib/icons/) — 24×24 grid, `currentColor`, `aria-hidden` always, so the accessible name lives on the control. Shared controls are in [src/lib/ui/](src/lib/ui/).
+The theme is stamped twice by [lib/theme.ts](src/lib/theme.ts): `data-theme` for `app.css`, `.dark` for shadcn's variant. One resolution, two stamps. Both it and `src/lib/icons/` go when the last Svelte surface is ported.
 
 ### Trigger flow ([src-tauri/src/trigger/](src-tauri/src/trigger/))
 
@@ -106,15 +120,16 @@ Rules that break subtly if ignored:
 
 ### The editing surface is an editor, not an owner ([src/settings/](src/settings/))
 
-There is no Save button and there must never be one (ADR-0003). **Settings is the only place anything is authored** — the global config (credential, Launcher hotkey, theme, model defaults) *and* the Actions; the Launcher is a picker that writes nothing. Two stores, one per kind of file, both driving [src/lib/saveSlot.svelte.ts](src/lib/saveSlot.svelte.ts): [settings/store.svelte.ts](src/settings/store.svelte.ts) for `config.toml`, [settings/actions.svelte.ts](src/settings/actions.svelte.ts) for `actions\*.toml`. Components receive values and callbacks, never calling `saveConfig` / `saveAction` themselves. The Action store reads `defaults` and the model catalog off the config store rather than fetching its own — two copies in one window could only drift.
+There is no Save button and there must never be one (ADR-0003). **Settings is the only place anything is authored** — the global config (credential, Launcher hotkey, theme, model defaults) *and* the Actions; the Launcher is a picker that writes nothing. Two stores, one per kind of file, both driving [src/lib/saveSlot.ts](src/lib/saveSlot.ts): [settings/store.ts](src/settings/store.ts) for `config.toml`, [settings/actions.ts](src/settings/actions.ts) for `actions\*.toml`. Components receive values and callbacks, never calling `saveConfig` / `saveAction` themselves. The Action store reads `defaults` and the model catalog off the config store rather than fetching its own — two copies in one window could only drift.
 
 - **Saving echoes back at the window that saved.** `save_config` → `reload_config` → `config-changed` (and `save_action` → `actions-changed`), broadcast to every window including the one that caused it. So the events being defended against are mostly our own writes arriving mid-keystroke, not the file watcher.
 - A snapshot is refused while a text field in the pane has focus **or** a write is pending, and is then *held* and applied when both clear — dropping it would leave the form permanently stale after an external edit.
 - Focus is read from the DOM when the event arrives, not tracked in per-field flags. The flags this replaced covered two of eleven inputs, so every field added later silently opted out.
-- Settings' navigation column sits **outside** the pane element, so changing section fires `focusout` and flushes the slot. No route change can strand an unwritten edit.
-- The model `<select>` uses `value=` + `onchange`, **never `bind:`**, and refuses to write `""` where no inherit option exists. Both halves stop a configured model being silently rewritten before the catalog lands.
+- Settings' navigation column sits **outside** the pane element, so changing section fires the pane's blur and flushes the slot. No route change can strand an unwritten edit.
+- Radix would portal an open dropdown or hint bubble to `document.body`, i.e. outside the pane — which reads as "the user left the form". `select` and `popover` portal into the pane instead ([lib/pane.tsx](src/lib/pane.tsx)); the delete dialog stays on the body, where the old native `<dialog>` was. ADR-0008 has the reasoning; a new portalling component has to pick a side.
+- `ModelSelect` is controlled — `value=` + `onChange`, **never** a two-way binding — and refuses to write `""` where no inherit option exists. Both halves stop a configured model being silently rewritten before the catalog lands. Radix rejects an item valued `""`, so inherit rides a sentinel mapped at both edges of that one file.
 - `save_action` re-probes the Direct Hotkey and refuses the *whole* write if it cannot be registered — so while an outside app holds an Action's hotkey, even renaming it fails. The editor says so and offers to clear the hotkey.
-- The window is reused (ADR-0007): `settings:opened` clears the last visit's typed API key and test result and closes whatever Action it left open in the editor. `onMount` cannot do it, and the first open misses the event because the window is still being built — so `Settings.svelte` always loads itself too.
+- The window is reused (ADR-0007): `settings:opened` clears the last visit's typed API key and test result and closes whatever Action it left open in the editor. `onMount` cannot do it, and the first open misses the event because the window is still being built — so `Settings.tsx` always loads itself too.
 - An Action's `[model]` overrides render as `OverrideField`: opening the row *is* the override, and it collapses again when focus leaves. The collapse is presentation only — the write already happened.
 - A field's explanation lives behind the info icon (`InfoHint`), never as a permanent line: only warnings and errors earn one, because those are conditions to act on.
 
@@ -141,7 +156,7 @@ This repo is indexed by GitNexus; MCP tools (`impact`, `context`, `query`, `dete
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (1156 symbols, 2502 relationships, 93 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (1331 symbols, 3145 relationships, 107 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
