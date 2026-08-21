@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
+import { FieldGroup } from "@/components/FieldGroup";
 import { HotkeyInput } from "@/components/HotkeyInput";
 import { ModelSelect } from "@/components/ModelSelect";
 import { OverrideField } from "@/components/OverrideField";
@@ -86,8 +87,8 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Callout>
       ) : null}
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-x-4">
-        <Field label="Name" warning={nameWarning}>
+      <FieldGroup title="Action">
+        <Field label="Name" measure="field" warning={nameWarning}>
           {({ id, describedBy }) => (
             <Input
               id={id}
@@ -101,12 +102,10 @@ export function ActionEditor({ action }: ActionEditorProps) {
           )}
         </Field>
 
-        {/* Right-hand column: the hint bubble hangs leftwards, or its box
-            overflows the pane and leaves a horizontal scrollbar behind. */}
         <Field
           label="Description"
+          measure="field"
           hint="Shown under the name in the Launcher, and searched."
-          hintAlign="end"
         >
           {({ id, describedBy }) => (
             <Input
@@ -120,9 +119,6 @@ export function ActionEditor({ action }: ActionEditorProps) {
             />
           )}
         </Field>
-      </div>
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-x-4">
         <Field label="Input Source" hint={SOURCE_HINT[draft.input_source]}>
           {({ id, describedBy }) => (
             <Segmented
@@ -136,127 +132,140 @@ export function ActionEditor({ action }: ActionEditorProps) {
           )}
         </Field>
 
-        <Field
-          label="Direct Hotkey"
-          hint="Optional. Without one, the Action is Launcher-only."
-          hintAlign="end"
-        >
+        <Field label="Direct Hotkey" hint="Optional. Without one, the Action is Launcher-only.">
           {() => (
             <HotkeyInput
               value={draft.hotkey ?? null}
               clearable
-              onChange={(accelerator) => store.editDraft((next) => (next.hotkey = accelerator), true)}
+              onChange={(accelerator) =>
+                store.editDraft((next) => (next.hotkey = accelerator), true)
+              }
             />
           )}
         </Field>
-      </div>
+      </FieldGroup>
 
-      <Field label="System prompt" hint="How the model should behave. Sent ahead of every input.">
-        {({ id, describedBy }) => (
-          <Textarea
-            id={id}
-            aria-describedby={describedBy}
-            className="font-mono min-h-30 text-xs"
-            value={draft.prompt.system}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              store.editDraft((next) => (next.prompt.system = value));
-            }}
-          />
-        )}
-      </Field>
-
-      <Field
-        label="User template"
-        warning={templateWarning}
-        hint="{{input}} is replaced by the Selection or the typed input. Empty means just the input."
-      >
-        {({ id, describedBy }) => (
-          <Input
-            id={id}
-            aria-describedby={describedBy}
-            className="font-mono text-xs"
-            value={draft.prompt.user ?? ""}
-            placeholder="{{input}}"
-            onChange={(event) => {
-              const value = event.currentTarget.value || null;
-              store.editDraft((next) => (next.prompt.user = value));
-            }}
-          />
-        )}
-      </Field>
-
-      <h2 className="font-small text-muted-foreground mt-6 mb-3 text-2xs font-semibold tracking-widest uppercase">
-        Model overrides
-      </h2>
-
-      <div className="mb-5 flex flex-col gap-2">
-        <OverrideField
-          label="Model"
-          inherited={defaults.model}
-          current={draft.model.model ?? defaults.model}
-          overridden={draft.model.model !== null}
-          error={modelHint}
-          onOverride={(on) =>
-            store.editDraft((next) => (next.model.model = on ? defaults.model : null), true)
-          }
+      <FieldGroup title="Prompt">
+        <Field
+          label="System prompt"
+          measure="wide"
+          hint="How the model should behave. Sent ahead of every input."
         >
-          {/* No inherit option: inherit is the row's job, so "" here could only
-              be a render artefact, and ModelSelect refuses to write it. */}
-          <ModelSelect
-            value={draft.model.model ?? ""}
-            options={modelOptions(draft.model.model ?? "", settings.models)}
-            onChange={(model) => store.editDraft((next) => (next.model.model = model), true)}
-          />
-        </OverrideField>
-
-        <OverrideField
-          label="Thinking"
-          inherited={defaults.thinking ? "on" : "off"}
-          current={(draft.model.thinking ?? defaults.thinking) ? "on" : "off"}
-          overridden={draft.model.thinking !== null}
-          onOverride={(on) =>
-            store.editDraft((next) => (next.model.thinking = on ? defaults.thinking : null), true)
-          }
-        >
-          <div className="flex items-center gap-2">
-            <Switch
-              aria-label="Think before answering"
-              checked={draft.model.thinking ?? defaults.thinking}
-              onCheckedChange={(value) =>
-                store.editDraft((next) => (next.model.thinking = value), true)
-              }
+          {({ id, describedBy }) => (
+            <Textarea
+              id={id}
+              aria-describedby={describedBy}
+              className="font-mono min-h-30 text-quiet"
+              value={draft.prompt.system}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                store.editDraft((next) => (next.prompt.system = value));
+              }}
             />
-            <span aria-hidden className="text-muted-foreground font-small min-w-9 text-xs">
-              {(draft.model.thinking ?? defaults.thinking) ? "On" : "Off"}
-            </span>
-          </div>
-        </OverrideField>
+          )}
+        </Field>
 
-        <OverrideField
-          label="Temperature"
-          hint={TEMPERATURE_HINT}
-          inherited={String(defaults.temperature)}
-          current={String(draft.model.temperature ?? defaults.temperature)}
-          overridden={draft.model.temperature !== null}
-          onOverride={(on) =>
-            store.editDraft(
-              (next) => (next.model.temperature = on ? defaults.temperature : null),
-              true,
-            )
-          }
+        <Field
+          label="User template"
+          measure="wide"
+          warning={templateWarning}
+          hint="{{input}} is replaced by the Selection or the typed input. Empty means just the input."
         >
-          <Temperature
-            value={draft.model.temperature ?? defaults.temperature}
-            onChange={(value) => store.editDraft((next) => (next.model.temperature = value))}
-          />
-        </OverrideField>
-      </div>
+          {({ id, describedBy }) => (
+            <Input
+              id={id}
+              aria-describedby={describedBy}
+              className="font-mono text-quiet"
+              value={draft.prompt.user ?? ""}
+              placeholder="{{input}}"
+              onChange={(event) => {
+                const value = event.currentTarget.value || null;
+                store.editDraft((next) => (next.prompt.user = value));
+              }}
+            />
+          )}
+        </Field>
+      </FieldGroup>
+
+      <FieldGroup title="Model overrides">
+        {/* Indented to the value column, so the override rows line up with the
+            controls in the ledger above them rather than with their labels, and
+            held to the same measure as the widest control in it — otherwise the
+            three of them are the only thing on the pane running past where every
+            value stops. */}
+        <div className="pt-3 pl-47">
+          <div className="flex max-w-105 flex-col gap-2">
+            <OverrideField
+              label="Model"
+              inherited={defaults.model}
+              current={draft.model.model ?? defaults.model}
+              overridden={draft.model.model !== null}
+              error={modelHint}
+              onOverride={(on) =>
+                store.editDraft((next) => (next.model.model = on ? defaults.model : null), true)
+              }
+            >
+              {/* No inherit option: inherit is the row's job, so "" here could only
+              be a render artefact, and ModelSelect refuses to write it. */}
+              <ModelSelect
+                value={draft.model.model ?? ""}
+                options={modelOptions(draft.model.model ?? "", settings.models)}
+                onChange={(model) => store.editDraft((next) => (next.model.model = model), true)}
+              />
+            </OverrideField>
+
+            <OverrideField
+              label="Thinking"
+              inherited={defaults.thinking ? "on" : "off"}
+              current={(draft.model.thinking ?? defaults.thinking) ? "on" : "off"}
+              overridden={draft.model.thinking !== null}
+              onOverride={(on) =>
+                store.editDraft(
+                  (next) => (next.model.thinking = on ? defaults.thinking : null),
+                  true,
+                )
+              }
+            >
+              <div className="flex items-center gap-2">
+                <Switch
+                  aria-label="Think before answering"
+                  checked={draft.model.thinking ?? defaults.thinking}
+                  onCheckedChange={(value) =>
+                    store.editDraft((next) => (next.model.thinking = value), true)
+                  }
+                />
+                <span aria-hidden className="text-muted-foreground min-w-5.5 text-meta">
+                  {(draft.model.thinking ?? defaults.thinking) ? "On" : "Off"}
+                </span>
+              </div>
+            </OverrideField>
+
+            <OverrideField
+              label="Temperature"
+              hint={TEMPERATURE_HINT}
+              inherited={String(defaults.temperature)}
+              current={String(draft.model.temperature ?? defaults.temperature)}
+              overridden={draft.model.temperature !== null}
+              onOverride={(on) =>
+                store.editDraft(
+                  (next) => (next.model.temperature = on ? defaults.temperature : null),
+                  true,
+                )
+              }
+            >
+              <Temperature
+                value={draft.model.temperature ?? defaults.temperature}
+                onChange={(value) => store.editDraft((next) => (next.model.temperature = value))}
+              />
+            </OverrideField>
+          </div>
+        </div>
+      </FieldGroup>
 
       {/* Above a divider rather than floating at the end of the form: it deletes
           a file, so it must not read as the last field's neighbour. */}
       <div className="flex items-center justify-between gap-3 border-t pt-4">
-        <span className="text-muted-foreground font-small text-xs">
+        <span className="text-muted-foreground text-meta">
           Deleting removes <code className="font-mono">{action.file_name}</code> from disk.
         </span>
         {/* Destructive up front, not only once the pointer is over it: hover is

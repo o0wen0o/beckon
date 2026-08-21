@@ -24,7 +24,7 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
   }
 
   return (
-    <div className="max-w-105">
+    <div className="max-w-85">
       {/* The scale is nested with the slider, not laid beside the number box:
           the ticks name positions *on the track*, so spanning the whole row put
           "2 · loose" under the number input and "1" left of the midpoint. */}
@@ -39,7 +39,7 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
             aria-describedby={describedBy}
             onValueChange={([next]) => commit(next)}
           />
-          <div className="text-muted-foreground font-small flex justify-between text-2xs">
+          <div className="text-muted-foreground flex justify-between text-micro">
             <span>0 · precise</span>
             <span>1</span>
             <span>2 · loose</span>

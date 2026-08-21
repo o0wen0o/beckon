@@ -2,7 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
+import { FieldGroup } from "@/components/FieldGroup";
 import { ModelSelect } from "@/components/ModelSelect";
+import { PaneHeader } from "@/components/PaneHeader";
 import { Temperature } from "@/components/Temperature";
 import { describeFailure } from "@/lib/failures";
 import { modelOption, modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
@@ -35,7 +37,10 @@ export function ModelDefaults() {
 
   return (
     <>
-      <h1 className="font-display mb-6 text-xl font-semibold">Model defaults</h1>
+      <PaneHeader title="Model defaults">
+        What every Action inherits unless its own <code className="font-mono">[model]</code> table
+        says otherwise.
+      </PaneHeader>
 
       {catalogNotice ? (
         <Callout tone="warn">
@@ -45,74 +50,80 @@ export function ModelDefaults() {
 
       {config ? (
         <>
-          <p className="text-muted-foreground font-small mb-4 text-xs">
-            Any Action can override these in its own <code className="font-mono">[model]</code>{" "}
-            table.
-          </p>
-
-          <Field label="Model" hint={modelHint ? undefined : modelInfo} error={modelHint}>
-            {({ id, describedBy }) => (
-              <ModelSelect
-                id={id}
-                describedBy={describedBy}
-                value={config.defaults.model}
-                options={modelOptions(config.defaults.model, store.models)}
-                onChange={(model) =>
-                  store.editConfig((draft) => (draft.defaults.model = model), true)
-                }
-              />
-            )}
-          </Field>
-
-          <Field label="Think before answering" warning={thinkingHint} hint={THINKING_HINT}>
-            {({ id, describedBy }) => (
-              <div className="flex items-center gap-2 self-start">
-                <Switch
+          <FieldGroup title="Model">
+            <Field label="Model" hint={modelHint ? undefined : modelInfo} error={modelHint}>
+              {({ id, describedBy }) => (
+                <ModelSelect
                   id={id}
-                  aria-describedby={describedBy}
-                  aria-label="Think before answering"
-                  checked={config.defaults.thinking}
-                  onCheckedChange={(on) =>
-                    store.editConfig((draft) => (draft.defaults.thinking = on), true)
+                  describedBy={describedBy}
+                  value={config.defaults.model}
+                  options={modelOptions(config.defaults.model, store.models)}
+                  onChange={(model) =>
+                    store.editConfig((draft) => (draft.defaults.model = model), true)
                   }
                 />
-                <span
-                  aria-hidden
-                  className="text-muted-foreground font-small min-w-9 text-left text-xs"
-                >
-                  {config.defaults.thinking ? "On" : "Off"}
-                </span>
-              </div>
-            )}
-          </Field>
+              )}
+            </Field>
 
-          <Field label="Temperature" hint={TEMPERATURE_HINT}>
-            {({ id, describedBy }) => (
-              <Temperature
-                id={id}
-                describedBy={describedBy}
-                value={config.defaults.temperature}
-                onChange={(value) =>
-                  store.editConfig((draft) => (draft.defaults.temperature = value))
-                }
-              />
-            )}
-          </Field>
+            <Field label="Think before answering" warning={thinkingHint} hint={THINKING_HINT}>
+              {({ id, describedBy }) => (
+                <div className="flex items-center gap-2 self-start">
+                  <Switch
+                    id={id}
+                    aria-describedby={describedBy}
+                    aria-label="Think before answering"
+                    checked={config.defaults.thinking}
+                    onCheckedChange={(on) =>
+                      store.editConfig((draft) => (draft.defaults.thinking = on), true)
+                    }
+                  />
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground min-w-5.5 text-left text-meta"
+                  >
+                    {config.defaults.thinking ? "On" : "Off"}
+                  </span>
+                </div>
+              )}
+            </Field>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => void store.refreshModels()}
-              disabled={store.modelsLoading}
+            <Field label="Temperature" hint={TEMPERATURE_HINT}>
+              {({ id, describedBy }) => (
+                <Temperature
+                  id={id}
+                  describedBy={describedBy}
+                  value={config.defaults.temperature}
+                  onChange={(value) =>
+                    store.editConfig((draft) => (draft.defaults.temperature = value))
+                  }
+                />
+              )}
+            </Field>
+          </FieldGroup>
+
+          <FieldGroup title="Catalog">
+            <Field
+              label="Model list"
+              hint="Refreshing asks the endpoint for its own list; the documented catalog is the fallback."
             >
-              {store.modelsLoading ? "Loading models…" : "Refresh models"}
-            </Button>
-            {store.models?.live ? (
-              <span className="text-muted-foreground font-small text-xs">
-                Listed by the endpoint at your base URL.
-              </span>
-            ) : null}
-          </div>
+              {() => (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void store.refreshModels()}
+                    disabled={store.modelsLoading}
+                  >
+                    {store.modelsLoading ? "Loading models…" : "Refresh models"}
+                  </Button>
+                  {store.models?.live ? (
+                    <span className="text-muted-foreground text-meta">
+                      Listed by the endpoint at your base URL.
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </Field>
+          </FieldGroup>
         </>
       ) : null}
     </>

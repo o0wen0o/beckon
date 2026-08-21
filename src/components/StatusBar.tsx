@@ -20,8 +20,8 @@ export function StatusBar({ busy, error, note = null }: StatusBarProps) {
     <div
       role="status"
       aria-live="polite"
-      className={`bg-card font-small flex h-7 flex-none items-center gap-2 border-t px-4 text-xs ${
-        error !== null ? "text-destructive" : "text-muted-foreground"
+      className={`bg-background flex h-8 flex-none items-center gap-2 border-t px-5 text-meta ${
+        error !== null ? "text-destructive" : "text-muted-quiet"
       }`}
     >
       {error ? (

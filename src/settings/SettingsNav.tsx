@@ -2,7 +2,14 @@
 // file: the list belongs in the pane, where a row has room for its Input Source
 // and its hotkey. A nav column of Actions would make "pick a section" and "pick
 // an Action" the same gesture for two unlike things.
-import { FolderIcon, KeyboardIcon, ListIcon, PaletteIcon, PlugIcon, SlidersIcon } from "lucide-react";
+import {
+  FolderIcon,
+  KeyboardIcon,
+  ListIcon,
+  PaletteIcon,
+  PlugIcon,
+  SlidersIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
 import { revealConfigDir } from "@/lib/ipc";
@@ -43,10 +50,12 @@ export function SettingsNav() {
   return (
     <nav
       aria-label="Settings"
-      className="bg-sidebar flex w-60 min-h-0 flex-none flex-col border-r px-2 py-3"
+      className="bg-sidebar flex w-52 min-h-0 flex-none flex-col border-r px-2.5 py-3.5"
     >
-      <div className="font-display flex items-center gap-2 px-2 pt-1 pb-5 text-sm font-semibold">
-        <BrandMark className="text-primary size-5" />
+      <div className="font-display flex items-center gap-2 px-2 pt-0.5 pb-4.5 text-sm font-semibold">
+        {/* The one chromatic thing in the window, and the reason `--brand` is a
+            token of its own: everything else here is ink on paper. */}
+        <BrandMark className="text-brand size-4.25" />
         <span>Beckon</span>
       </div>
 
@@ -61,29 +70,32 @@ export function SettingsNav() {
                 aria-current={active ? "page" : undefined}
                 onClick={() => store.go(section.id)}
                 className={[
-                  "relative flex w-full items-center justify-start gap-2 rounded-md py-2 pr-2 pl-3 text-left",
+                  "flex w-full items-center justify-start gap-2.25 rounded-md px-2.25 py-1.5 text-left",
                   "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
-                  // One signal for "current", one for "under the pointer". A
-                  // row that is filled *and* railed says the same thing twice,
-                  // and the fill then has nothing left to distinguish it from
-                  // hover.
+                  // The fill arrives rather than appearing. One frame is what
+                  // makes a nav column feel like a set of radio buttons; 150ms
+                  // is short enough that it never delays the pane behind it,
+                  // which swaps on the same curve.
+                  "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                  // Inversion is the marker: the current row is the only filled
+                  // thing in the window, so it needs no rail and no weight
+                  // change beside it. The hover tint is then free to mean
+                  // "under the pointer" and nothing else.
                   active
-                    ? "text-foreground font-medium"
+                    ? "bg-primary text-primary-foreground font-medium"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 ].join(" ")}
               >
-                {/* The brand rail — now the primary marker for "current",
-                    which is why it is the one place colour appears here.
-                    `aria-current` above carries it for assistive tech. */}
-                <span
-                  aria-hidden
-                  className={`bg-primary absolute inset-y-1.5 left-0 w-0.5 rounded-full transition-opacity ${
-                    active ? "opacity-100" : "opacity-0"
-                  }`}
-                />
-                <Icon className="size-3.75 flex-none" />
+                {/* The icon inherits the row's colour, and an inherited change
+                    only animates where the child declares the transition too —
+                    without this the label eases and the glyph snaps. */}
+                <Icon className="size-3.75 flex-none transition-colors duration-150 ease-out motion-reduce:transition-none" />
                 <span className="min-w-0 flex-1 truncate">{section.label}</span>
-                {flags[section.id] ? (
+                {/* Not drawn on the current row. A 6px dot on the inverted fill
+                    is 2.7:1 at best and 1.3:1 for the warning tone — and it is
+                    the one row whose problem is already on screen, in the pane
+                    to the right. */}
+                {flags[section.id] && !active ? (
                   <span
                     title="Something in this section needs attention"
                     className={`size-1.5 flex-none rounded-full ${

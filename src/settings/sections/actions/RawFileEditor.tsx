@@ -22,17 +22,17 @@ export function RawFileEditor() {
       ) : null}
 
       <Textarea
-        className="font-mono min-h-55 text-xs"
+        className="font-mono min-h-55 text-quiet"
         spellCheck={false}
         value={raw.text}
         onChange={(event) => store.editRaw(event.currentTarget.value)}
       />
 
-      {raw.error ? <p className="text-destructive font-small mt-1 text-xs">{raw.error}</p> : null}
+      {raw.error ? <p className="text-destructive mt-1 text-note">{raw.error}</p> : null}
 
       <div className="mt-3 flex items-center gap-2">
         <Button onClick={() => void store.saveRaw()}>Save file</Button>
-        <span className="text-muted-foreground font-small text-xs">
+        <span className="text-muted-foreground text-meta">
           It reloads the moment it parses.
         </span>
       </div>

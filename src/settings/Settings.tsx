@@ -30,6 +30,13 @@ export function Settings() {
     settings.pane = pane;
   }, [pane]);
 
+  // A new section starts at its own top. The pane is one scroll container for
+  // every route, so without this, arriving at a short pane from a scrolled long
+  // one lands you at whatever offset the previous section happened to be at.
+  React.useEffect(() => {
+    pane?.scrollTo({ top: 0 });
+  }, [pane, store.route]);
+
   /** Both stores hold a write; whatever moved focus ends both of them. */
   const flush = React.useCallback(() => {
     settings.flush();
@@ -91,19 +98,30 @@ export function Settings() {
           <main
             ref={setPane}
             onBlur={flush}
-            className="min-w-0 flex-1 overflow-y-auto px-10 pt-8 pb-12"
+            className="min-w-0 flex-1 overflow-y-auto px-7.5 pt-6.5 pb-10"
           >
-            {store.route === "connection" ? (
-              <Connection />
-            ) : store.route === "actions" ? (
-              <Actions />
-            ) : store.route === "triggering" ? (
-              <Triggering />
-            ) : store.route === "appearance" ? (
-              <Appearance />
-            ) : (
-              <ModelDefaults />
-            )}
+            {/* Keyed on the route so the wrapper remounts and the animation
+                actually re-runs. The pane rises 4px as it fades: the nav item
+                fills on the same 150–200ms curve, so the click reads as one
+                movement from the column into the pane rather than as two
+                unrelated repaints. Nothing here waits on it — the content is
+                already laid out, only its opacity and offset animate. */}
+            <div
+              key={store.route}
+              className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-out motion-reduce:animate-none"
+            >
+              {store.route === "connection" ? (
+                <Connection />
+              ) : store.route === "actions" ? (
+                <Actions />
+              ) : store.route === "triggering" ? (
+                <Triggering />
+              ) : store.route === "appearance" ? (
+                <Appearance />
+              ) : (
+                <ModelDefaults />
+              )}
+            </div>
           </main>
         </div>
 

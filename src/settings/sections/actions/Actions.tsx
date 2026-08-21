@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FieldGroup } from "@/components/FieldGroup";
+import { PaneHeader } from "@/components/PaneHeader";
 import type { InputSource } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
@@ -33,6 +35,11 @@ const SOURCE_ICON = {
 function sourceLabel(source: InputSource) {
   return source.charAt(0).toUpperCase() + source.slice(1);
 }
+
+/** The ledger row, shared by the Actions and the files that will not parse: the
+ *  same four columns, so a broken file sits in the list rather than beside it. */
+const ROW =
+  "group hover:bg-accent focus-visible:ring-ring/50 flex w-full items-center gap-3.5 border-b px-2 py-2.5 text-left transition-colors duration-150 ease-out focus-visible:ring-[3px] focus-visible:outline-none motion-reduce:transition-none";
 
 export function Actions() {
   const store = useStore(actionStore);
@@ -55,8 +62,10 @@ export function Actions() {
     const title = editing.kind === "raw" ? editing.file : store.draft?.name || editing.file;
 
     return (
-      <>
-        <header className="mb-6 flex items-center gap-3">
+      // The list and the editor are two views of one pane, and each mounts
+      // fresh when the other leaves, so the entrance runs without a key.
+      <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-out motion-reduce:animate-none">
+        <header className="mb-6.5 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -67,11 +76,11 @@ export function Actions() {
             <ArrowLeftIcon className="size-3.5" />
           </Button>
           <div className="flex min-w-0 flex-col">
-            <span className="font-display text-xl font-semibold">{title}</span>
+            <span className="font-display text-title font-semibold tracking-title">{title}</span>
             {/* The filename is the identity (ADR-0003): renaming never moves it.
                 In the raw editor the heading *is* the filename, so repeating it
                 here would print the same string twice, one line apart. */}
-            <span className="text-muted-foreground font-small truncate text-2xs">
+            <span className="text-muted-foreground truncate text-meta">
               {editing.kind === "raw" ? "does not parse — edited as text" : editing.file}
             </span>
           </div>
@@ -85,124 +94,143 @@ export function Actions() {
           ) : store.selected ? (
             <ActionEditor action={store.selected} />
           ) : (
-            <p className="text-muted-foreground font-small text-xs">That Action is gone.</p>
+            <p className="text-muted-foreground text-meta">That Action is gone.</p>
           )}
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="font-display mb-6 text-xl font-semibold">Actions</h1>
-        <Button onClick={() => void store.create()}>
-          <PlusIcon className="size-3.5" /> New Action
-        </Button>
-      </header>
+    <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-out motion-reduce:animate-none">
+      <PaneHeader
+        title="Actions"
+        action={
+          <Button onClick={() => void store.create()}>
+            <PlusIcon className="size-3.5" /> New Action
+          </Button>
+        }
+      >
+        One Action is one prompt, stored as its own file. The filename is its identity; the name is
+        only what you see.
+      </PaneHeader>
 
-      <ul className="flex list-none flex-col gap-0.5 p-0">
-        {snapshot.actions.map((action) => {
-          const conflict = snapshot.hotkey_errors[action.id];
-          const SourceIcon = SOURCE_ICON[action.input_source];
-          return (
-            <li key={action.id}>
-              <button
-                type="button"
-                onClick={() => store.open(action.file_name)}
-                className="group hover:bg-accent focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
-              >
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{action.name || action.file_name}</span>
-                  {action.description ? (
-                    <span className="text-muted-foreground font-small truncate text-xs">
-                      {action.description}
-                    </span>
-                  ) : null}
-                </span>
-                {/* Two fixed slots, not a shrink-to-fit row: with the hotkey
-                    chip optional, an ordinary flex row parks each Input Source
-                    pill at a different x and the column reads as ragged. */}
-                <span className="flex items-center gap-2">
-                  {/* An outline pill drew a box around a word. This is a
-                      property of the Action, not something to press, so it
-                      reads as the label it is. */}
-                  <span
-                    title={`Input Source: ${sourceLabel(action.input_source)}`}
-                    className="text-muted-foreground font-small flex items-center gap-1 text-2xs"
+      {snapshot.actions.length > 0 ? (
+        <FieldGroup
+          title={`${snapshot.actions.length} ${snapshot.actions.length === 1 ? "Action" : "Actions"}`}
+        >
+          <ul className="flex list-none flex-col p-0">
+            {snapshot.actions.map((action) => {
+              const conflict = snapshot.hotkey_errors[action.id];
+              const SourceIcon = SOURCE_ICON[action.input_source];
+              return (
+                <li key={action.id}>
+                  <button
+                    type="button"
+                    onClick={() => store.open(action.file_name)}
+                    className={ROW}
                   >
-                    <SourceIcon className="size-3" />
-                    {sourceLabel(action.input_source)}
-                  </span>
-                  {/* Reserved whether or not this Action has a hotkey, so the
-                      pills line up. */}
-                  <span className="flex min-w-24 flex-none justify-end">
-                    {conflict ? (
-                      // Outlined like the working hotkey chip beside it, in the
-                      // danger colour: it is still the Action's hotkey, just an
-                      // inactive one, and a solid red pill reads as a button.
-                      <Badge
-                        variant="outline"
-                        title={conflict}
-                        className="border-destructive/50 text-destructive gap-1 font-normal"
-                      >
-                        <TriangleAlertIcon className="size-3" /> {action.hotkey}
-                      </Badge>
-                    ) : action.hotkey ? (
-                      <kbd className="bg-muted text-muted-foreground font-mono rounded border px-1.5 py-0.5 text-2xs">
-                        {action.hotkey}
-                      </kbd>
-                    ) : null}
-                  </span>
-                </span>
-                {/* The rows are the only way into the editor, and a name over a
-                    description reads as a list of facts unless something says it
-                    opens. */}
-                <span className="text-muted-foreground group-hover:text-primary group-focus-visible:text-primary flex flex-none transition-all group-hover:translate-x-0.5">
-                  <ChevronRightIcon className="size-4" />
-                </span>
-              </button>
-            </li>
-          );
-        })}
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate font-medium">{action.name || action.file_name}</span>
+                      <span className="text-muted-foreground truncate text-meta">
+                        {/* A description if there is one, the filename if not:
+                            the second line is where the row's identity goes,
+                            and an empty one leaves the name floating. */}
+                        {action.description || (
+                          <span className="font-mono">{action.file_name}</span>
+                        )}
+                      </span>
+                    </span>
+                    {/* Two fixed columns, not a shrink-to-fit row: with the
+                        hotkey chip optional, an ordinary flex row parks each
+                        Input Source at a different x and the list reads as
+                        ragged. */}
+                    <span
+                      title={`Input Source: ${sourceLabel(action.input_source)}`}
+                      className="text-muted-quiet flex w-23 flex-none items-center gap-1.5 text-meta"
+                    >
+                      <SourceIcon className="size-3" />
+                      {sourceLabel(action.input_source)}
+                    </span>
+                    <span className="flex w-28 flex-none justify-end">
+                      {conflict ? (
+                        // Outlined like the working hotkey chip beside it, in
+                        // the danger colour: it is still the Action's hotkey,
+                        // just an inactive one, and a solid red pill reads as a
+                        // button.
+                        <Badge
+                          variant="outline"
+                          title={conflict}
+                          className="border-destructive/60 text-destructive gap-1 text-meta font-normal"
+                        >
+                          <TriangleAlertIcon className="size-3" /> {action.hotkey}
+                        </Badge>
+                      ) : action.hotkey ? (
+                        <kbd className="bg-muted text-muted-foreground font-mono rounded border px-1.5 py-0.5 text-meta">
+                          {action.hotkey}
+                        </kbd>
+                      ) : null}
+                    </span>
+                    {/* The rows are the only way into the editor, and a name
+                        over a description reads as a list of facts unless
+                        something says it opens. */}
+                    <span className="text-muted-quiet group-hover:text-foreground group-focus-visible:text-foreground flex flex-none transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 motion-reduce:transition-none">
+                      <ChevronRightIcon className="size-4" />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </FieldGroup>
+      ) : null}
 
-        {/* A file that does not parse is reported, never dropped (ADR-0003), and
-            the way back is the raw editor this row opens. */}
-        {snapshot.errors.map((error) => (
-          <li key={error.file_name}>
-            <button
-              type="button"
-              onClick={() => void store.openRaw(error.file_name)}
-              className="group hover:bg-accent focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
-            >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="font-mono truncate text-xs">{error.file_name}</span>
-                {/* The parse error itself, not a tooltip holding it: this row is
-                    the only report that the file exists, and a `title` is
-                    invisible to everything except a resting mouse. */}
-                <span className="text-destructive font-small truncate text-xs">{error.message}</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="border-destructive/50 text-destructive gap-1 font-normal"
+      {/* A file that does not parse is reported, never dropped (ADR-0003), and
+          the way back is the raw editor this row opens. */}
+      {snapshot.errors.length > 0 ? (
+        <FieldGroup title="Will not parse">
+          <ul className="flex list-none flex-col p-0">
+            {snapshot.errors.map((error) => (
+              <li key={error.file_name}>
+                <button
+                  type="button"
+                  onClick={() => void store.openRaw(error.file_name)}
+                  className={ROW}
                 >
-                  <TriangleAlertIcon className="size-3" /> Repair
-                </Badge>
-              </span>
-              <span className="text-muted-foreground group-hover:text-primary flex flex-none transition-all group-hover:translate-x-0.5">
-                <ChevronRightIcon className="size-4" />
-              </span>
-            </button>
-          </li>
-        ))}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="font-mono truncate font-medium">{error.file_name}</span>
+                    {/* The parse error itself, not a tooltip holding it: this
+                        row is the only report that the file exists, and a
+                        `title` is invisible to everything except a resting
+                        mouse. */}
+                    <span className="text-destructive truncate text-meta">
+                      {error.message}
+                    </span>
+                  </span>
+                  <span className="w-23 flex-none" />
+                  <span className="flex w-28 flex-none justify-end">
+                    <Badge
+                      variant="outline"
+                      className="border-destructive/60 text-destructive gap-1 text-meta font-normal"
+                    >
+                      <TriangleAlertIcon className="size-3" /> Repair
+                    </Badge>
+                  </span>
+                  <span className="text-muted-quiet group-hover:text-foreground flex flex-none transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 motion-reduce:transition-none">
+                    <ChevronRightIcon className="size-4" />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </FieldGroup>
+      ) : null}
 
-        {snapshot.actions.length === 0 && snapshot.errors.length === 0 ? (
-          <li className="text-muted-foreground py-6">
-            <p className="m-0">No Actions yet. One Action is one prompt, stored as its own file.</p>
-          </li>
-        ) : null}
-      </ul>
-    </>
+      {snapshot.actions.length === 0 && snapshot.errors.length === 0 ? (
+        <p className="text-muted-foreground py-6">
+          No Actions yet. One Action is one prompt, stored as its own file.
+        </p>
+      ) : null}
+    </div>
   );
 }

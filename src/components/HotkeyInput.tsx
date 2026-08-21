@@ -44,37 +44,35 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
   return (
     <>
       <div className="flex items-center gap-2">
-        {/* The button carries what it does, not just what it holds: styled like
-            a field, it reads as a value someone else typed and nothing suggests
-            that clicking is how a combination is recorded. */}
+        {/* The value is a chip and the affordance is a button beside it, rather
+            than one bordered control doing both. A box holding a combination
+            reads as a value someone typed into a field, and the thing that says
+            how to change it should be the thing you press — which is also what
+            keeps this row the same weight as the hotkey chips in the Actions
+            list, instead of the widest control on the pane. */}
+        {value ? (
+          <kbd
+            className={`bg-muted font-mono rounded border px-1.5 py-0.5 text-meta tabular-nums ${
+              error !== null ? "border-destructive/60 text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {value}
+          </kbd>
+        ) : null}
         <Button
-          variant="outline"
+          variant="ghost"
+          size="sm"
           className={[
-            "min-w-58 max-w-105 justify-start tabular-nums",
-            recording ? "border-primary text-primary" : "",
-            error !== null ? "border-destructive text-destructive" : "",
+            "min-w-24 flex-none justify-start",
+            recording ? "text-primary" : "",
+            error !== null && !recording ? "text-destructive" : "",
           ].join(" ")}
           onClick={() => setRecording((on) => !on)}
           onKeyDown={onKeyDown}
           onBlur={() => setRecording(false)}
         >
           <KeyboardIcon className="size-3.5" />
-          {recording ? (
-            <span className="min-w-0 flex-1 truncate text-left">Press a combination…</span>
-          ) : (
-            <>
-              <span
-                className={`min-w-0 flex-1 truncate text-left ${value ? "" : "text-muted-foreground"}`}
-              >
-                {value ?? "Not set"}
-              </span>
-              {/* The affordance, quiet enough not to compete with the
-                  combination itself. */}
-              <span className="text-muted-foreground font-small flex-none text-2xs">
-                {value ? "Change" : "Record"}
-              </span>
-            </>
-          )}
+          {recording ? "Press keys…" : value ? "Change…" : "Record…"}
         </Button>
 
         {clearable && value && !recording ? (
@@ -82,7 +80,7 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
             variant="ghost"
             size="sm"
             aria-label="Clear the Direct Hotkey"
-            className="font-small flex-none text-xs"
+            className="flex-none"
             onClick={() => {
               setError(null);
               onChange(null);
@@ -93,7 +91,7 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
         ) : null}
       </div>
 
-      {error ? <p className="text-destructive font-small mt-1 text-xs">{error}</p> : null}
+      {error ? <p className="text-destructive mt-1 text-note">{error}</p> : null}
     </>
   );
 }

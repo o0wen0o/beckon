@@ -1,6 +1,8 @@
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
+import { FieldGroup } from "@/components/FieldGroup";
 import { HotkeyInput } from "@/components/HotkeyInput";
+import { PaneHeader } from "@/components/PaneHeader";
 import { Switch } from "@/components/ui/switch";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
@@ -16,7 +18,9 @@ export function Triggering() {
 
   return (
     <>
-      <h1 className="font-display mb-6 text-xl font-semibold">Triggering</h1>
+      <PaneHeader title="Triggering">
+        How Beckon is summoned. Every hotkey is registered the moment you record it.
+      </PaneHeader>
 
       {store.startupErrors.length > 0 ? (
         <Callout tone="danger">
@@ -33,10 +37,10 @@ export function Triggering() {
       ) : null}
 
       {config ? (
-        <>
+        <FieldGroup title="Summoning">
           <Field
             label="Launcher hotkey"
-            hint="Recorded hotkeys are registered immediately — if the combination is taken it goes red and is not saved."
+            hint="If the combination is already taken it goes red and is not saved."
           >
             {() => <HotkeyInput value={config.launcher_hotkey} onChange={setLauncherHotkey} />}
           </Field>
@@ -64,14 +68,14 @@ export function Triggering() {
                     or the row twitches every time it is thrown. */}
                 <span
                   aria-hidden
-                  className="text-muted-foreground font-small min-w-9 text-left text-xs"
+                  className="text-muted-foreground min-w-5.5 text-left text-meta"
                 >
                   {config.autostart ? "On" : "Off"}
                 </span>
               </div>
             )}
           </Field>
-        </>
+        </FieldGroup>
       ) : null}
     </>
   );

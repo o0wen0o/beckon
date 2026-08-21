@@ -57,9 +57,11 @@ export function ModelSelect({
 
   return (
     <Select value={value === "" ? INHERIT : value} onValueChange={choose}>
-      {/* A model id is a dozen characters; stretched across the pane the closed
-          select reads as an empty text field with a chevron parked far right. */}
-      <SelectTrigger id={id} aria-describedby={describedBy} className="max-w-105">
+      {/* Held to the same measure as a text field rather than shrunk to its own
+          content: shadcn's trigger is `w-fit`, which parks a twelve-character
+          model id in a box narrower than everything else in the value column
+          and breaks the one line the ledger draws. */}
+      <SelectTrigger id={id} aria-describedby={describedBy} className="w-full max-w-85">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

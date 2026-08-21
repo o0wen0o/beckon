@@ -38,7 +38,7 @@ export function InfoHint({ text, id, align = "start" }: InfoHintProps) {
         <PopoverContent
           align={align}
           aria-hidden
-          className="text-muted-foreground font-small w-auto max-w-70 p-3 text-xs leading-relaxed"
+          className="text-muted-foreground w-auto max-w-70 p-3 text-meta leading-relaxed"
         >
           {text}
         </PopoverContent>

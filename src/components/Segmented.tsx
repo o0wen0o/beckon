@@ -33,24 +33,20 @@ export function Segmented<T extends string>({
       // rather than written.
       onValueChange={(next) => next && onChange(next as T)}
       size="sm"
-      // The group's fill and the selected chip's fill trade places between
-      // themes, because the chip has to sit *above* the group in both: in light
-      // that is white on grey, in dark it is grey on the page colour. Keeping
-      // `bg-muted` on the group in dark would have put a 0.145 chip inside a
-      // 0.269 well, which reads as the one option that is switched off.
-      className="bg-muted dark:bg-background self-start gap-0.5 rounded-md border p-0.5"
+      className="bg-muted self-start gap-0.5 rounded-md border p-0.5"
     >
       {options.map((option) => (
         <ToggleGroupItem
           key={option.value}
           value={option.value}
-          // The selected item and the hovered one must not read the same, and
-          // the stock variant gives both `hover:bg-accent`. `--accent` equals
-          // `--muted` in dark and equals the group's own fill in light, so the
-          // hover fill is either indistinguishable from the selected chip or
-          // from nothing — it is cancelled outright. A fill means "selected"
-          // and nothing else; hover brightens the label instead.
-          className="text-muted-foreground data-[state=off]:hover:bg-transparent data-[state=off]:hover:text-foreground data-[state=on]:bg-background dark:data-[state=on]:bg-muted data-[state=on]:text-foreground rounded-sm px-3"
+          // Selected is the inverted chip, and it is the only fill on the pane —
+          // 17:1 against its own label, and nothing else here is filled, so it
+          // cannot be mistaken for anything. That also settles what the stock
+          // variant gets wrong: it gives the selected item and the hovered one
+          // the same `bg-accent`, and `--accent` equals `--muted`, so a hover
+          // fill would be indistinguishable from the group's own ground. The
+          // fill means "selected" and nothing else; hover brightens the label.
+          className="text-muted-foreground data-[state=off]:hover:bg-transparent data-[state=off]:hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:font-medium rounded-sm px-3 transition-colors duration-150 ease-out motion-reduce:transition-none"
         >
           {option.label}
         </ToggleGroupItem>

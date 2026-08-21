@@ -1,4 +1,6 @@
 import { Field } from "@/components/Field";
+import { FieldGroup } from "@/components/FieldGroup";
+import { PaneHeader } from "@/components/PaneHeader";
 import { Segmented } from "@/components/Segmented";
 import type { Theme } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
@@ -11,7 +13,7 @@ const THEMES: { value: Theme; label: string }[] = [
 ];
 
 const THEME_HINT =
-  "Applies to the Launcher, the Popover and this window at once. Beckon starts light unless you say otherwise — “Follow Windows” is the only setting that reads the system preference.";
+  "Beckon starts light unless you say otherwise. “Follow Windows” is the only setting that reads the system preference, and it follows it live.";
 
 export function Appearance() {
   const store = useStore(settings);
@@ -19,21 +21,25 @@ export function Appearance() {
 
   return (
     <>
-      <h1 className="font-display mb-6 text-xl font-semibold">Appearance</h1>
+      <PaneHeader title="Appearance">
+        Applies to the Launcher, the Popover and this window at once.
+      </PaneHeader>
 
       {config ? (
-        <Field label="Theme" hint={THEME_HINT}>
-          {({ id, describedBy }) => (
-            <Segmented
-              id={id}
-              describedBy={describedBy}
-              label="Theme"
-              value={config.theme}
-              options={THEMES}
-              onChange={(theme) => store.editConfig((draft) => (draft.theme = theme), true)}
-            />
-          )}
-        </Field>
+        <FieldGroup>
+          <Field label="Theme" hint={THEME_HINT}>
+            {({ id, describedBy }) => (
+              <Segmented
+                id={id}
+                describedBy={describedBy}
+                label="Theme"
+                value={config.theme}
+                options={THEMES}
+                onChange={(theme) => store.editConfig((draft) => (draft.theme = theme), true)}
+              />
+            )}
+          </Field>
+        </FieldGroup>
       ) : null}
     </>
   );

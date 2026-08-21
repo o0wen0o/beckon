@@ -84,12 +84,12 @@ export function OverrideField({
       {expanded ? (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground flex-none text-xs font-semibold">{label}</span>
+            <span className="text-muted-foreground flex-none text-meta font-semibold">{label}</span>
             {hint ? <InfoHint text={hint} /> : null}
             <Button
               variant="link"
               size="sm"
-              className="text-muted-foreground font-small ml-auto h-auto p-0 text-xs underline"
+              className="text-muted-foreground ml-auto h-auto p-0 text-meta underline"
               onClick={() => {
                 onOverride(false);
                 setExpanded(false);
@@ -106,26 +106,26 @@ export function OverrideField({
           onClick={open}
           className="hover:bg-accent flex w-full items-baseline gap-2 rounded-sm p-2 text-left"
         >
-          <span className="text-muted-foreground flex-none text-xs font-semibold">{label}</span>
+          <span className="text-muted-foreground flex-none text-meta font-semibold">{label}</span>
           {/* An inherited value is shown, but never as though it were this
               Action's. */}
           <span
-            className={`font-mono min-w-0 flex-1 truncate text-xs ${
+            className={`font-mono min-w-0 flex-1 truncate text-meta ${
               overridden ? "text-foreground" : "text-muted-foreground"
             }`}
           >
             {overridden ? current : inherited}
           </span>
-          <span className="text-muted-foreground font-small flex-none text-2xs">
+          <span className="text-muted-foreground flex-none text-meta">
             {overridden ? "overridden" : "from Model defaults"}
           </span>
         </button>
       )}
 
       {error ? (
-        <p className="text-destructive font-small mx-2 mb-1 text-xs">{error}</p>
+        <p className="text-destructive mx-2 mb-1 text-note">{error}</p>
       ) : warning ? (
-        <p className="font-small mx-2 mb-1 text-warning text-xs">{warning}</p>
+        <p className="mx-2 mb-1 text-warning text-note">{warning}</p>
       ) : null}
     </div>
   );
