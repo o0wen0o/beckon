@@ -15,6 +15,12 @@ extern "C" {
     fn AXIsProcessTrusted() -> bool;
 }
 
+/// The pane that grants it. A constant, not an argument: this is one dead end
+/// being unblocked, not a general "open what the webview asks for".
+pub fn settings_url() -> Option<&'static str> {
+    Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+}
+
 pub fn input_permission() -> InputPermission {
     // Safe: no arguments, no ownership, reads a process-wide TCC decision.
     if unsafe { AXIsProcessTrusted() } {

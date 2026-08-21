@@ -41,7 +41,10 @@ const buttonVariants = cva(
         // the only things saying it is quieter than the value beside it.
         ghost:
           "text-muted-foreground font-normal hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+        // Beckon: underlined at rest, and no box (see `compoundVariants`). Its
+        // only use is a link inside `Callout` prose, where stock's hover-only
+        // underline and inherited button padding would both read as a control.
+        link: "text-primary underline underline-offset-4",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -59,6 +62,11 @@ const buttonVariants = cva(
         "icon-lg": "size-10",
       },
     },
+    // Beckon's addition. A link runs inside a sentence, so it takes no height
+    // and no padding from whatever `size` it is given — and cva emits compound
+    // variants after `size`, which is the only place that can be said once
+    // rather than as a class string at each call site.
+    compoundVariants: [{ variant: "link", class: "h-auto p-0" }],
     defaultVariants: {
       variant: "default",
       size: "default",

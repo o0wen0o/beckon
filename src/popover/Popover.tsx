@@ -4,7 +4,7 @@
 // belong to the window rather than to a field.
 import * as React from "react";
 import { hidePopover, Subscriptions } from "@/lib/ipc";
-import { hasCommandModifier, IS_MAC } from "@/lib/platform";
+import { EMPTY_GRAB_CAUSE, hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { Callout } from "@/components/Callout";
 import { Kbd } from "@/components/Kbd";
@@ -108,10 +108,7 @@ export function Popover() {
               <strong>{view?.action_name}</strong> works on a Selection, and nothing was selected.
             </p>
             <p>
-              Select some text and press the hotkey again.{" "}
-              {IS_MAC
-                ? "Without Accessibility permission nothing can be read at all — Settings says so if that is what happened."
-                : "Elevated windows cannot be read at all."}
+              Select some text and press the hotkey again. {EMPTY_GRAB_CAUSE}
             </p>
           </Callout>
         ) : store.notice === "awaiting-input" ? (

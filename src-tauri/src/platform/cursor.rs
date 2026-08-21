@@ -8,12 +8,12 @@
 //! time here would be a second place for it to be wrong. Using one path also
 //! means every Windows run exercises the code macOS depends on.
 
-use tauri::{AppHandle, Runtime};
+use tauri::AppHandle;
 
 use super::WorkArea;
 
 /// Where the pointer is, relative to the top-left of the desktop.
-pub fn cursor_position<R: Runtime>(app: &AppHandle<R>) -> Option<(i32, i32)> {
+pub fn cursor_position(app: &AppHandle) -> Option<(i32, i32)> {
     let position = app.cursor_position().ok()?;
     Some((position.x as i32, position.y as i32))
 }
@@ -21,7 +21,7 @@ pub fn cursor_position<R: Runtime>(app: &AppHandle<R>) -> Option<(i32, i32)> {
 /// The work area — taskbar, Dock and menu bar excluded — of the monitor
 /// containing the point. Falls back to the primary monitor, so a coordinate
 /// that lands between screens still resolves.
-pub fn work_area_at<R: Runtime>(app: &AppHandle<R>, x: i32, y: i32) -> Option<WorkArea> {
+pub fn work_area_at(app: &AppHandle, x: i32, y: i32) -> Option<WorkArea> {
     let monitor = app
         .monitor_from_point(x as f64, y as f64)
         .ok()

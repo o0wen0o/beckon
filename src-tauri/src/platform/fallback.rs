@@ -4,8 +4,6 @@
 //! and macOS, which is what keeps the isolation honest — a Win32 or AppKit call
 //! that leaked into business logic would break this file first.
 
-use crate::platform::InputPermission;
-
 pub mod focus {
     pub fn foreground_window() -> Option<isize> {
         None
@@ -28,7 +26,11 @@ pub mod selection {
 }
 
 pub mod permission {
-    use super::InputPermission;
+    use crate::platform::InputPermission;
+
+    pub fn settings_url() -> Option<&'static str> {
+        None
+    }
 
     pub fn input_permission() -> InputPermission {
         InputPermission::NotRequired

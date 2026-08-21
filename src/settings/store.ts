@@ -153,12 +153,22 @@ class SettingsStore extends Notifier {
   }
 
   async refreshAll() {
+    // Four independent reads, so they go out together rather than paying four
+    // round trips in series — this runs on every reveal of a reused window
+    // (ADR-0007), while the pane is still showing the last visit's contents.
+    const [config, keyStatus, startupErrors, inputPermission] = await Promise.all([
+      getConfig(),
+      getKeyStatus(),
+      getStartupErrors(),
+      getInputPermission(),
+    ]);
+
     // Through `adoptConfig`, not straight assignment: a refresh triggered by
     // reopening the window must obey the same suppression as an event.
-    this.adoptConfig(await getConfig());
-    this.keyStatus = await getKeyStatus();
-    this.startupErrors = await getStartupErrors();
-    this.inputPermission = await getInputPermission();
+    this.adoptConfig(config);
+    this.keyStatus = keyStatus;
+    this.startupErrors = startupErrors;
+    this.inputPermission = inputPermission;
 
     if (!this.#routedForKey && this.firstRun) {
       // Only on the first open: yanking someone to Connection every time they
@@ -175,9 +185,13 @@ class SettingsStore extends Notifier {
   }
 
   /** Re-read whenever this window comes back: the switch is thrown outside
-   *  Beckon, in System Settings, and the user returns expecting it to know. */
+   *  Beckon, in System Settings, and the user returns expecting it to know.
+   *  Only notifies on a change — every alt-tab calls this, and the answer is
+   *  almost always the one already held. */
   async refreshInputPermission() {
-    this.inputPermission = await getInputPermission();
+    const next = await getInputPermission();
+    if (next === this.inputPermission) return;
+    this.inputPermission = next;
     this.notify();
   }
 

@@ -19,7 +19,7 @@ import {
   showSettings,
   Subscriptions,
 } from "@/lib/ipc";
-import { COMMAND_KEY, hasCommandModifier } from "@/lib/platform";
+import { COMMAND_MODIFIER, formatAccelerator, hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { ActionRow, BrokenRow } from "./ActionRow";
 import { actionStore } from "./actions";
@@ -230,7 +230,7 @@ export function Launcher() {
         <Button
           variant="ghost"
           size="icon-sm"
-          title={`Settings (${COMMAND_KEY},)`}
+          title={`Settings (${formatAccelerator(`${COMMAND_MODIFIER}+,`)})`}
           aria-label="Settings"
           onClick={openSettings}
         >

@@ -6,7 +6,7 @@ import { KeyboardIcon, XIcon } from "lucide-react";
 import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
 import { describeError, probeHotkey } from "@/lib/ipc";
-import { formatAccelerator, IS_MAC } from "@/lib/platform";
+import { formatAccelerator, IS_MAC, MODIFIER_ADVICE } from "@/lib/platform";
 
 interface HotkeyInputProps {
   value: string | null;
@@ -113,11 +113,7 @@ function toAccelerator(
   const key = keyName(event.code);
   if (!key) return null;
   if (mods.length === 0) {
-    setError(
-      IS_MAC
-        ? "Add Cmd, Control, Option or Shift — a bare key would fire everywhere."
-        : "Add Ctrl, Alt or Shift — a bare key would fire everywhere.",
-    );
+    setError(`Add ${MODIFIER_ADVICE} — a bare key would fire everywhere.`);
     return null;
   }
   return [...mods, key].join("+");

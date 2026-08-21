@@ -24,8 +24,19 @@ export const AUTOSTART_LABEL = IS_MAC ? "Start at login" : "Start with Windows";
 /** What `theme = "system"` follows. */
 export const SYSTEM_APPEARANCE = IS_MAC ? "macOS appearance" : "Windows preference";
 
-/** The modifier the two window shortcuts use: Cmd on macOS, Ctrl elsewhere. */
-export const COMMAND_KEY = IS_MAC ? "⌘" : "Ctrl+";
+/** The modifier the two window shortcuts use, as an accelerator token — the
+ *  glyph is `formatAccelerator`'s to draw, so ⌘ stays in one place. */
+export const COMMAND_MODIFIER = IS_MAC ? "Cmd" : "Ctrl";
+
+/** Which modifiers `hotkey::parse` accepts, in the platform's own names. The
+ *  Rust side says the same thing in `MODIFIER_ADVICE`; this is the copy the
+ *  recorder can show without a round trip. */
+export const MODIFIER_ADVICE = IS_MAC ? "Cmd, Control, Option or Shift" : "Ctrl, Alt or Shift";
+
+/** Why an empty grab happens here, which is not the same reason on both. */
+export const EMPTY_GRAB_CAUSE = IS_MAC
+  ? "Without Accessibility permission nothing can be read at all — Settings says so if that is what happened."
+  : "Elevated windows cannot be read at all.";
 
 /** True when the event carries this platform's command modifier. */
 export function hasCommandModifier(event: KeyboardEvent | React.KeyboardEvent) {
@@ -51,17 +62,13 @@ export function formatAccelerator(accelerator: string): string {
   if (!IS_MAC) return accelerator;
 
   const tokens = accelerator.split("+").map((token) => token.trim());
-  const modifiers: string[] = [];
-  const keys: string[] = [];
+  const isModifier = (token: string) => GLYPHS.some(([pattern]) => pattern.test(token));
 
-  for (const token of tokens) {
-    const glyph = GLYPHS.find(([pattern]) => pattern.test(token));
-    if (glyph) modifiers.push(glyph[1]);
-    else if (token) keys.push(token);
-  }
-
-  // Sorted by GLYPHS' own order, so "Shift+Cmd+T" and "Cmd+Shift+T" draw alike.
-  const order = GLYPHS.map(([, glyph]) => glyph);
-  modifiers.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  // Walked in GLYPHS' order rather than the accelerator's, so "Shift+Cmd+T" and
+  // "Cmd+Shift+T" draw alike without a second table to sort against.
+  const modifiers = GLYPHS.filter(([pattern]) => tokens.some((token) => pattern.test(token))).map(
+    ([, glyph]) => glyph,
+  );
+  const keys = tokens.filter((token) => token && !isModifier(token));
   return modifiers.join("") + keys.join("+");
 }

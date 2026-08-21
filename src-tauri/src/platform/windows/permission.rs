@@ -3,6 +3,11 @@
 
 use crate::platform::InputPermission;
 
+/// Nothing to grant, so there is nowhere to send anyone.
+pub fn settings_url() -> Option<&'static str> {
+    None
+}
+
 pub fn input_permission() -> InputPermission {
     InputPermission::NotRequired
 }

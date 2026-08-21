@@ -58,7 +58,6 @@ export function Triggering() {
           <p>
             <Button
               variant="link"
-              className="h-auto p-0 underline"
               onClick={() => void openInputPermissionSettings()}
             >
               Open Accessibility settings

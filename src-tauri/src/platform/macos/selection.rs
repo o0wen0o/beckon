@@ -102,15 +102,16 @@ fn read_clipboard_text() -> Option<String> {
 }
 
 fn restore_clipboard(backup: Option<String>) {
-    let pasteboard = NSPasteboard::generalPasteboard();
     // With no text backup there was nothing of ours to give back; clearing at
     // least avoids leaving the grabbed Selection sitting in the pasteboard.
-    let _ = pasteboard.clearContents();
-    let Some(text) = backup else { return };
-    let restored =
-        unsafe { pasteboard.setString_forType(&NSString::from_str(&text), NSPasteboardTypeString) };
-    if !restored {
-        log::warn!("could not restore the pasteboard");
+    let Some(text) = backup else {
+        let _ = NSPasteboard::generalPasteboard().clearContents();
+        return;
+    };
+    // Through the same write the Popover's Copy uses, so the grab's restore
+    // cannot diverge from it on how a pasteboard write is performed.
+    if let Err(err) = write_clipboard_text(&text) {
+        log::warn!("could not restore the pasteboard: {err}");
     }
 }
 

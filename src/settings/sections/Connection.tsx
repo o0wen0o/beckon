@@ -73,7 +73,6 @@ export function Connection() {
           <p>
             <Button
               variant="link"
-              className="h-auto p-0 underline"
               onClick={() => void openApiKeyPage()}
             >
               Get a key from platform.deepseek.com

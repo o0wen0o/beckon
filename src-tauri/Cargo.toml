@@ -62,7 +62,6 @@ windows = { version = "0.61", features = [
 # crates gate every class behind its own feature, and a missing one is a link
 # error nobody on a Windows machine can see.
 keyring = { version = "3", features = ["apple-native"] }
-objc2 = "0.6"
 objc2-foundation = "0.3"
 objc2-app-kit = "0.3"
 core-graphics = "0.24"

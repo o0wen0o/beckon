@@ -4,6 +4,7 @@
 import * as React from "react";
 import { onActionsChanged, onConfigChanged, onSettingsOpened, Subscriptions } from "@/lib/ipc";
 import { PaneProvider } from "@/lib/pane";
+import { IS_MAC } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PaneEnter } from "@/components/PaneEnter";
@@ -53,10 +54,6 @@ export function Settings() {
     actionStore.flush();
   }, []);
 
-  const recheckPermission = React.useCallback(() => {
-    void settings.refreshInputPermission();
-  }, []);
-
   React.useEffect(() => {
     // The first open builds the window, so `settings:opened` fires before
     // anything is listening — this component always loads itself.
@@ -94,13 +91,15 @@ export function Settings() {
     window.addEventListener("blur", flush);
     // Coming back is the signal that the Accessibility switch may have moved:
     // it is thrown in System Settings, and nothing tells us when (ADR-0013).
-    window.addEventListener("focus", recheckPermission);
+    // Only macOS has a switch, so nowhere else pays for the listener.
+    const recheckPermission = () => void settings.refreshInputPermission();
+    if (IS_MAC) window.addEventListener("focus", recheckPermission);
     return () => {
       window.removeEventListener("blur", flush);
       window.removeEventListener("focus", recheckPermission);
       void subscriptions.dispose();
     };
-  }, [flush, recheckPermission]);
+  }, [flush]);
 
   const pendingDelete = actions.pendingDelete;
   const Pane = PANES[store.route];

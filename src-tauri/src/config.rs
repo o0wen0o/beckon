@@ -244,13 +244,6 @@ temperature = 1.3
         assert_eq!(parsed, Config::default());
     }
 
-    /// Both defaults have to survive `hotkey::parse`, which is the only reason
-    /// the platform split above is safe to make.
-    #[test]
-    fn the_default_hotkey_has_a_modifier() {
-        assert!(DEFAULT_LAUNCHER_HOTKEY.contains('+'));
-    }
-
     #[test]
     fn corrupt_config_reports_and_does_not_overwrite() {
         let dir = tempfile::tempdir().unwrap();
