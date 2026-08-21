@@ -6,7 +6,7 @@
 // alike sit side by side in one file. Output is plain text with preserved
 // whitespace: acceptable for the MVP, and it cannot inject anything into the
 // WebView.
-import { CheckIcon, CopyIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, RotateCcwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeFailure } from "@/lib/failures";
 import { showSettings } from "@/lib/ipc";
@@ -24,6 +24,16 @@ const CLAMP_AT = 160;
  * on screen.
  */
 const CARD = "bg-muted max-w-4/5 rounded-lg border px-3 py-1.5 whitespace-pre-wrap text-quiet";
+
+/**
+ * The three quiet buttons under a turn — the reasoning disclosure, the question's
+ * clamp toggle, and Copy — one step quieter than `ghost`'s own grey. They are
+ * labels *about* the turn rather than any part of it, which is the job
+ * `--muted-quiet` exists for; the negative margin is what pulls each of them
+ * flush with the text it belongs to. Hover still takes them to full ink, so the
+ * grey is a resting state and not a permanently dimmed control.
+ */
+const QUIET = "text-muted-quiet";
 
 export function TurnView({ turn, index }: { turn: Turn; index: number }) {
   /**
@@ -54,7 +64,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
             <Button
               variant="ghost"
               size="xs"
-              className="-mr-2"
+              className={cn(QUIET, "-mr-1.5")}
               onClick={() => exchange.expandQuestion(turn)}
             >
               {turn.questionExpanded ? "Show less" : "Show all"}
@@ -63,7 +73,11 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         </div>
       ) : null}
 
-      <div className="flex min-w-0 flex-col items-start gap-1.5">
+      {/* Capped as a proportion, the way the card opposite is: `--container-measure`
+          is the *pane's* prose measure at 980px, and in a 620px window it wrapped
+          the answer some 100px short of the edge — narrower than the question
+          above it, which inverted which side of the turn looked like the subject. */}
+      <div className="flex min-w-0 max-w-11/12 flex-col items-start gap-1.5">
         {/* Nothing else on this side says the turn went wrong once the label
             column is gone, so the failure keeps a marker of its own. */}
         {failure ? (
@@ -73,7 +87,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         {turn.reasoning ? (
           <>
             {turn.reasoningOpen ? (
-              <p className="text-muted-foreground max-h-40 overflow-y-auto whitespace-pre-wrap text-quiet">
+              <p className="text-muted-foreground max-h-30 overflow-y-auto whitespace-pre-wrap text-quiet">
                 {turn.reasoning}
               </p>
             ) : null}
@@ -82,7 +96,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
             <Button
               variant="ghost"
               size="xs"
-              className="-ml-2"
+              className={cn(QUIET, "-ml-1.5")}
               onClick={() => exchange.toggleReasoning(turn)}
             >
               {turn.reasoningOpen ? "Hide" : "Show what it thought"}
@@ -94,7 +108,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
           // Two independent proofs the request is alive: a bar that pulses and
           // a counting integer. Under reduced motion the bar goes static — which
           // is still a bar, not a stalled one — and the counter carries it.
-          <div className="flex w-full max-w-75 flex-col gap-2 py-1">
+          <div className="flex w-full max-w-75 flex-col gap-2">
             <div className="bg-muted-foreground h-0.5 animate-pulse rounded-full motion-reduce:animate-none motion-reduce:opacity-60" />
             <span className="text-muted-quiet tabular-nums text-meta">
               Waiting for the first token
@@ -105,7 +119,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
 
         {turn.answer ? (
           // The only prose in the product, so it gets its own leading.
-          <p className="max-w-measure whitespace-pre-wrap break-words leading-relaxed">
+          <p className="whitespace-pre-wrap break-words leading-relaxed">
             {turn.answer}
             {turn.status === "streaming" ? (
               // Not a blinking text caret — a blink says "type here". A steady
@@ -115,9 +129,13 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
           </p>
         ) : null}
 
+        {/* No icon, for the reason a `Callout` has none: the words carry the
+            meaning and the colour is not the only thing saying it. A warning
+            triangle beside one line of prose also made this the only glyph in
+            the scroller, which read as the loudest state rather than the
+            mildest one. */}
         {turn.status === "interrupted" ? (
-          <p className="text-warning flex items-center gap-1.5 text-note">
-            <TriangleAlertIcon className="size-3 flex-none" />
+          <p className="text-warning text-note">
             {turn.answer ? "Interrupted" : "Interrupted before any output"}
             {turn.note ? ` — ${turn.note}` : ""}
           </p>
@@ -129,10 +147,10 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
 
         {failure ? (
           <>
-            <p className="max-w-measure text-quiet">{failure}</p>
+            <p className="text-quiet">{failure}</p>
             <div className="mt-1 flex gap-2">
               <Button size="sm" onClick={() => void exchange.retry()}>
-                <RotateCcwIcon /> Retry
+                <RotateCcwIcon className="size-3.5" /> Retry
               </Button>
               {settlesInSettings(turn.errorKind) ? (
                 <Button variant="outline" size="sm" onClick={() => void showSettings()}>
@@ -144,12 +162,16 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         ) : null}
 
         {turn.answer && settled ? (
-          // Quiet, and fixed-width so the Copied swap cannot reflow the block:
-          // the answer is the content, not the button under it.
+          // Shrink-to-fit like every other quiet button here. It was pinned to a
+          // fixed width so the Copied swap could not reflow anything, which it
+          // cannot anyway — it is the last child of a column that starts its
+          // children at the left edge, so nothing sits below or beside it. What
+          // the pinning did instead was leave 28px of empty button, which is
+          // invisible at rest and the whole shape of the thing under the pointer.
           <Button
             variant="ghost"
             size="xs"
-            className="-ml-2 w-22 justify-start"
+            className={cn(QUIET, "-ml-1.5")}
             onClick={() => void exchange.copy(turn.answer, index)}
           >
             {copied ? <CheckIcon /> : <CopyIcon />}

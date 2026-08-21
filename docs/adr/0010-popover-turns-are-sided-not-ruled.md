@@ -29,9 +29,16 @@ already knows how to read.
 
 ## The shape
 
-Your input is a card on the right, capped at 80% of the window; the answer runs left and bare to
-`--container-measure`. There are no hairlines between turns — the gap separates them, which is
-what makes the two sides visible as sides.
+Your input is a card on the right, capped at 80% of the window; the answer runs left and bare,
+capped at 11/12. There are no hairlines between turns — the gap separates them, which is what
+makes the two sides visible as sides.
+
+Both caps are proportions of the window, and that is the point: they are the two halves of one
+symmetry, and a symmetry cannot be expressed with a proportion on one side and an absolute on the
+other. The answer was first capped at `--container-measure`, which is the *pane's* prose measure
+at 62ch and was chosen for a 980px window; in the Popover's 620px it wrapped the answer about
+100px short of the edge — narrower than the question above it, which inverted which side of a turn
+looked like the subject of the window.
 
 **The card is filled with `--muted`, the quietest fill there is.** The alternative considered and
 rejected was the inverted fill: `--primary` with paper text, which is unmistakable and is what a
@@ -64,5 +71,23 @@ as a conversation, which is the one thing this window is.
 - The header is the only place the model is named. That was already true of the status; it is now
   true of the model too, which is the version of that header the ADR-0009 prototype argued for and
   the label column quietly undid.
-- Prose in the Popover is still measured — `max-w-measure` on the answer. Sided layout without a
-  measure is how a chat window ends up with 90-character lines.
+- Prose in the Popover is still measured, by the 11/12 cap rather than by `--container-measure`.
+  A sided layout with no cap at all is how a chat window ends up with 90-character lines; the cap
+  here is a proportion because it is the mirror of the card's, and at 620px it lands at roughly the
+  same character count the pane's measure was chosen for anyway.
+- **Two type registers had to be levelled, and one library size retuned.** The three notices share
+  one slot at the top of the scroller, and two of them were a step below the `Callout` that is the
+  third — body size and a bold name for all of them now, since a reader sees the difference without
+  there being anything to read into it. And the `xs` button size, which exists for this window
+  alone, is `text-note` rather than Tailwind's `text-xs` — the same 12px, on our scale — with its
+  `has-[>svg]` padding split removed: shadcn narrows a button that contains an icon, which is right
+  for a boxed control and wrong for a borderless one pulled flush with the text above it by a
+  negative margin, and the split parked `Copy` 2px left of `Show what it thought`.
+- **A `Callout` no longer owns its outer margin unconditionally.** `mb-6.5` is the ledger's rhythm
+  below one; this scroller spaces its children with a `gap`, where that margin lands on top of the
+  gap as a hole in the column. The component takes a `className` for that one caller.
+- **The interrupted line lost its warning triangle.** Same reason a `Callout` has no icon — the
+  words carry the meaning and the colour is not the only thing saying it — plus a local one: it was
+  the only glyph in the scroller, which made the mildest state look like the loudest.
+- Icons in the Popover's 32px and 36px buttons are set at 14px rather than shadcn's 16px default.
+  At 16px beside 14px text a `Send` or `Retry` glyph is the largest thing on the line it is on.

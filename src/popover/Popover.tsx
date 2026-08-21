@@ -100,20 +100,24 @@ export function Popover() {
             of the product uses for one — a rule, not a box; the other two are
             ordinary prose. */}
         {store.notice === "no-view" ? (
-          <p className="text-muted-foreground text-quiet">Nothing to show.</p>
+          <p className="text-muted-foreground">Nothing to show.</p>
         ) : store.notice === "empty-selection" ? (
-          <Callout tone="warn">
+          // `mb-0`: the margin baked into a callout is the ledger's rhythm
+          // below one, and this scroller spaces its children with a gap.
+          <Callout tone="warn" className="mb-0">
             <p>
               <strong>{view?.action_name}</strong> works on a Selection, and nothing was selected.
             </p>
-            <p className="text-quiet">
-              Select some text and press the hotkey again. Elevated windows cannot be read at all.
-            </p>
+            <p>Select some text and press the hotkey again. Elevated windows cannot be read at all.</p>
           </Callout>
         ) : store.notice === "awaiting-input" ? (
-          <p className="text-muted-foreground text-quiet">
+          // Body size and a bold name, which is what `Callout` sets — the three
+          // notices land in the same slot, and one of them being a step smaller
+          // with a lighter name than the other two is a difference the reader
+          // sees without there being anything to read into it.
+          <p className="text-muted-foreground">
             Type what you want to send to{" "}
-            <strong className="text-foreground font-semibold">{view?.action_name}</strong>.
+            <strong className="text-foreground font-bold">{view?.action_name}</strong>.
           </p>
         ) : null}
 

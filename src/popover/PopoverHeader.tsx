@@ -40,7 +40,10 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
           thinking
         </Badge>
       ) : null}
-      <Button variant="ghost" size="icon-sm" aria-label="Close" title="Close" onClick={onClose}>
+      {/* `icon-xs`, not `icon-sm`: a 32px hit target in a 34px bar leaves one
+          pixel above and below it, so the hover fill reads as a band across the
+          whole title bar rather than as a button in it. */}
+      <Button variant="ghost" size="icon-xs" aria-label="Close" title="Close" onClick={onClose}>
         <XIcon className="size-3.5" />
       </Button>
     </header>

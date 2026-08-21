@@ -58,7 +58,15 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        // Beckon's addition, and the Popover's alone: the quiet button under a
+        // turn. `text-note` rather than Tailwind's `text-xs` — the same 12px,
+        // but on our scale and so at our leading. The padding is deliberately
+        // *not* split by `has-[>svg]`: shadcn narrows a button with an icon in
+        // it, which is right for a boxed control and wrong for a borderless one
+        // pulled back by a negative margin to sit flush with the text above it —
+        // `Copy` carries an icon and `Show what it thought` does not, and the
+        // split parked their labels 2px apart.
+        xs: "h-6 gap-1.5 rounded-md px-1.5 text-note [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
         icon: "size-9",

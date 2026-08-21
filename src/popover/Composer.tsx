@@ -50,8 +50,11 @@ export function Composer({ placeholder, onSend }: ComposerProps) {
         }}
         className="max-h-30 min-h-9 resize-none py-1.5"
       />
+      {/* Full height, so it lines up with the empty box beside it rather than
+          with the last line of a grown one — and a 14px glyph, because 16px
+          against 14px text is the one size that reads as an icon set too big. */}
       <Button className="flex-none" disabled={draft.trim() === ""} onClick={send}>
-        <SendIcon /> Send
+        <SendIcon className="size-3.5" /> Send
       </Button>
     </div>
   );
