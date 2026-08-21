@@ -1,12 +1,7 @@
-// Kinds matter here: a rejected key is not an unreachable API, and neither is
-// a missing credential (ADR-0005). One map for every consumer of a
-// `Failure.kind`, so a new kind cannot reach one banner and miss another.
-//
-// It lives in `lib/` rather than under `settings/` because there are two
-// consumers now: Settings' Connection banner and the Popover's failed turn.
-// A provider's own string ("401 Unauthorized", a reqwest chain) is what the
-// backend hands over, and a failure that reads one way in one window and
-// another way in the next is the thing this file is for.
+// Kinds matter: a rejected key is not an unreachable API, and neither is a
+// missing credential (ADR-0005). One map for every consumer of a `Failure.kind`
+// — Settings' Connection banner and the Popover's failed turn — so a new kind
+// cannot reach one and miss the other.
 import type { Failure } from "./types";
 
 export const FAILURE_PREFIX: Record<string, string> = {

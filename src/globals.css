@@ -1,0 +1,269 @@
+/* shadcn/ui's generated stylesheet: the `@import`s, the `dark` variant, the
+   token blocks, the `@theme inline` bridge and the `@layer base` reset are the
+   library's own file, not hand-authored styling. Components carry no CSS of
+   their own — every rule below this comment belongs to shadcn/ui or Tailwind.
+
+   It is the design system for all three windows (ADR-0009). The notes below say
+   "the pane" because Settings is where each decision was made and is the widest
+   surface it has to hold, but the Launcher and the Popover read the same tokens
+   and added one between them: `--text-query`, noted where it is defined.
+
+   The base colour is shadcn's `neutral`, and the surface is monochrome: the
+   accent is not a hue, it is *inversion*. A selected nav item and a selected
+   segment are ink-filled with paper text, and that fill is the only fill on the
+   pane, so "current" cannot be confused with anything else. Brand colour
+   survives in exactly one place, the mark in the corner — hence `--brand`,
+   which is not a shadcn token and has exactly one consumer.
+
+   The pay-off is that `--primary` and `--ring` go back to the values shadcn
+   generates. What is left is four deviations, each measured:
+
+   - `--muted-foreground` is darkened to `0.475` in light mode. The generated
+     `0.556` is 4.34:1 on `--muted`, and — more to the point — a field's
+     explanation is now a permanent line rather than a bubble, so this is body
+     copy, not a whisper. 0.475 is 6.68:1 on the background and 6.05:1 on
+     `--muted`. Dark mode keeps the generated `0.708` (7.63:1 and 5.83:1).
+   - `--input` is split away from `--border` and darkened until it clears 3:1
+     (3.36:1 light, 3.14:1 dark). `--border` is decorative; `--input` is the
+     sole boundary of a text field, which WCAG 1.4.11 treats as a UI component.
+     This is the split the retired app.css made as `--border-strong` (ADR-0009).
+   - `--ring` is `--primary` rather than the generated grey. shadcn draws the
+     ring at `ring/50`, and the generated `0.708` lands at 1.6:1 that way —
+     invisible, on the one affordance a keyboard user has. At `--primary` it is
+     3.41:1 light and 4.45:1 dark.
+   - `--warning` and `--success` are added, because the alternative is
+     `text-amber-700 dark:text-amber-400` written out at every use site, and a
+     component naming its own colour is what this file exists to prevent.
+     Light 6.11:1 and 5.67:1; dark 11.23:1 and 11.97:1.
+
+   `--destructive-foreground` is dropped rather than carried: nothing consumes
+   it — shadcn's own destructive button says `text-white` — and the generated
+   value is 2.77:1 on `--destructive` in dark, so the one thing it could have
+   been used for would have failed. */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted-quiet: var(--muted-quiet);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-brand: var(--brand);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* The pane's own type scale. `body` is 14px (see the base layer), and below
+     it a ledger needs three steps, not one: 10.5px for a tracked group head,
+     11.5px for metadata — a filename under a name, "from Model defaults", a
+     hotkey chip — and 13px for the quiet reading register, which is a row's
+     label and a pane's lede. Tailwind's ladder offers 12 and 14 across that
+     whole span, and rounding to it is what put every line on the pane a size
+     above where it belongs. 23px over 14px is the display step: a ratio you can
+     see, rather than a heading that looks like it failed to grow. */
+  --text-micro: 0.65625rem;
+  --text-micro--line-height: 0.875rem;
+  --text-meta: 0.71875rem;
+  --text-meta--line-height: 1.0625rem;
+  --text-quiet: 0.8125rem;
+  --text-quiet--line-height: 1.125rem;
+  --text-note: 0.75rem;
+  --text-note--line-height: 1.125rem;
+  /* The one step *above* body, and it has one consumer: the Launcher's
+     query box. A picker's query is the window's subject and it sits in a
+     56px bar, where body size reads as timid — but 15px over 14px is a
+     difference you have to look for, so the step is a whole size. It is a
+     token rather than Tailwind's own 1rem step so that the scale still lists
+     every size the product uses. */
+  --text-query: 1rem;
+  --text-query--line-height: 1.5rem;
+  --text-title: 1.4375rem;
+  --text-title--line-height: 1.75rem;
+
+  /* One measure for every run of prose on the pane — the pane lede, a field's
+     explanation, a callout. Tailwind ships `max-w-prose` at a fixed 65ch, which
+     at this type size overruns the value column and leaves the last line of a
+     hint sitting under the buttons beside it; 62ch is the prototype's measure
+     and it is a container name of our own, because the built-in utility is
+     static and cannot be re-pointed. */
+  --container-measure: 62ch;
+  /* A pane's lede is the one run of prose set under a display title, and it is
+     shorter than the measure on purpose: it has to read as a caption to the
+     heading rather than as the section's first paragraph. */
+  --container-lede: 58ch;
+  /* The two measures a control is allowed to take, and the reason they are
+     tokens: a text field stretched across the pane reads as an empty box with a
+     cursor in one corner, so the value column holds a control to a measure —
+     and a control that caps *itself* at a number written into its own class
+     string is a second place deciding the same thing. `Field` names the measure
+     for the row; `ModelSelect` and `Temperature` name it because they are
+     dropped into rows that do not. The wide one is for a control sharing its
+     line with buttons. */
+  --container-control: 21.25rem;
+  --container-control-wide: 26.25rem;
+
+  /* Tracking belongs to the type scale, not to a component. The eyebrow is set
+     open because it is uppercase at 10.5px, where default tracking closes the
+     letters into a block; the title is set tight because 23px display needs it,
+     and Tailwind's `tracking-tight` overshoots to -0.025em, which at this size
+     reads as letters touching. */
+  --tracking-eyebrow: 0.11em;
+  --tracking-title: -0.018em;
+
+  /* The ledger's grid, in the one place both halves of it can be read at once:
+     `Field` draws the label column and the gap, and the Action's override rows
+     indent past both to line up with the controls above them. As two numbers in
+     two files that indent was arithmetic done in a comment, and the block was
+     the only thing on the pane out of line the moment either number moved. */
+  --spacing-ledger-label: 10.5rem;
+  --spacing-ledger-gap: 1.25rem;
+
+  /* Motion is 150–200ms `ease-out` across all three windows, so the house curve
+     is the default rather than a string each component repeats: a bare
+     `transition-colors` added later lands on it instead of on Tailwind's own
+     `ease`, which is the drift these two lines exist to stop. */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: var(--ease-out);
+
+  /* Two faces, not three. Segoe UI Variable ships a Small optical size for
+     text at or below 12px, and using it on every hint meant the pane changed
+     typeface halfway down each row — a difference you can see without being
+     able to name, which reads as unfinished. Display is the one real switch,
+     and it happens once per pane, on the title. */
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+:root {
+  /* Windows 11 rounds an undecorated window's corners at ~8px, and a larger
+     CSS radius gets clipped by DWM's, which shows as a nick in each corner. */
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.475 0 0);
+  /* The third grey, and the reason there is one: a group head, a row's Input
+     Source and the standing status line are labels *about* values rather than
+     values, and setting them at the same weight as an explanation is what made
+     the pane read as one flat grey. 4.65:1 on the background — the mock's
+     `--ink3` is 0.625, which is 3.57:1 and fails AA as text, so this is as
+     light as a real window can take it. */
+  --muted-quiet: oklch(0.56 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.505 0.185 25);
+  --warning: oklch(0.48 0.105 70);
+  --success: oklch(0.45 0.09 152);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.64 0 0);
+  --ring: oklch(0.205 0 0);
+  /* The one chromatic value on the surface, and it has one consumer:
+     `BrandMark`. 5.76:1 on the background, 11.30:1 on the dark one. */
+  --brand: oklch(0.508 0.128 245.8);
+  /* The navigation column is not a second surface — it is the same page with a
+     rule down it. A tint plus a border draws one boundary twice. */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.205 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  /* Quieter is *darker* here, not lighter. 4.62:1 on the background. */
+  --muted-quiet: oklch(0.58 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.72 0.17 22);
+  --warning: oklch(0.84 0.12 82);
+  --success: oklch(0.82 0.13 155);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 35%);
+  --ring: oklch(0.922 0 0);
+  --brand: oklch(0.809 0.115 216.6);
+  --sidebar: oklch(0.145 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.922 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* 14px, not the browser's 16px. Every explicit `text-*` on the pane was
+       sized against a 14px body and the two together are the pane's density;
+       inheriting 16px left everything that carries no class of its own — an
+       Action's name, a paragraph — a full step out of the scale. */
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  /* Mono at the same pixel size as the sans face beside it looks a size larger
+     — greater x-height, heavier stroke — so a filename under a name reads as
+     louder than the name. 0.92em is the optical match. */
+  code,
+  kbd,
+  .font-mono {
+    font-size: 0.92em;
+  }
+}
