@@ -112,7 +112,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
 
         {turn.answer ? (
           // The only prose in the product, so it gets its own leading.
-          <p className="whitespace-pre-wrap break-words leading-relaxed">
+          <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">
             {turn.answer}
             {turn.status === "streaming" ? (
               // Not a blinking caret: a blink says "type here", a breathing
