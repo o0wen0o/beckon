@@ -1,6 +1,9 @@
-// The ledger's horizontal rule: a tracked micro-label with a hairline under it,
-// and its rows. This is where the pane's air lives — rows inside a group are
-// tight, and the gap between groups is what says "different subject".
+// A tracked micro-label and the cards under it. The head carries no hairline
+// (ADR-0012): every card already has an edge, so a rule under the label would be
+// the only line on the pane that closes nothing.
+//
+// This is where the pane's air lives — cards inside a group are 10px apart, and
+// the gap between groups is what says "different subject".
 import type * as React from "react";
 
 interface FieldGroupProps {
@@ -9,23 +12,23 @@ interface FieldGroupProps {
   title?: string;
   /** One standing statement about the whole group, set quiet at the far end of
    *  the head. For the statement whose only alternative is repeating itself on
-   *  every row in the group. */
+   *  every card in the group. */
   note?: string;
   children: React.ReactNode;
 }
 
 export function FieldGroup({ title, note, children }: FieldGroupProps) {
   return (
-    <section className="mb-8.5 last:mb-0">
+    <section className="mb-7.5 last:mb-0">
       {title ? (
-        <div className="flex items-baseline gap-3 border-b pb-2">
+        <div className="flex items-baseline gap-3 pb-2">
           <h2 className="text-muted-quiet text-micro font-semibold tracking-eyebrow uppercase">
             {title}
           </h2>
           {note ? <span className="text-muted-quiet ml-auto text-meta">{note}</span> : null}
         </div>
       ) : null}
-      {children}
+      <div className="flex flex-col gap-2.5">{children}</div>
     </section>
   );
 }

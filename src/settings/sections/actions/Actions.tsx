@@ -14,6 +14,7 @@ import { PaneHeader } from "@/components/PaneHeader";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { ActionEditor } from "./ActionEditor";
+import { ActionDefinition, DEFINITION_SCREEN } from "./ActionDefinition";
 import { RawFileEditor } from "./RawFileEditor";
 
 /** The ledger row, shared by the Actions and the files that will not parse: the
@@ -47,31 +48,39 @@ export function Actions() {
 
   if (editing) {
     /** The display name, or the bare file name for one that does not parse. */
-    const title = editing.kind === "raw" ? editing.file : store.draft?.name || editing.file;
+    const name = editing.kind === "raw" ? editing.file : store.draft?.name || editing.file;
+    const onDefinition = editing.kind === "action" && editing.screen === "definition";
+    // On the Definition screen the heading is the screen and the Action's name is
+    // the line under it — otherwise the name is the heading and its filename,
+    // which is the identity (ADR-0003), sits underneath.
+    const title = onDefinition ? DEFINITION_SCREEN : name;
+    const under = onDefinition
+      ? name
+      : editing.kind === "raw"
+        ? "does not parse — edited as text"
+        : editing.file;
 
     return (
       // The list and the editor are two views of one pane; the entrance belongs
-      // to the shell, which keys `PaneEnter` on the open file as well as the
-      // route, so this swap animates once rather than twice.
+      // to the shell, which keys `PaneEnter` on the open screen as well as the
+      // file, so this swap animates once rather than twice.
       <div>
+        {/* Outside the form element below, so that pressing it moves focus out
+            of whatever was being typed — and `showScreen` flushes as well, for
+            the keyboard path where focus was already elsewhere. */}
         <header className="mb-6.5 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Back to Actions"
+            aria-label={onDefinition ? `Back to ${name}` : "Back to Actions"}
             className="flex-none"
-            onClick={() => store.close()}
+            onClick={() => (onDefinition ? store.showScreen("main") : store.close())}
           >
             <ArrowLeftIcon className="size-3.5" />
           </Button>
           <div className="flex min-w-0 flex-col">
             <span className="font-display text-title font-semibold tracking-title">{title}</span>
-            {/* The filename is the identity (ADR-0003): renaming never moves it.
-                In the raw editor the heading *is* the filename, so repeating it
-                here would print the same string twice, one line apart. */}
-            <span className="text-muted-foreground truncate text-meta">
-              {editing.kind === "raw" ? "does not parse — edited as text" : editing.file}
-            </span>
+            <span className="text-muted-foreground truncate text-meta">{under}</span>
           </div>
         </header>
 
@@ -80,10 +89,12 @@ export function Actions() {
         <div ref={form} onBlur={() => store.flush()}>
           {editing.kind === "raw" ? (
             <RawFileEditor />
-          ) : store.selected ? (
-            <ActionEditor action={store.selected} />
-          ) : (
+          ) : !store.selected ? (
             <p className="text-muted-foreground text-meta">That Action is gone.</p>
+          ) : onDefinition ? (
+            <ActionDefinition />
+          ) : (
+            <ActionEditor action={store.selected} />
           )}
         </div>
       </div>

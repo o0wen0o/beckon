@@ -10,6 +10,14 @@ three bordered boxes indented into the value column, each collapsed to a summary
 That exception is removed, and with it `OverrideField` and `InfoHint`. The rest of ADR-0008
 stands.
 
+**Amended by [ADR-0012](0012-settings-pane-is-cards-not-a-ledger.md):** the pane is cards now, not
+a ledger, so "row" below reads as "card" throughout. Every decision in this ADR survives that —
+the live control showing the effective value, the dot in the reserved label gutter, the revert
+control naming the default, the group head's note. What changed is where the revert control sits:
+the card right-aligns its control, so the slot holding the revert is held open at the card's right
+edge rather than after a slot the width of the control measure. The two ledger spacing tokens named
+in the last bullet are deleted.
+
 ## What the exception was buying, and what it cost
 
 An Action's `[model]` keys are optional — absent means "inherit Model defaults" — so the row had a
@@ -64,8 +72,8 @@ dropped: a value nobody is departing from is not news, and three rows do not nee
   `components/ui` as library source.
 - The Model select is sized to its content with a floor (`w-fit min-w-48`, ceiling unchanged)
   rather than stretched to the measure. Stretched, its chevron sat 200px from the value it belongs
-  to; the floor is what the measure was really protecting against. The ledger's line is the
-  control's left edge either way.
+  to; the floor is what the measure was really protecting against. The line the column keeps is the control's
+  right edge under ADR-0012, and was its left edge here; either way the sizing is unaffected.
 - The temperature readout is 28px rather than an input's full height: it is a caption on the
   slider, and at 36px it stood taller than the track it annotates.
-- `--spacing-ledger-label` and `--spacing-ledger-gap` now have exactly one consumer, `Field`.
+- `--spacing-ledger-label` and `--spacing-ledger-gap` now have exactly one consumer, `Field`. (Both are deleted under ADR-0012, which has no label column.)

@@ -85,13 +85,15 @@ export function Connection() {
         {/* The state line lives inside the field rather than after it: it is
             what the field currently holds, so it reads on the field's own
             rhythm — above the explanation, below the control. */}
-        <Field label="API key">
+        {/* Stacked: it is typed, and the two buttons share its line, so there is
+            no width at which it could right-align against its own name. */}
+        <Field label="API key" stacked>
           {({ id, describedBy }) => (
             <div className="flex flex-col gap-1.25">
-              {/* The row, not the field, is what takes the wide measure: the
-                  buttons live on the same line, so holding the whole line to
-                  420px is what keeps this row inside the value column instead
-                  of running past every other control on the pane. */}
+              {/* The line, not the field, is what takes the wide measure: the
+                  buttons live on it, so holding the whole line to 420px is what
+                  keeps this control the same width as the others rather than
+                  running the length of the card. */}
               <div className="flex max-w-control-wide items-center gap-2">
                 <Input
                   id={id}
@@ -160,6 +162,7 @@ export function Connection() {
           <Field
             label="Base URL"
             measure="field"
+            stacked
             hint="Any OpenAI-compatible endpoint. Requests go to /v1/chat/completions."
           >
             {({ id, describedBy }) => (

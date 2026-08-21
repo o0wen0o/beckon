@@ -23,14 +23,22 @@
      explanation is now a permanent line rather than a bubble, so this is body
      copy, not a whisper. 0.475 is 6.68:1 on the background and 6.05:1 on
      `--muted`. Dark mode keeps the generated `0.708` (7.63:1 and 5.83:1).
-   - `--input` is split away from `--border` and darkened until it clears 3:1
-     (3.36:1 light, 3.14:1 dark). `--border` is decorative; `--input` is the
-     sole boundary of a text field, which WCAG 1.4.11 treats as a UI component.
-     This is the split the retired app.css made as `--border-strong` (ADR-0009).
+   - `--input` is `--border`: a control's edge is the same line as the card that
+     holds it (ADR-0012), so the pane carries one weight of edge instead of a
+     light card drawn around a darker box. It was split away and darkened to
+     clear 3:1 (WCAG 1.4.11 treats a text field's boundary as a UI component)
+     and that margin is spent here — `--border` is 1.32:1 light, 1.24:1 dark.
+     What identifies a field is its unfilled box and, when it matters, the
+     `--ring` focus border; the darker value survives as `--border-strong`.
+   - `--border-strong` is the hover edge, and the only state change a card or a
+     control has under the pointer: the line strengthens and nothing fills, so
+     a fill still means "selected" and nothing else.
    - `--ring` is `--primary` rather than the generated grey. shadcn draws the
      ring at `ring/50`, and the generated `0.708` lands at 1.6:1 that way —
      invisible, on the one affordance a keyboard user has. At `--primary` it is
-     3.41:1 light and 4.45:1 dark.
+     3.41:1 light and 4.45:1 dark. The fields draw the halo at `ring/25` and
+     2px: what a keyboard user is answering is the focus *border*, which goes
+     from `--border` to `--ring` — the halo only has to be seen, not read.
    - `--warning` and `--success` are added, because the alternative is
      `text-amber-700 dark:text-amber-400` written out at every use site, and a
      component naming its own colour is what this file exists to prevent.
@@ -68,6 +76,7 @@
   --color-brand: var(--brand);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-border-strong: var(--border-strong);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -84,11 +93,11 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   /* The pane's own type scale. `body` is 14px (see the base layer), and below
-     it a ledger needs three steps, not one: 10.5px for a tracked group head,
-     11.5px for metadata — a filename under a name, "from Model defaults", a
-     hotkey chip — and 13px for the quiet reading register, which is a row's
-     label and a pane's lede. Tailwind's ladder offers 12 and 14 across that
-     whole span, and rounding to it is what put every line on the pane a size
+     it the pane needs three steps, not one: 10.5px for a tracked group head,
+     11.5px for metadata — a field's explanation, a filename under a name, a
+     hotkey chip — and 13px for the quiet reading register, which is a pane's
+     lede and the prose beside a control. Tailwind's ladder offers 12 and 14
+     across that whole span, and rounding to it is what put every line a size
      above where it belongs. 23px over 14px is the display step: a ratio you can
      see, rather than a heading that looks like it failed to grow. */
   --text-micro: 0.65625rem;
@@ -112,23 +121,23 @@
 
   /* One measure for every run of prose on the pane — the pane lede, a field's
      explanation, a callout. Tailwind ships `max-w-prose` at a fixed 65ch, which
-     at this type size overruns the value column and leaves the last line of a
-     hint sitting under the buttons beside it; 62ch is the prototype's measure
-     and it is a container name of our own, because the built-in utility is
-     static and cannot be re-pointed. */
+     at this type size runs a hint the whole width of its card and under the
+     control beside it; 62ch is the prototype's measure and it is a container
+     name of our own, because the built-in utility is static and cannot be
+     re-pointed. */
   --container-measure: 62ch;
   /* A pane's lede is the one run of prose set under a display title, and it is
      shorter than the measure on purpose: it has to read as a caption to the
      heading rather than as the section's first paragraph. */
   --container-lede: 58ch;
   /* The two measures a control is allowed to take, and the reason they are
-     tokens: a text field stretched across the pane reads as an empty box with a
-     cursor in one corner, so the value column holds a control to a measure —
-     and a control that caps *itself* at a number written into its own class
-     string is a second place deciding the same thing. `Field` names the measure
-     for the row; `ModelSelect` and `Temperature` name it because they are
-     dropped into rows that do not. The wide one is for a control sharing its
-     line with buttons. */
+     tokens: a text field stretched across its card reads as an empty box with a
+     cursor in one corner, so a card holds its control to a measure — and a
+     control that caps *itself* at a number written into its own class string is
+     a second place deciding the same thing. `Field` names the measure for the
+     card; `ModelSelect` and `Temperature` name it because they are dropped into
+     cards that do not. The wide one is for a control sharing its line with
+     buttons, and for the stacked cards that hold typed text. */
   --container-control: 21.25rem;
   --container-control-wide: 26.25rem;
 
@@ -139,15 +148,6 @@
      reads as letters touching. */
   --tracking-eyebrow: 0.11em;
   --tracking-title: -0.018em;
-
-  /* The ledger's grid: the label column and the gap between it and the value
-     column. `Field` is the only consumer, which is the point — the Action's
-     `[model]` overrides used to be a block indented past both by hand, and that
-     indent was arithmetic in a comment that went out of line the moment either
-     number moved. They are ordinary rows now, and these two numbers are read
-     once. */
-  --spacing-ledger-label: 10.5rem;
-  --spacing-ledger-gap: 1.25rem;
 
   /* Motion is 150–200ms `ease-out` across all three windows, so the house curve
      is the default rather than a string each component repeats: a bare
@@ -195,7 +195,8 @@
   --warning: oklch(0.48 0.105 70);
   --success: oklch(0.45 0.09 152);
   --border: oklch(0.9 0 0);
-  --input: oklch(0.64 0 0);
+  --border-strong: oklch(0.78 0 0);
+  --input: var(--border);
   --ring: oklch(0.205 0 0);
   /* The one chromatic value on the surface, and it has one consumer:
      `BrandMark`. 5.76:1 on the background, 11.30:1 on the dark one. */
@@ -233,7 +234,8 @@
   --warning: oklch(0.84 0.12 82);
   --success: oklch(0.82 0.13 155);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 35%);
+  --border-strong: oklch(1 0 0 / 22%);
+  --input: var(--border);
   --ring: oklch(0.922 0 0);
   --brand: oklch(0.809 0.115 216.6);
   --sidebar: oklch(0.145 0 0);

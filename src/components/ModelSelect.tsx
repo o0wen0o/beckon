@@ -65,12 +65,12 @@ export function ModelSelect({
     <Select value={value === "" ? INHERIT : value} onValueChange={choose}>
       {/* Sized to its own content, with a floor. Stretched to the control
           measure the chevron parks 200px from the value it belongs to, and the
-          row reads as an empty box with a marker in the far corner; the floor is
-          what that measure was really protecting against — a twelve-character
-          model id in a box visibly narrower than everything else in the value
-          column. The line the ledger draws is the control's left edge, which is
-          the same either way. The ceiling is still `Field`'s own token.
-          (ADR-0011.) */}
+          control reads as an empty box with a marker in the far corner; the
+          floor is what that measure was really protecting against — a
+          twelve-character model id in a box visibly narrower than every other
+          control on the pane. The card right-aligns it either way, so the edge
+          the column keeps is the trigger's right one. The ceiling is still
+          `Field`'s own token. (ADR-0011, ADR-0012.) */}
       <SelectTrigger
         id={id}
         aria-describedby={describedBy}

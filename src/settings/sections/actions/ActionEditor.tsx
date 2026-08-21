@@ -7,13 +7,12 @@
 // a second copy could only drift from it.
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { HotkeyInput } from "@/components/HotkeyInput";
 import { ModelSelect } from "@/components/ModelSelect";
+import { NavCard } from "@/components/NavCard";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { Segmented } from "@/components/Segmented";
 import { Temperature } from "@/components/Temperature";
@@ -23,6 +22,7 @@ import type { Action, InputSource } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { settings } from "../../store";
+import { DEFINITION_SCREEN } from "./ActionDefinition";
 
 /** Derived rather than restated: this is the one place an Input Source is
  *  chosen, so a third hand-written copy of the three values and their labels is
@@ -76,10 +76,15 @@ export function ActionEditor({ action }: ActionEditorProps) {
 
   if (!draft || !defaults) return null;
 
-  const templateWarning =
-    draft.prompt.user && !draft.prompt.user.includes("{{input}}")
-      ? "This template never includes the input."
-      : null;
+  // The Definition screen's own warnings, carried onto the card that opens it:
+  // one at a time, because that screen shows every one of them in full. A
+  // field's problem must survive being one click away.
+  const definitionWarning =
+    draft.name.trim() === ""
+      ? "Without a name this Action shows as its file name in the Launcher."
+      : draft.prompt.user && !draft.prompt.user.includes("{{input}}")
+        ? "The user template never includes the input."
+        : null;
   // The same two lines Model defaults draws under its own Model row: what the
   // model is, and a `thinking` setting it cannot honour. Both read the effective
   // values, since those are what a request would carry.
@@ -87,10 +92,6 @@ export function ActionEditor({ action }: ActionEditorProps) {
     modelOverrideOptions.find((option) => option.id === effectiveModel)?.description ?? "";
   const effectiveThinking = draft.model.thinking ?? defaults.thinking;
   const thinkingHint = thinkingWarning(effectiveModel, effectiveThinking, catalog);
-  const nameWarning =
-    draft.name.trim() === ""
-      ? "Without a name this Action shows as its file name in the Launcher."
-      : null;
 
   return (
     <>
@@ -115,38 +116,21 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Callout>
       ) : null}
 
-      <FieldGroup title="Action">
-        <Field label="Name" measure="field" warning={nameWarning}>
-          {({ id, describedBy }) => (
-            <Input
-              id={id}
-              aria-describedby={describedBy}
-              value={draft.name}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                store.editDraft((next) => (next.name = value));
-              }}
-            />
-          )}
-        </Field>
+      {/* What the Action is, behind one card that opens its own screen
+          (ADR-0012): the four fields there are the only ones written rather
+          than chosen, and stacking them ahead of the choices buried the
+          choices. It sits above the first group head because it is not one of a
+          set — it is the other half of this Action. */}
+      <FieldGroup>
+        <NavCard
+          label={DEFINITION_SCREEN}
+          hint="The name, what it is for, and the two prompts it sends."
+          warning={definitionWarning}
+          onClick={() => store.showScreen("definition")}
+        />
+      </FieldGroup>
 
-        <Field
-          label="Description"
-          measure="field"
-          hint="Shown under the name in the Launcher, and searched."
-        >
-          {({ id, describedBy }) => (
-            <Input
-              id={id}
-              aria-describedby={describedBy}
-              value={draft.description ?? ""}
-              onChange={(event) => {
-                const value = event.currentTarget.value || null;
-                store.editDraft((next) => (next.description = value));
-              }}
-            />
-          )}
-        </Field>
+      <FieldGroup title="Trigger">
         <Field label="Input Source" hint={SOURCE_HINT[draft.input_source]}>
           {({ id, describedBy }) => (
             <Segmented
@@ -173,56 +157,15 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Field>
       </FieldGroup>
 
-      <FieldGroup title="Prompt">
-        <Field
-          label="System prompt"
-          measure="wide"
-          hint="How the model should behave. Sent ahead of every input."
-        >
-          {({ id, describedBy }) => (
-            <Textarea
-              id={id}
-              aria-describedby={describedBy}
-              className="font-mono min-h-30 text-quiet"
-              value={draft.prompt.system}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                store.editDraft((next) => (next.prompt.system = value));
-              }}
-            />
-          )}
-        </Field>
-
-        <Field
-          label="User template"
-          measure="wide"
-          warning={templateWarning}
-          hint="{{input}} is replaced by the Selection or the typed input. Empty means just the input."
-        >
-          {({ id, describedBy }) => (
-            <Input
-              id={id}
-              aria-describedby={describedBy}
-              className="font-mono text-quiet"
-              value={draft.prompt.user ?? ""}
-              placeholder="{{input}}"
-              onChange={(event) => {
-                const value = event.currentTarget.value || null;
-                store.editDraft((next) => (next.prompt.user = value));
-              }}
-            />
-          )}
-        </Field>
-      </FieldGroup>
-
       {/* Every `[model]` key is optional, and absent means "inherit Model
           defaults". The control is live either way and shows the effective
           value, so touching it *is* the override — one gesture for a select, a
           switch and a slider alike. What says which side of the default a row is
           on is `Field`'s `override`: a dot in the label's gutter and a revert
           control, on an overridden row only, with the head's note covering the
-          rest. This was three bordered boxes indented into the value column, and
-          the only thing on the pane that was not a ledger row (ADR-0011). */}
+          rest. This was three bordered boxes indented into the value column,
+          and the only thing on the pane that was not a row of its own
+          (ADR-0011). */}
       <FieldGroup title="Model overrides" note="Unmarked rows follow Model defaults">
         <Field
           label="Model"
@@ -289,23 +232,24 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Field>
       </FieldGroup>
 
-      {/* Above a divider rather than floating at the end of the form: it deletes
-          a file, so it must not read as the last field's neighbour. */}
-      <div className="flex items-center justify-between gap-3 border-t pt-4">
-        <span className="text-muted-foreground text-meta">
-          Deleting removes <code className="font-mono">{action.file_name}</code> from disk.
-        </span>
-        {/* Destructive up front, not only once the pointer is over it: hover is
-            not a state a keyboard user passes through. The outline carries that
-            at rest; solid red is the confirmation dialog's. */}
-        <Button
-          variant="destructive-outline"
-          className="flex-none"
-          onClick={() => store.askDelete(action)}
+      {/* A card like every other, under a head of its own: with no hairlines
+          left on the pane there is no divider to sit above, and a group head is
+          what now says "this is not one of the settings". */}
+      <FieldGroup title="This file">
+        <Field
+          label="Delete this Action"
+          hint={`Removes ${action.file_name} from disk. This cannot be undone.`}
         >
-          Delete Action
-        </Button>
-      </div>
+          {/* Destructive up front, not only once the pointer is over it: hover is
+              not a state a keyboard user passes through. The outline carries that
+              at rest; solid red is the confirmation dialog's. */}
+          {() => (
+            <Button variant="destructive-outline" onClick={() => store.askDelete(action)}>
+              Delete Action
+            </Button>
+          )}
+        </Field>
+      </FieldGroup>
     </>
   );
 }

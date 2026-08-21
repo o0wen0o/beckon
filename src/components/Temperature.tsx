@@ -24,7 +24,10 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
   }
 
   return (
-    <div className="max-w-control">
+    // A width, not just a ceiling: the card right-aligns its control, and a
+    // slider whose track is `flex-1` inside a shrink-to-fit box collapses to the
+    // number input beside it. The measure is still `Field`'s own token.
+    <div className="w-control max-w-full">
       {/* The scale is nested with the slider, not laid beside the number box:
           the ticks name positions *on the track*, so spanning the whole row put
           "2 · loose" under the number input and "1" left of the midpoint. */}

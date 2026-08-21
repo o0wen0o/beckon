@@ -97,8 +97,14 @@ export function Settings() {
   const pendingDelete = actions.pendingDelete;
   const Pane = PANES[store.route];
   /** What is on screen, which is the route except inside Actions, where opening
-   *  a file is a view change the route does not see. */
-  const paneKey = `${store.route}:${actions.editing?.file ?? ""}`;
+   *  a file — and then one of that Action's screens (ADR-0012) — is a view
+   *  change the route does not see. */
+  const editing = actions.editing;
+  const paneKey = [
+    store.route,
+    editing?.file ?? "",
+    editing?.kind === "action" ? editing.screen : "",
+  ].join(":");
 
   return (
     <PaneProvider value={pane}>

@@ -21,10 +21,18 @@ import { SaveSlot, textFocusHeld } from "../lib/saveSlot";
 import { Notifier } from "../lib/store";
 import type { Action, ActionFile, RegistrySnapshot } from "../lib/types";
 
+/**
+ * Which screen of an Action's editor is open (ADR-0012). The four text fields
+ * are one card that opens its own screen, so the editor is two views, not one
+ * long form — and which one is showing is state like any other, not a `useState`
+ * inside a component the shell re-keys.
+ */
+export type ActionScreen = "main" | "definition";
+
 /** What the Actions section is showing instead of its list. */
 export type Editing =
   /** An Action being edited as a form. `file` is its identity. */
-  | { kind: "action"; file: string }
+  | { kind: "action"; file: string; screen: ActionScreen }
   /** A file that does not parse, being repaired as text. */
   | { kind: "raw"; file: string };
 
@@ -139,8 +147,17 @@ class ActionStore extends Notifier {
   // --- opening and closing ------------------------------------------------
 
   open(file: string) {
-    this.#enterEditor({ kind: "action", file });
+    this.#enterEditor({ kind: "action", file, screen: "main" });
     this.syncDraft();
+  }
+
+  /** Move between the editor's screens. The write is flushed first: a card that
+   *  navigates has to end a pending edit exactly as leaving the section does. */
+  showScreen(screen: ActionScreen) {
+    if (this.editing?.kind !== "action" || this.editing.screen === screen) return;
+    this.flush();
+    this.editing = { ...this.editing, screen };
+    this.notify();
   }
 
   async openRaw(file: string) {
