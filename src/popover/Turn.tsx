@@ -17,30 +17,24 @@ import { exchange, isSettled, settlesInSettings, type Turn } from "./exchange";
 const CLAMP_AT = 160;
 
 /**
- * The card is capped well short of the window: a bubble that reaches both edges
- * stops reading as one side of a conversation. The fill is `--muted`, the
- * quietest one there is — inversion is reserved for "current" everywhere else in
- * the product, and spending it here would make your own words the loudest thing
- * on screen.
+ * Capped well short of the window: a bubble reaching both edges stops reading as
+ * one side of a conversation. The fill is `--muted`, the quietest there is —
+ * inversion means "current" everywhere else, and spending it here would make
+ * your own words the loudest thing on screen.
  */
 const CARD = "bg-muted max-w-4/5 rounded-lg border px-3 py-1.5 whitespace-pre-wrap text-quiet";
 
 /**
- * The three quiet buttons under a turn — the reasoning disclosure, the question's
- * clamp toggle, and Copy — one step quieter than `ghost`'s own grey. They are
- * labels *about* the turn rather than any part of it, which is the job
- * `--muted-quiet` exists for; the negative margin is what pulls each of them
- * flush with the text it belongs to. Hover still takes them to full ink, so the
- * grey is a resting state and not a permanently dimmed control.
+ * The three quiet buttons under a turn — reasoning disclosure, clamp toggle,
+ * Copy — one step quieter than `ghost`'s grey, because they are labels *about*
+ * the turn rather than part of it. The negative margin pulls each flush with
+ * the text it belongs to; hover still takes them to full ink.
  */
 const QUIET = "text-muted-quiet";
 
 export function TurnView({ turn, index }: { turn: Turn; index: number }) {
-  /**
-   * The cause named first, then the provider's own words — the same sentence
-   * Settings builds. Printing `note` bare handed the user a raw reqwest chain
-   * for a `network` failure while Settings said "Could not reach the API".
-   */
+  /** The cause named first, then the provider's own words — the same sentence
+   *  Settings builds, rather than a raw reqwest chain. */
   const failure =
     turn.status === "error"
       ? describeFailure({ kind: turn.errorKind ?? "error", message: turn.note ?? "" })
@@ -105,9 +99,8 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         ) : null}
 
         {turn.status === "waiting-first-token" ? (
-          // Two independent proofs the request is alive: a bar that pulses and
-          // a counting integer. Under reduced motion the bar goes static — which
-          // is still a bar, not a stalled one — and the counter carries it.
+          // Two independent proofs the request is alive: a pulsing bar and a
+          // counting integer. Under reduced motion the counter carries it.
           <div className="flex w-full max-w-75 flex-col gap-2">
             <div className="bg-muted-foreground h-0.5 animate-pulse rounded-full motion-reduce:animate-none motion-reduce:opacity-60" />
             <span className="text-muted-quiet tabular-nums text-meta">
@@ -122,8 +115,8 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
           <p className="whitespace-pre-wrap break-words leading-relaxed">
             {turn.answer}
             {turn.status === "streaming" ? (
-              // Not a blinking text caret — a blink says "type here". A steady
-              // bar that breathes says "output is arriving".
+              // Not a blinking caret: a blink says "type here", a breathing
+              // bar says "output is arriving".
               <span className="bg-foreground ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-xs align-text-bottom motion-reduce:animate-none" />
             ) : null}
           </p>
@@ -162,12 +155,10 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         ) : null}
 
         {turn.answer && settled ? (
-          // Shrink-to-fit like every other quiet button here. It was pinned to a
-          // fixed width so the Copied swap could not reflow anything, which it
-          // cannot anyway — it is the last child of a column that starts its
-          // children at the left edge, so nothing sits below or beside it. What
-          // the pinning did instead was leave 28px of empty button, which is
-          // invisible at rest and the whole shape of the thing under the pointer.
+          // Shrink-to-fit like every other quiet button here. A fixed width to
+          // stop the Copied swap reflowing is unnecessary — it is the last
+          // child of a left-aligned column — and leaves empty button under the
+          // pointer.
           <Button
             variant="ghost"
             size="xs"

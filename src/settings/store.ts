@@ -1,22 +1,18 @@
 // Settings is an *editor of files*, not their owner (ADR-0003): every change
 // commits to disk (debounced), and `config-changed` re-renders the form.
 //
-// It owns what is global — the credential, the Launcher hotkey, the theme, the
-// model defaults. The Actions are edited in the same window but by their own
-// store, `./actions.ts`, because they are many files rather than one;
-// `src/lib/saveSlot.ts` is the write machinery both share, and that store reads
-// the defaults and the model catalog from this one.
+// This store owns what is global — the credential, the Launcher hotkey, the
+// theme, the model defaults. The Actions are edited in the same window by
+// `./actions.ts`, which reads the defaults and the model catalog from here;
+// `src/lib/saveSlot.ts` is the write machinery both share.
 //
-// All of it lives here rather than in the components, for one reason: a save is
-// echoed straight back at this window. `save_config` calls
-// `reload::reload_config`, which emits `config-changed` to every window
-// including this one — so the events being defended against are mostly our own
-// writes, arriving mid-keystroke. Spreading that defence across a dozen field
-// components is how one clobbering bug becomes twelve.
+// The adoption rules live here rather than in the components because a save is
+// echoed straight back at this window (`save_config` → `reload_config` →
+// `config-changed`), so the events defended against are mostly our own writes
+// arriving mid-keystroke. Spread across a dozen fields, one clobbering bug
+// becomes twelve.
 //
-// A module-level singleton is right here specifically because there is exactly
-// one Settings window and it is never destroyed (ADR-0007). Components reach it
-// through `useStore`, which subscribes them to `notify`.
+// A module-level singleton: one Settings window, never destroyed (ADR-0007).
 import {
   describeError,
   getConfig,
@@ -185,11 +181,10 @@ class SettingsStore extends Notifier {
     this.modelsLoading = true;
     this.notify();
     try {
-      // Populate from the documented catalog first. The live fetch is
+      // Populate from the documented catalog first: the live fetch is
       // deliberately unbounded (no HTTP timeout, by design), and a dropdown
-      // holding nothing but its own current value while that is in flight is
-      // the regression the fallback exists to prevent. A refresh keeps the
-      // list already on screen instead of flashing back to the catalog.
+      // holding only its own current value meanwhile is the regression this
+      // prevents. A refresh keeps the list already on screen.
       if (!this.models) {
         this.models = await getModels(false);
         this.notify();

@@ -1,8 +1,7 @@
 // The Launcher: the universal entry point to every Action, and only that.
-// Picking is keyboard only — it is summoned by a hotkey, so the hands are
-// already on the keys — and the window dies with its focus. Authoring an Action
-// lives in Settings (ADR-0003), a window that can survive a click elsewhere; a
-// form inside a picker cannot.
+// Picking is keyboard only and the window dies with its focus, which is what
+// keeps authoring in Settings (ADR-0003) — a form inside a picker could not
+// survive a click elsewhere.
 //
 // The window is the query, the ranked list and the keys. One row is
 // `ActionRow`; the registry behind it is `actions.ts`.
@@ -74,9 +73,8 @@ export function Launcher() {
   }, [selected]);
 
   // The list and the cursor, written during render for the window-level handler
-  // to read. The handler's behaviour never changes, so it is registered once:
-  // with `matches` and `selected` as dependencies it was torn down and rebuilt
-  // on every keystroke and every arrow press, on this window's hot path.
+  // to read. Depending on `matches` / `selected` instead would rebind the
+  // handler on every keystroke, on this window's hot path.
   const latest = React.useRef({ matches, selected });
   latest.current = { matches, selected };
 
@@ -98,9 +96,8 @@ export function Launcher() {
     setWanted((selected + delta + matches.length) % matches.length);
   }, []);
 
-  // On the window, not on the card: clicking a row leaves focus on the body,
-  // and a handler bound to the tree would stop answering Escape the moment the
-  // mouse was used once.
+  // On the window, not on the card: clicking a row leaves focus on the body, so
+  // a handler bound to the tree stops answering Escape after the first click.
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -140,10 +137,9 @@ export function Launcher() {
   const nothing = matches.length === 0 && snapshot.errors.length === 0;
 
   return (
-    // The frameless card: it fills the window rect exactly, so the drop shadow
-    // under it is DWM's rather than one painted here. The radius matches the
-    // ~8px Windows 11 rounds an undecorated window at — a larger one is clipped
-    // by DWM's and shows as a nick in each corner.
+    // The frameless card fills the window rect exactly, so the shadow under it
+    // is DWM's. The radius matches the ~8px Windows 11 rounds an undecorated
+    // window at; a larger one is clipped and shows as a nick in each corner.
     <div className="bg-background flex h-screen flex-col overflow-hidden rounded-lg border">
       <div className="flex h-14 flex-none items-center gap-3 border-b px-4">
         <SearchIcon className="text-muted-quiet size-4.5 flex-none" />

@@ -1,17 +1,14 @@
 // The Popover's view of the Exchange on screen.
 //
-// The states are the point of this window: "waiting for the first token" must
-// not look like "streaming", and an interrupted stream must keep the text it
-// already produced (README). All of that is decided here, so the components
-// only render turns — the state machine cannot be half-implemented in markup.
+// The states are the point: "waiting for the first token" must not look like
+// "streaming", and an interrupted stream keeps the text it already produced
+// (README). All of it is decided here so the components only render turns.
 //
-// Rust drives it with events, not return values, so this module is mostly a
-// reducer over `exchange:*`. It touches no DOM at all: following the stream and
-// focusing the composer are effects in the components, keyed off what changed
-// here.
+// Rust drives it with events, not return values, so this is mostly a reducer
+// over `exchange:*`. It touches no DOM — following the stream and focusing the
+// composer are effects in the components, keyed off what changed here.
 //
-// A module-level singleton, because there is exactly one Popover window and it
-// is never destroyed (ADR-0007). Components reach it through `useStore`.
+// A module-level singleton: one Popover window, never destroyed (ADR-0007).
 import {
   cancelExchange,
   copyToClipboard,
@@ -78,9 +75,8 @@ class ExchangeStore extends Notifier {
   copiedTurn: number | null = null;
   /**
    * Bumped by every reveal. The window is reused (ADR-0007), so the composer
-   * from the last trigger is still mounted with the last trigger's draft in it
-   * and grown to the last trigger's height; keying it on this remounts it, and
-   * a fresh element is the only reliable way to clear both at once.
+   * still holds the last trigger's draft at the last trigger's height; keying
+   * it on this remounts it, which clears both at once.
    */
   epoch = 0;
 
@@ -113,11 +109,8 @@ class ExchangeStore extends Notifier {
     return this.view !== null && (this.view.phase === "needs-input" || this.canFollowUp);
   }
 
-  /**
-   * `PopoverPhase` is resolved in Rust precisely so the rule lives in one place;
-   * choosing the notice from it in a JSX ternary chain put a second copy of that
-   * rule in the one file no test can reach.
-   */
+  /** `PopoverPhase` is resolved in Rust so the rule lives in one place; picking
+   *  the notice here keeps the second half of it out of markup. */
   get notice(): Notice {
     if (this.view === null) return "no-view";
     if (this.turns.length > 0) return "none";
@@ -125,8 +118,7 @@ class ExchangeStore extends Notifier {
   }
 
   /** What the bar along the bottom says a live turn is doing. `busy` decides
-   *  whether the bar is there at all; this is the same register, so it is
-   *  resolved beside it rather than re-split in markup. */
+   *  whether the bar is there at all; this is the same register. */
   get runLabel() {
     return this.current?.status === "streaming" ? "Streaming" : "Waiting";
   }
@@ -150,9 +142,8 @@ class ExchangeStore extends Notifier {
           this.#forCurrent(payload.exchange_id, (turn) => {
             turn.answer += payload.content;
             turn.reasoning += payload.reasoning;
-            // Thinking arrives before the answer, so show it while it is all
-            // there is and get out of the way once real text lands — unless
-            // the user has said otherwise by toggling the disclosure.
+            // Thinking arrives first: show it while it is all there is, get
+            // out of the way once real text lands — unless the user toggled.
             if (!turn.reasoningTouched) turn.reasoningOpen = turn.answer === "";
             if (turn.status === "waiting-first-token") this.#markStreaming(turn);
           }),
@@ -184,10 +175,9 @@ class ExchangeStore extends Notifier {
   }
 
   /**
-   * Only the "waiting for the first token" counter reads the clock, so outside
-   * that wait this would be a re-render per quarter second for the process's
-   * lifetime — the Popover window is never destroyed (ADR-0007). It publishes
-   * only when the whole second it displays actually changes.
+   * Only the "waiting for the first token" counter reads the clock; the window
+   * is never destroyed (ADR-0007), so this would otherwise re-render four times
+   * a second forever. It publishes only when the displayed second changes.
    */
   startClock() {
     const ticker = setInterval(() => {
@@ -205,8 +195,7 @@ class ExchangeStore extends Notifier {
   /**
    * The reveal hook. The window outlives every trigger, so this — not a mount —
    * is where per-Exchange state is reset. Anything added to this store that
-   * survives a hide has to be cleared here; the per-turn flags come free,
-   * because `Turn` objects themselves are rebuilt.
+   * survives a hide has to be cleared here.
    */
   async load() {
     this.view = await getPopoverView();
@@ -324,9 +313,8 @@ class ExchangeStore extends Notifier {
     this.#waited = 0;
   }
 
-  /** Both callers are inside `#forCurrent`, which publishes once the event has
-   *  landed — so this must not publish too, or every first token re-renders the
-   *  window twice. */
+  /** Both callers sit inside `#forCurrent`, which publishes once the event has
+   *  landed — publishing here too would re-render twice per first token. */
   #markStreaming(turn: Turn) {
     turn.status = "streaming";
     this.#waitingSince = 0;

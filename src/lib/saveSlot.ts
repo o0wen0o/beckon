@@ -1,16 +1,14 @@
 // The write half of "the filesystem is the source of truth" (ADR-0003), shared
-// by the two stores that edit files: `settings/store.ts` edits `config.toml`,
-// `settings/actions.ts` edits `actions\*.toml`.
+// by the two stores that edit files: `settings/store.ts` for `config.toml`,
+// `settings/actions.ts` for `actions\*.toml`.
 //
-// Both face the same hazard, which is why this is one module and not two: a
-// save is echoed straight back at the window that caused it. `save_config` /
-// `save_action` call into `reload`, which broadcasts `config-changed` /
-// `actions-changed` to every window — so the snapshots being defended against
-// are mostly our own writes arriving mid-keystroke, not the file watcher.
+// Both face the same hazard: a save is echoed straight back at the window that
+// caused it, because `save_config` / `save_action` call into `reload`, which
+// broadcasts to every window. So the snapshots defended against here are mostly
+// our own writes arriving mid-keystroke, not the file watcher.
 //
-// Plain fields and an `onchange` callback rather than reactive state of its
-// own: the surface that owns this is React now, and a store that reaches for a
-// framework's reactivity primitive can only be used by that framework.
+// Plain fields and an `onchange` callback rather than reactive state of its own,
+// so the module is not tied to one framework's primitive.
 
 import { describeError } from "./ipc";
 
@@ -21,16 +19,15 @@ export type Write = () => Promise<void>;
 /**
  * Whether adopting a snapshot right now would fight the user.
  *
- * Read from the DOM at the instant the event arrives rather than tracked in
- * flags: flags get wired to the fields that existed when they were written, so
- * every field added afterwards silently opts out of the protection.
+ * Read from the DOM as the event arrives rather than tracked in flags, which
+ * only ever cover the fields that existed when they were written.
  *
  * `document.hasFocus()` matters on Windows: `activeElement` survives the window
  * losing OS focus, so without it an external edit made while Beckon is in the
  * background would never be adopted at all.
  *
  * Selects, checkboxes and buttons deliberately do not count — they commit
- * immediately, so a snapshot arriving under one of them is never a surprise.
+ * immediately, so a snapshot arriving under one is never a surprise.
  */
 export function textFocusHeld(pane: HTMLElement | null): boolean {
   if (!pane || !document.hasFocus()) return false;
@@ -42,8 +39,8 @@ export function textFocusHeld(pane: HTMLElement | null): boolean {
 /**
  * One debounced write target. ADR-0003 makes disk authoritative, so every edit
  * has to land there — but not on every keystroke. `busy` is the second half of
- * the suppression rule: it stops a snapshot that was already in flight when the
- * user typed from being adopted back over the newer local value.
+ * the suppression rule: it stops a snapshot already in flight from being
+ * adopted back over a newer local value.
  */
 export class SaveSlot {
   #busy = false;
@@ -58,8 +55,7 @@ export class SaveSlot {
     /** Rust refused the write: the in-memory value is a lie until we re-read. */
     private readonly onreject: () => void,
     /** Fired whenever `busy` or `error` changes, so the owning store can
-     *  re-render. Both are read straight off this object; only the fact that
-     *  they moved is announced. */
+     *  re-render. Both are read straight off this object. */
     private readonly onchange: () => void = () => {},
   ) {}
 

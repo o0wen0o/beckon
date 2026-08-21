@@ -1,10 +1,9 @@
-// A switch with its state written beside it, which is the only form a switch
-// takes on this surface. Three panes drew it by hand and the third had already
-// dropped `self-start` and `text-left`, so the fixed-width readout that exists to
-// stop the row twitching was centred in one place and flush in two.
+// A switch with its state written beside it — the only form a switch takes on
+// this surface, so the fixed-width readout that keeps the row from twitching
+// cannot be dropped by one pane and not another.
 //
 // A switch rather than a checkbox: these settings take effect immediately, and a
-// checkbox reads as "will be applied when you save" — which there is no way to
+// checkbox reads as "will be applied when you save", which there is no way to
 // do here (ADR-0003).
 import { Switch } from "@/components/ui/switch";
 

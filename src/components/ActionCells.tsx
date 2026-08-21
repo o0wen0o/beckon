@@ -1,27 +1,17 @@
-// The two fixed columns an Action's row ends with, in one place. The Launcher's
-// list and the Actions list in Settings are meant to read as the same list, and
-// `lib/inputSource.ts` and `Kbd` already carry the icon, the word and the chip —
-// but the columns *around* them were a second copy, which is where the drift
-// landed: the same conflict chip written out at four call sites, two of them
-// carrying a size class and two of them not.
+// The two fixed columns an Action's row ends with, shared by the Launcher's list
+// and the Actions list in Settings so the two cannot drift.
 //
-// The widths are fixed rather than shrink-to-fit because the hotkey chip is
-// optional: an ordinary flex row parks every Input Source at a different x and
-// the list reads as ragged.
-//
-// The inversion classes are unconditional. Only the Launcher marks a row
-// `aria-selected`, so in Settings they never match — which is what lets one
-// column serve a picker whose current row is ink-filled and a pane whose rows
-// are not.
+// The widths are fixed because the hotkey chip is optional: a shrink-to-fit row
+// parks every Input Source at a different x. The inversion classes are
+// unconditional — only the Launcher marks a row `aria-selected`.
 import { TriangleAlertIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/Kbd";
 import { SOURCE_ICON, sourceLabel } from "@/lib/inputSource";
 import type { InputSource } from "@/lib/types";
 
-/** Outlined like the working hotkey chip beside it, in the danger colour: it is
- *  still the Action's hotkey, just an inactive one, and a solid red pill reads
- *  as a button. */
+/** Outlined like the working chip beside it: still the Action's hotkey, just an
+ *  inactive one. A solid red pill would read as a button. */
 const DANGER_CHIP =
   "border-destructive/60 text-destructive group-aria-selected:border-current group-aria-selected:text-primary-foreground gap-1 font-normal";
 
@@ -55,9 +45,8 @@ export function HotkeyCell({
   return (
     <span className="flex w-28 flex-none justify-end">
       {conflict ? (
-        // Mono, so it carries no size of its own: `font-mono` is 0.92em in the
-        // base layer, which is what keeps it level with the registered chip
-        // rather than a step above it.
+        // Mono, so it takes 0.92em from the base layer and stays level with
+        // the registered chip rather than a step above it.
         <Badge variant="outline" title={conflict} className={`${DANGER_CHIP} font-mono`}>
           <TriangleAlertIcon className="size-3" /> {hotkey}
         </Badge>
@@ -70,9 +59,8 @@ export function HotkeyCell({
   );
 }
 
-/** What stands in the hotkey column for a file that does not parse: it cannot be
- *  run, so the row is a way to the raw editor instead. Set in the sans, so it
- *  takes a size — the mono chips above it get theirs from the base layer. */
+/** Stands in the hotkey column for a file that does not parse: it cannot be run,
+ *  so the row is a way to the raw editor instead. Sans, so it needs a size. */
 export function RepairCell() {
   return (
     <span className="flex w-28 flex-none justify-end">

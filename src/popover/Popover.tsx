@@ -1,8 +1,7 @@
-// The Popover window: a title bar, a scrolling conversation, and a composer
-// when there is something to type into it. The states that make this window
-// worth having live in `exchange.ts`; what is left here is the shell, the one
-// piece of DOM the store cannot reach — the scroller — and the keys that belong
-// to the window rather than to a field.
+// The Popover window: a title bar, a scrolling conversation, and a composer when
+// there is something to type into. The states live in `exchange.ts`; what is
+// left here is the shell, the scroller the store cannot reach, and the keys that
+// belong to the window rather than to a field.
 import * as React from "react";
 import { hidePopover, Subscriptions } from "@/lib/ipc";
 import { useStore } from "@/lib/useStore";
@@ -20,10 +19,9 @@ const STICK_WITHIN = 48;
 export function Popover() {
   const store = useStore(exchange);
   const scroller = React.useRef<HTMLDivElement | null>(null);
-  // Whether the stream should still be followed. Kept as a ref written on
-  // scroll rather than measured after a delta lands: once the text is in the
-  // DOM the distance to the bottom has already grown by whatever just arrived,
-  // and a large delta would read as "the user scrolled up".
+  // Whether the stream should still be followed. Written on scroll rather than
+  // measured after a delta lands: by then the distance to the bottom has grown
+  // by whatever just arrived, and a large delta reads as "scrolled up".
   const stick = React.useRef(true);
 
   React.useEffect(() => {
@@ -111,10 +109,9 @@ export function Popover() {
             <p>Select some text and press the hotkey again. Elevated windows cannot be read at all.</p>
           </Callout>
         ) : store.notice === "awaiting-input" ? (
-          // Body size and a bold name, which is what `Callout` sets — the three
-          // notices land in the same slot, and one of them being a step smaller
-          // with a lighter name than the other two is a difference the reader
-          // sees without there being anything to read into it.
+          // Body size and a bold name, matching `Callout`: all three notices
+          // land in the same slot, so a step of difference between them says
+          // nothing a reader can act on.
           <p className="text-muted-foreground">
             Type what you want to send to{" "}
             <strong className="text-foreground font-bold">{view?.action_name}</strong>.

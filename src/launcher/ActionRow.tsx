@@ -1,12 +1,8 @@
-// One row of the Launcher's list, in the same four columns the Actions list in
-// Settings uses: name over description, the Input Source, the Direct Hotkey.
-// The two lists are meant to read as one list, so the columns are fixed here
-// too — with the hotkey chip optional, an ordinary flex row parks every Input
-// Source at a different x and the list reads as ragged.
+// One row of the Launcher's list, in the same four columns Settings' Actions
+// list uses: name over description, Input Source, Direct Hotkey. The two lists
+// must read as one, so the columns are fixed here too.
 //
-// The selected row is ink-filled with paper text. That inversion is the only
-// fill in the window, which is what makes "selected" unmistakable without a
-// tint, a rail or a hue.
+// The selected row is ink-filled with paper text — the only fill in the window.
 import { HotkeyCell, RepairCell, SourceCell } from "@/components/ActionCells";
 import { highlight } from "@/lib/fuzzy";
 import type { Action } from "@/lib/types";
@@ -14,11 +10,10 @@ import type { Action } from "@/lib/types";
 const ROW =
   "group flex h-13 w-full cursor-default items-center gap-3.5 border-b px-4 text-left transition-colors duration-150 ease-out aria-selected:bg-primary aria-selected:text-primary-foreground motion-reduce:transition-none";
 
-/** A description is body copy about the row; the Input Source column beside it
- *  is a label about it, and carries the quieter of the two greys from
- *  `SourceCell`. Inside the selected row both become strengths of the paper text
- *  — the muted greys are tuned against the background and read as smudges on
- *  the fill. */
+/** A description is body copy about the row; the Input Source beside it is a
+ *  label about it, and carries the quieter grey from `SourceCell`. On the
+ *  selected row both become strengths of the paper text — the muted greys are
+ *  tuned against the background and read as smudges on the fill. */
 const DESC = "text-muted-foreground group-aria-selected:text-primary-foreground/80";
 
 interface ActionRowProps {

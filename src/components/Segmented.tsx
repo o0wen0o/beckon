@@ -1,7 +1,5 @@
 // Three-or-so mutually exclusive choices, shown rather than hidden behind a
-// dropdown. shadcn/ui's ToggleGroup in `single` mode is Radix's roving-focus
-// group, which is the same one-tab-stop-plus-arrows behaviour the hand-rolled
-// radiogroup implemented.
+// dropdown. ToggleGroup in `single` mode gives Radix's roving focus.
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface SegmentedProps<T extends string> {
@@ -39,13 +37,9 @@ export function Segmented<T extends string>({
         <ToggleGroupItem
           key={option.value}
           value={option.value}
-          // Selected is the inverted chip, and it is the only fill on the pane —
-          // 17:1 against its own label, and nothing else here is filled, so it
-          // cannot be mistaken for anything. That also settles what the stock
-          // variant gets wrong: it gives the selected item and the hovered one
-          // the same `bg-accent`, and `--accent` equals `--muted`, so a hover
-          // fill would be indistinguishable from the group's own ground. The
-          // fill means "selected" and nothing else; hover brightens the label.
+          // A fill means "selected" and nothing else; hover brightens the
+          // label. Stock gives selected and hovered the same `bg-accent`, and
+          // `--accent` equals `--muted`, so hover would match the group's ground.
           className="text-muted-foreground data-[state=off]:hover:bg-transparent data-[state=off]:hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:font-medium rounded-sm px-3 transition-colors duration-150 ease-out motion-reduce:transition-none"
         >
           {option.label}

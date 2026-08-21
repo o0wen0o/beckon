@@ -48,14 +48,12 @@ export function ModelSelect({
   );
 
   /**
-   * `value=` + `onValueChange`, never a two-way binding. A binding would write
-   * back whatever the select settled on before the catalog arrived, which is
-   * exactly how a configured model gets silently replaced.
+   * `value=` + `onValueChange`, never a two-way binding: a binding writes back
+   * whatever the select settled on before the catalog arrived.
    *
-   * The guard is the other half of that rule: without an inherit option there
-   * is no legitimate "", so an empty value can only be a render artefact from a
-   * select momentarily holding a value not in its own list — and writing it
-   * would blank the configured model.
+   * The guard is the other half — without an inherit option there is no
+   * legitimate "", so an empty value is a render artefact from a select briefly
+   * holding a value not in its own list, and writing it would blank the model.
    */
   function choose(next: string) {
     const resolved = next === INHERIT ? "" : next;

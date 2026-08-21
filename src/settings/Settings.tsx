@@ -1,7 +1,6 @@
-// The shell. It owns the subscriptions and the focus signal, and nothing else:
-// every piece of state and every write lives in a store — the global config in
-// store.ts, the Actions in actions.ts (ADR-0003) — so a field component cannot
-// acquire an opinion about the disk.
+// The shell: the subscriptions and the focus signal, and nothing else. Every
+// piece of state and every write lives in a store — the global config in
+// store.ts, the Actions in actions.ts (ADR-0003).
 import * as React from "react";
 import { onActionsChanged, onConfigChanged, onSettingsOpened, Subscriptions } from "@/lib/ipc";
 import { PaneProvider } from "@/lib/pane";
@@ -42,9 +41,8 @@ export function Settings() {
     settings.pane = pane;
   }, [pane]);
 
-  // A new section starts at its own top. The pane is one scroll container for
-  // every route, so without this, arriving at a short pane from a scrolled long
-  // one lands you at whatever offset the previous section happened to be at.
+  // A new section starts at its own top: the pane is one scroll container for
+  // every route, so otherwise a short pane inherits the last one's offset.
   React.useEffect(() => {
     pane?.scrollTo({ top: 0 });
   }, [pane, store.route]);

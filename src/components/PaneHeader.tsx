@@ -1,11 +1,5 @@
 // Every pane opens the same way: the section's name at display size, one line
-// saying what the section is for, and — where the section has one — the action
-// that creates something, on the same line as the title.
-//
-// The size step is deliberate and it is the point. A 24px display title over
-// 14px body is a ratio you can see; the 20px-over-16px it replaced was a
-// difference you had to look for, which is what made the pane read as flat
-// rather than as quiet.
+// saying what it is for, and the section's create action on the title's line.
 import type * as React from "react";
 
 interface PaneHeaderProps {

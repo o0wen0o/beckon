@@ -1,6 +1,5 @@
-// What every surface does before it paints. Written once so a second pre-mount
-// step — and the reasoning for awaiting it — cannot land in two of the three
-// entry points and not the third.
+// What every surface does before it paints, written once so a second pre-mount
+// step cannot land in two of the three entry points and not the third.
 import { createRoot } from "react-dom/client";
 import type { ReactElement } from "react";
 import "../globals.css";

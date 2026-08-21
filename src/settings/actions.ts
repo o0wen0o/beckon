@@ -1,17 +1,13 @@
-// Action authoring lives in Settings (ADR-0003: the settings window is an
-// *editor* of the files on disk). The Launcher is the picker and nothing more,
-// so the two verbs — run one, author one — do not share a gesture.
+// Action authoring lives in Settings (ADR-0003), the Launcher is the picker and
+// nothing more, so running one and authoring one do not share a gesture.
 //
 // Everything editable is held here rather than in the components: a save is
-// echoed back at this window as `actions-changed`, and spreading the defence
-// against that across a dozen field components is how one clobbering bug
-// becomes twelve. `src/lib/saveSlot.ts` carries the shared half of that
-// reasoning, and `store.ts` is the other half of this window — the global
-// config, which is also where the defaults an override inherits from and the
-// model catalog are already loaded, so this store never fetches them.
+// echoed back at this window as `actions-changed`, and spreading that defence
+// across a dozen fields turns one clobbering bug into twelve. The write
+// machinery is `src/lib/saveSlot.ts`; the defaults an override inherits from
+// and the model catalog are read off `store.ts` rather than fetched again.
 //
-// A module-level singleton, because there is exactly one Settings window and
-// it is never destroyed (ADR-0007).
+// A module-level singleton: one Settings window, never destroyed (ADR-0007).
 import {
   createAction,
   deleteAction as deleteActionFile,

@@ -1,12 +1,11 @@
 // An Action's `[model]` values are all optional: absent means "inherit the
-// global default". Expressing that as an "inherit" entry in a dropdown makes it
-// look like a value somebody picked, and hides what is being inherited.
+// global default". An "inherit" entry in a dropdown reads as a value somebody
+// picked, and hides what is being inherited.
 //
-// So the row *is* the control: it reads as a value with its provenance, and
-// opening it is what overrides — there is no separate button to press first. It
-// closes again when focus leaves, which keeps a list of these readable as a
-// summary of the Action rather than as a wall of open forms. Closing is
-// presentation only; the override itself is on disk the moment it is made.
+// So the row *is* the control: opening it is what overrides, and it closes again
+// when focus leaves, which keeps a list of these readable as a summary rather
+// than a wall of open forms. Closing is presentation only — the override is on
+// disk the moment it is made.
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { InfoHint } from "./InfoHint";

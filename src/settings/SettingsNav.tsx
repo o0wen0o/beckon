@@ -1,7 +1,6 @@
-// One entry per section, Actions included — a single "Actions" item, not one per
-// file: the list belongs in the pane, where a row has room for its Input Source
-// and its hotkey. A nav column of Actions would make "pick a section" and "pick
-// an Action" the same gesture for two unlike things.
+// One entry per section, and Actions is a single item rather than one per file:
+// the list belongs in the pane, where a row has room for its Input Source and
+// its hotkey, and "pick a section" must not become "pick an Action".
 import {
   FolderIcon,
   KeyboardIcon,
@@ -72,23 +71,19 @@ export function SettingsNav() {
                 className={[
                   "flex w-full items-center justify-start gap-2.25 rounded-md px-2.25 py-1.5 text-left",
                   "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
-                  // The fill arrives rather than appearing. One frame is what
-                  // makes a nav column feel like a set of radio buttons; 150ms
-                  // is short enough that it never delays the pane behind it,
-                  // which swaps on the same curve.
+                  // The fill arrives rather than appearing, on the same 150ms
+                  // curve the pane behind it swaps on.
                   "transition-colors duration-150 ease-out motion-reduce:transition-none",
                   // Inversion is the marker: the current row is the only filled
-                  // thing in the window, so it needs no rail and no weight
-                  // change beside it. The hover tint is then free to mean
-                  // "under the pointer" and nothing else.
+                  // thing in the window, so hover is free to mean "under the
+                  // pointer" and nothing else.
                   active
                     ? "bg-primary text-primary-foreground font-medium"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 ].join(" ")}
               >
-                {/* The icon inherits the row's colour, and an inherited change
-                    only animates where the child declares the transition too —
-                    without this the label eases and the glyph snaps. */}
+                {/* An inherited colour change only animates where the child
+                    declares the transition too, or the glyph snaps. */}
                 <Icon className="size-3.75 flex-none transition-colors duration-150 ease-out motion-reduce:transition-none" />
                 <span className="min-w-0 flex-1 truncate">{section.label}</span>
                 {/* Not drawn on the current row. A 6px dot on the inverted fill

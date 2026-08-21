@@ -1,11 +1,6 @@
 // The ledger's horizontal rule: a tracked micro-label with a hairline under it,
-// and the rows that belong to it.
-//
-// This is where the pane's air lives. Rows inside a group are tight — the
-// hairline is enough to separate them — and the gap between groups is what says
-// "different subject". Spacing every field apart by the same amount instead
-// produces a list with no structure in it, which is the failure this component
-// exists to correct.
+// and its rows. This is where the pane's air lives — rows inside a group are
+// tight, and the gap between groups is what says "different subject".
 import type * as React from "react";
 
 interface FieldGroupProps {

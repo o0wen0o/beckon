@@ -1,29 +1,18 @@
-// One row of the ledger, and the only layout a labelled control gets: a
+// One row of the ledger, and the only layout a labelled control gets: a fixed
 // right-aligned label against a value column, closed by a hairline. Centralised
-// so a field added later cannot invent its own spacing or forget to wire
+// so a field added later cannot invent its own spacing or forget
 // `aria-describedby`.
 //
-// The label column is fixed and the labels are flush to it, so the controls all
-// start at the same x and the pane can be read as a column of values rather than
-// as a stack of forms. That column is what makes the density legible: rows are
-// tight, and the air goes between `FieldGroup`s instead.
-//
-// The explanation is a permanent line under the control. It used to live behind
-// an info icon, on the grounds that two lines of prose per control reads as
-// documentation — true when the label sat directly above the control and the
-// hint pushed them apart, but in the value column the hint is beside the label
-// rather than between them, and a settings pane nobody can read without
-// hovering is the worse failure. `InfoHint` survives where the room genuinely
-// is not there: `OverrideField`'s collapsed rows.
+// The explanation is a permanent line under the control, not a bubble — a
+// settings pane nobody can read without hovering is the worse failure.
+// `InfoHint` survives only where the room is not there: `OverrideField`.
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 
 /**
- * The two measures a control is allowed to take, named rather than numbered:
- * the values are `--container-control` and `--container-control-wide`, so a
- * control that has to cap itself (`ModelSelect`, `Temperature`) reaches the same
- * number this row does. `wide` is for a control that shares its line with
- * buttons.
+ * The two measures a control may take, named rather than numbered, so a control
+ * that has to cap itself (`ModelSelect`, `Temperature`) reaches the same number
+ * this row does. `wide` is for a control sharing its line with buttons.
  */
 const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;
 
@@ -51,8 +40,7 @@ export function Field({
   const id = React.useId();
   const descriptionId = `${id}-description`;
   const hintId = `${id}-hint`;
-  // The control is described by whatever is loudest, and by the hint whenever
-  // there is one.
+  // Described by whatever is loudest, plus the hint whenever there is one.
   const describedBy =
     [error || warning ? descriptionId : null, hint ? hintId : null].filter(Boolean).join(" ") ||
     undefined;

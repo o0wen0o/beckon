@@ -1,10 +1,10 @@
-// A field's explanation, moved off the form and behind an icon: a settings pane
-// where every control carries two lines of prose reads as documentation rather
-// than as a form, and the density hides the controls themselves.
+// An explanation behind an icon, for the one place a permanent line does not
+// fit: `OverrideField`'s collapsed rows. Everywhere else a field's explanation
+// is a standing line under the control (see `Field`).
 //
 // The text stays in the accessibility tree at all times — the `sr-only` span is
 // what `aria-describedby` points at — so the popover is a visual affordance
-// only, and is `aria-hidden` to stop the same sentence being read twice.
+// only, and is `aria-hidden` to stop the sentence being read twice.
 import * as React from "react";
 import { InfoIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
