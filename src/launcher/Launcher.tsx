@@ -27,7 +27,10 @@ import { actionStore } from "./actions";
 export function Launcher() {
   const store = useStore(actionStore);
   const [query, setQuery] = React.useState("");
-  const [wanted, setWanted] = React.useState(0);
+  // `null` until the user has done something. A summoned window draws no
+  // cursor: the ink fill says "Enter runs this", and on a window nobody has
+  // touched yet there is no this.
+  const [wanted, setWanted] = React.useState<number | null>(null);
   const [selectionChars, setSelectionChars] = React.useState(0);
 
   const input = React.useRef<HTMLInputElement | null>(null);
@@ -41,7 +44,9 @@ export function Launcher() {
 
   // Clamped rather than reset: the list re-ranks on every keystroke, and a
   // selection that survives the narrowing is what makes typing-then-Enter work.
-  const selected = matches.length === 0 ? 0 : Math.min(wanted, matches.length - 1);
+  // Where the cursor *would* be while it is still hidden is the top match, so
+  // Enter has an answer either way.
+  const selected = matches.length === 0 ? 0 : Math.min(wanted ?? 0, matches.length - 1);
 
   const focusQuery = React.useCallback(() => {
     input.current?.focus();
@@ -59,7 +64,7 @@ export function Launcher() {
         // (ADR-0007), so the last visit's query is still sitting in it.
         setSelectionChars(chars);
         setQuery("");
-        setWanted(0);
+        setWanted(null);
         focusQuery();
       }),
     );
@@ -94,7 +99,12 @@ export function Launcher() {
   const move = React.useCallback((delta: number) => {
     const { matches, selected } = latest.current;
     if (matches.length === 0) return;
-    setWanted((selected + delta + matches.length) % matches.length);
+    // The first arrow reveals the cursor where it already was rather than moving
+    // one past it. Only Down needs saying: a hidden cursor is clamped to 0, so
+    // the wrap already lands the first Up on the last row.
+    setWanted((at) =>
+      at === null && delta > 0 ? 0 : (selected + delta + matches.length) % matches.length,
+    );
   }, []);
 
   // On the window, not on the card: clicking a row leaves focus on the body, so
@@ -149,7 +159,12 @@ export function Launcher() {
         <input
           ref={input}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            // Typing narrows the list, so the top match becomes an answer to
+            // Enter — and an answer Enter will act on has to be visible.
+            setWanted((at) => at ?? 0);
+          }}
           placeholder="Search Actions…"
           spellCheck={false}
           autoComplete="off"
@@ -159,10 +174,20 @@ export function Launcher() {
         <Kbd>Esc</Kbd>
       </div>
 
+      {/* The rows are cards (ADR-0014), so the list is a gutter holding them
+          rather than a run of full-bleed rows: `p-1.5` insets every frame from
+          the window's own edge, and the gap is what keeps two adjacent frames
+          from doubling into one 2px line.
+
+          The gutter is also the window's one ground. A card on the same paper as
+          everything around it is only a frame; on a `--muted` well it is a card,
+          and the query bar above it stays paper because it is the subject rather
+          than the body. The chrome keeps its hairlines and takes no tint of its
+          own — a tint plus a border draws one boundary twice. */}
       <ul
         role="listbox"
         aria-label="Actions"
-        className="min-h-0 flex-1 list-none overflow-y-auto p-0 scrollbar-gutter-stable"
+        className="bg-muted flex min-h-0 flex-1 list-none flex-col gap-1.25 overflow-y-auto p-1.5 scrollbar-gutter-stable"
       >
         {snapshot.errors.map((error) => (
           <BrokenRow
@@ -180,8 +205,7 @@ export function Launcher() {
             action={action}
             conflict={snapshot.hotkey_errors[action.id]}
             query={query}
-            selected={index === selected}
-            onSelect={() => setWanted(index)}
+            selected={wanted !== null && index === selected}
             onRun={() => run(index)}
           />
         ))}
@@ -190,7 +214,7 @@ export function Launcher() {
             query box: the list is the window's whole body, so an empty one that
             hugs the top leaves a void that reads as content failing to load. */}
         {nothing ? (
-          <li className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+          <li className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
             {snapshot.actions.length === 0 ? (
               <>
                 <BrandMark className="text-brand size-6" />

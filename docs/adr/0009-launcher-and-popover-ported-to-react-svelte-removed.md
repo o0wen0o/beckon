@@ -23,6 +23,10 @@ The rejected alternative worth recording is the third variant: a query-first win
 
 **The Popover is the ledger applied to turns.** A fixed label column holds `You`, the model's name, `Thinking` and — when it fails — `Failed`, against a content column, one hairline per row. A transcript with the question in a quoted block was the alternative, and the ledger won for the reason the ledger won in Settings: the label column is what stops "what I asked", "what it thought" and "what it said" being told apart by indentation and colour alone.
 
+**Superseded in part by [ADR-0014](0014-launcher-rows-are-cards.md):** the Launcher's row is a card
+rather than a full-bleed hairline row, and the pointer no longer moves the keyboard cursor. The four
+fixed columns, and the reason they are fixed, still hold.
+
 **Superseded in part by [ADR-0010](0010-popover-turns-are-sided-not-ruled.md):** the label column described in this section is gone, and the Popover is sided instead. Everything else here — the port itself, the Launcher, the pulse, the consequences below — still holds.
 
 The label column was set in `Field`'s register — 13px, sentence case, normal weight — and not in the tracked uppercase micro it was first drawn in. There is one ledger across the three windows, so a row label is a row label; the micro register belongs to a group head, which is *quieter* than the rows under it, and uppercase fails outright on the one label here that is not a word, since a model id is lowercase and hyphenated and `DEEPSEEK-REASONER` reads as a shout. `ROW_LABEL` is exported so the composer's label cannot drift from the rows above it.

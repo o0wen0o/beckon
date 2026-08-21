@@ -1,14 +1,31 @@
 // One row of the Launcher's list, in the same four columns Settings' Actions
-// list uses: name over description, Input Source, Direct Hotkey. The two lists
-// must read as one, so the columns are fixed here too.
+// list uses: name over description, Input Source, Direct Hotkey. The columns are
+// fixed here so every Input Source parks at the same x in both lists.
 //
-// The selected row is ink-filled with paper text — the only fill in the window.
+// The row is a card, not a ruled row (ADR-0014); the fill still belongs to the
+// keyboard cursor alone. The treatment is on `ROW` below.
+//
+// Hover does *not* select. The pointer once drove the cursor, which made the two
+// the same row and left no ground for a hover state to paint on; a click still
+// runs the row it landed on, which is what `onRun` already did.
 import { HotkeyCell, RepairCell, SourceCell } from "@/components/ActionCells";
 import { highlight } from "@/lib/fuzzy";
 import type { Action } from "@/lib/types";
 
+/** The card carries `--background` because the list under it does not: it sits on
+ *  a `--muted` well (ADR-0014), which is what makes a frame at rest read as an
+ *  object rather than as a rule around nothing.
+ *
+ *  So hover is the *edge*, not the ground — `--muted` is the well now and a card
+ *  hovering to it would sink into the list instead of lifting off it. Same edge
+ *  as Settings' `CARD_HOVER`, through the same token, and still one property
+ *  moving; the guard has to be written out because Tailwind reads class names
+ *  out of the source text, so `not-aria-selected:` cannot be composed onto it.
+ *
+ *  The selected card's frame goes to the fill's own colour: a filled row still
+ *  wearing a lighter outline reads as two marks rather than one block. */
 const ROW =
-  "group flex h-13 w-full cursor-default items-center gap-3.5 border-b px-4 text-left transition-colors duration-150 ease-out aria-selected:bg-primary aria-selected:text-primary-foreground motion-reduce:transition-none";
+  "group flex h-13 w-full cursor-default items-center gap-3.5 rounded-md border bg-background px-4 text-left transition-colors not-aria-selected:hover:border-border-strong aria-selected:border-primary aria-selected:bg-primary aria-selected:text-primary-foreground motion-reduce:transition-none";
 
 /** A description is body copy about the row; the Input Source beside it is a
  *  label about it, and carries the quieter grey from `SourceCell`. On the
@@ -22,31 +39,15 @@ interface ActionRowProps {
   conflict?: string;
   query: string;
   selected: boolean;
-  onSelect: () => void;
   onRun: () => void;
   ref?: React.Ref<HTMLLIElement>;
 }
 
-export function ActionRow({
-  action,
-  conflict,
-  query,
-  selected,
-  onSelect,
-  onRun,
-  ref,
-}: ActionRowProps) {
+export function ActionRow({ action, conflict, query, selected, onRun, ref }: ActionRowProps) {
   return (
-    // A listbox, not a menu: the query box keeps focus and the window drives
-    // the list from the keyboard, so the mouse here is a convenience.
-    <li
-      ref={ref}
-      role="option"
-      aria-selected={selected}
-      onMouseMove={onSelect}
-      onClick={onRun}
-      className={ROW}
-    >
+    // A listbox, not a menu: the query box keeps focus and the window drives the
+    // list from the keyboard, so the mouse here is a convenience.
+    <li ref={ref} role="option" aria-selected={selected} onClick={onRun} className={ROW}>
       <span className="flex min-w-0 flex-1 flex-col">
         {/* The row's name, at the weight the Actions list gives it — so a
             matched run is one step up from it rather than two. */}

@@ -128,6 +128,11 @@ its row is the Launcher's row at pane density — the same four columns at the s
 consistency with the pane; carding the list means carding the Launcher, which is a separate
 decision about a window whose whole job is one keypress.
 
+**[ADR-0014](0014-launcher-rows-are-cards.md) took that decision the other way round:** the
+Launcher's row is carded and this list is not. Parity is now the columns — `ActionCells` and its
+fixed widths — and no longer the geometry. The reason this list stays ruled is the one above: it is
+a list of records inside a pane whose one enclosure is already the card.
+
 `SettingsNav`'s divider and the `StatusBar`'s top border also stay: both are window chrome, not
 pane rules.
 

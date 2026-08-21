@@ -32,7 +32,9 @@
      `--ring` focus border; the darker value survives as `--border-strong`.
    - `--border-strong` is the hover edge, and the only state change a card or a
      control has under the pointer: the line strengthens and nothing fills, so
-     a fill still means "selected" and nothing else.
+     a fill still means "selected" and nothing else. It is also what the
+     Launcher's cards hover to, since `--muted` is the ground they stand on
+     rather than a ground they can move to (ADR-0014).
    - `--ring` is `--primary` rather than the generated grey. shadcn draws the
      ring at `ring/50`, and the generated `0.708` lands at 1.6:1 that way —
      invisible, on the one affordance a keyboard user has. At `--primary` it is
