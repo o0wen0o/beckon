@@ -2,6 +2,7 @@
 // missing credential (ADR-0005). One map for every consumer of a `Failure.kind`
 // — Settings' Connection banner and the Popover's failed turn — so a new kind
 // cannot reach one and miss the other.
+import { CREDENTIAL_STORE } from "./platform";
 import type { Failure } from "./types";
 
 export const FAILURE_PREFIX: Record<string, string> = {
@@ -9,7 +10,7 @@ export const FAILURE_PREFIX: Record<string, string> = {
   network: "Could not reach the API",
   http: "The API refused the request",
   "no-credential": "No API key stored",
-  "read-error": "The Credential Manager could not be read",
+  "read-error": `The ${CREDENTIAL_STORE} could not be read`,
   interrupted: "The answer stopped early",
   empty: "The endpoint listed no models",
   config: "Beckon is not configured for this",

@@ -16,6 +16,7 @@
 import {
   describeError,
   getConfig,
+  getInputPermission,
   getKeyStatus,
   getModels,
   getStartupErrors,
@@ -23,7 +24,7 @@ import {
 } from "../lib/ipc";
 import { SaveSlot, textFocusHeld } from "../lib/saveSlot";
 import { Notifier } from "../lib/store";
-import type { Config, KeyStatus, ModelCatalog } from "../lib/types";
+import type { Config, InputPermission, KeyStatus, ModelCatalog } from "../lib/types";
 
 export type SectionRoute = "connection" | "actions" | "triggering" | "appearance" | "defaults";
 
@@ -38,6 +39,8 @@ class SettingsStore extends Notifier {
   models: ModelCatalog | null = null;
   modelsLoading = false;
   startupErrors: string[] = [];
+  /** `null` until the first answer, so nothing is claimed before it is known. */
+  inputPermission: InputPermission | null = null;
   route: SectionRoute = "connection";
 
   // Transient, and therefore reset on every open (ADR-0007).
@@ -155,6 +158,7 @@ class SettingsStore extends Notifier {
     this.adoptConfig(await getConfig());
     this.keyStatus = await getKeyStatus();
     this.startupErrors = await getStartupErrors();
+    this.inputPermission = await getInputPermission();
 
     if (!this.#routedForKey && this.firstRun) {
       // Only on the first open: yanking someone to Connection every time they
@@ -168,6 +172,13 @@ class SettingsStore extends Notifier {
     // must not wait on it. The dropdown renders from the current value until
     // the catalog lands.
     void this.refreshModels();
+  }
+
+  /** Re-read whenever this window comes back: the switch is thrown outside
+   *  Beckon, in System Settings, and the user returns expecting it to know. */
+  async refreshInputPermission() {
+    this.inputPermission = await getInputPermission();
+    this.notify();
   }
 
   /** Startup errors are re-read on every reload: the tray clears them when the

@@ -9,7 +9,7 @@
 //! live WebView is the most expensive thing in a resident tool. It is built on
 //! first use and kept afterwards.
 
-use tauri::{AppHandle, LogicalSize, PhysicalPosition, WebviewUrl, WebviewWindow};
+use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow};
 
 use crate::platform;
 
@@ -57,10 +57,11 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
     let size = LogicalSize::new(width, height);
     let _ = window.set_size(size);
 
-    let Some(cursor) = platform::cursor::cursor_position() else {
+    let app = window.app_handle();
+    let Some(cursor) = platform::cursor::cursor_position(app) else {
         return;
     };
-    let Some(area) = platform::cursor::work_area_at(cursor.0, cursor.1) else {
+    let Some(area) = platform::cursor::work_area_at(app, cursor.0, cursor.1) else {
         return;
     };
     let Ok(scale) = window.scale_factor() else {
@@ -75,11 +76,12 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
 /// promises the *Popover* is cursor-adjacent, and a centred Launcher is what
 /// every comparable tool does.
 pub(super) fn center_on_active_monitor(window: &WebviewWindow) {
-    let Some(cursor) = platform::cursor::cursor_position() else {
+    let app = window.app_handle();
+    let Some(cursor) = platform::cursor::cursor_position(app) else {
         let _ = window.center();
         return;
     };
-    let Some(area) = platform::cursor::work_area_at(cursor.0, cursor.1) else {
+    let Some(area) = platform::cursor::work_area_at(app, cursor.0, cursor.1) else {
         let _ = window.center();
         return;
     };

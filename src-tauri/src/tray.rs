@@ -1,7 +1,14 @@
-//! Tray icon: the only always-visible part of Beckon.
+//! Tray icon — the Windows notification area, the macOS menu bar: the only
+//! always-visible part of Beckon.
 //!
 //! Two icon states — normal, and error for "a hotkey did not register", which
 //! the README insists must never be silent.
+//!
+//! The icon is **not** a macOS template image, which is the platform's default
+//! for a menu-bar item. A template is rendered from alpha alone, and the two
+//! states here are one silhouette that differs only in accent colour — so
+//! template mode would erase the error state and leave a black squircle
+//! (ADR-0013).
 
 use std::sync::atomic::Ordering;
 
@@ -26,6 +33,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::from_bytes(ICON_NORMAL)?)
+        .icon_as_template(false)
         .tooltip("Beckon")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -35,9 +43,10 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            // Left click opens Settings. On Windows a notification's click
-            // cannot be routed back to us, so the tray icon is the reliable
-            // target for "the error notification says: open Settings".
+            // Left click opens Settings. Neither platform routes a
+            // notification's click back to us reliably, so the tray icon is the
+            // one dependable target for "the error notification says: open
+            // Settings".
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
@@ -78,7 +87,7 @@ pub fn set_error(app: &AppHandle, summary: &str) {
         .builder()
         .title("Beckon: a hotkey is not active")
         .body(format!(
-            "{summary}\n\nClick the Beckon tray icon to open Settings and fix it."
+            "{summary}\n\nClick the Beckon icon to open Settings and fix it."
         ))
         .show();
 }

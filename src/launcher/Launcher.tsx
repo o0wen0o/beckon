@@ -19,6 +19,7 @@ import {
   showSettings,
   Subscriptions,
 } from "@/lib/ipc";
+import { COMMAND_KEY, hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { ActionRow, BrokenRow } from "./ActionRow";
 import { actionStore } from "./actions";
@@ -123,7 +124,7 @@ export function Launcher() {
           move(event.shiftKey ? -1 : 1);
           return;
         case ",":
-          if (event.ctrlKey) {
+          if (hasCommandModifier(event)) {
             event.preventDefault();
             openSettings();
           }
@@ -138,8 +139,10 @@ export function Launcher() {
 
   return (
     // The frameless card fills the window rect exactly, so the shadow under it
-    // is DWM's. The radius matches the ~8px Windows 11 rounds an undecorated
-    // window at; a larger one is clipped and shows as a nick in each corner.
+    // is the compositor's — DWM's or the WindowServer's. The radius matches the
+    // ~8px Windows 11 rounds an undecorated window at, which is close enough to
+    // macOS's own that one value serves both; a larger one is clipped and shows
+    // as a nick in each corner.
     <div className="bg-background flex h-screen flex-col overflow-hidden rounded-lg border">
       <div className="flex h-14 flex-none items-center gap-3 border-b px-4">
         <SearchIcon className="text-muted-quiet size-4.5 flex-none" />
@@ -227,7 +230,7 @@ export function Launcher() {
         <Button
           variant="ghost"
           size="icon-sm"
-          title="Settings (Ctrl+,)"
+          title={`Settings (${COMMAND_KEY},)`}
           aria-label="Settings"
           onClick={openSettings}
         >

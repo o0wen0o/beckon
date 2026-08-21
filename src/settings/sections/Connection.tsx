@@ -14,6 +14,7 @@ import {
   setApiKey,
   testConnection,
 } from "@/lib/ipc";
+import { CREDENTIAL_STORE } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
@@ -60,8 +61,8 @@ export function Connection() {
   return (
     <>
       <PaneHeader title="Connection">
-        Where requests go, and the credential they go with. The key lives in the Windows Credential
-        Manager, never in a file.
+        Where requests go, and the credential they go with. The key lives in the {CREDENTIAL_STORE},
+        never in a file.
       </PaneHeader>
 
       {store.firstRun ? (
@@ -109,7 +110,7 @@ export function Connection() {
                 {/* The one green thing in the window. Everything else on the
                     pane is written to a TOML file as you type (ADR-0003), so
                     nothing else needs — or may have — a commit button. This one
-                    does: the key goes to the Windows Credential Manager, it is
+                    does: the key goes to the OS credential store, it is
                     cleared from the field the moment it lands, and there is no
                     way to read it back to check. So it carries a colour — and
                     it is outlined rather than filled, because Remove sits on
@@ -144,7 +145,7 @@ export function Connection() {
               ) : store.keyStatus?.kind === "read-error" ? (
                 <p className="text-destructive m-0 flex items-start gap-1 text-note">
                   <TriangleAlertIcon className="size-3.5 flex-none" />
-                  The Credential Manager could not be read: {store.keyStatus.message}. Save the key
+                  The {CREDENTIAL_STORE} could not be read: {store.keyStatus.message}. Save the key
                   again to recreate the credential.
                 </p>
               ) : null}

@@ -1,5 +1,5 @@
 {
-  "$schema": "../gen/schemas/windows-schema.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capabilities for the Launcher, Popover and Settings surfaces.",
   "windows": ["launcher", "popover", "settings"],

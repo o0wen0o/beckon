@@ -3,6 +3,7 @@ import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { PaneHeader } from "@/components/PaneHeader";
 import { Segmented } from "@/components/Segmented";
+import { SYSTEM_APPEARANCE } from "@/lib/platform";
 import type { Theme } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
@@ -13,8 +14,7 @@ const THEMES = [
   { value: "system", label: "System", icon: MonitorIcon },
 ] satisfies { value: Theme; label: string; icon: typeof SunIcon }[];
 
-const THEME_HINT =
-  "Beckon starts light unless you say otherwise. “System” is the only setting that reads the Windows preference, and it follows it live.";
+const THEME_HINT = `Beckon starts light unless you say otherwise. “System” is the only setting that reads the ${SYSTEM_APPEARANCE}, and it follows it live.`;
 
 export function Appearance() {
   const store = useStore(settings);

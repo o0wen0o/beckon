@@ -41,7 +41,11 @@ export function SettingsNav() {
     // A file that does not parse, or a Direct Hotkey that lost its conflict:
     // both are only repairable from inside this section.
     actions: actions.flagged ? "bad" : null,
-    triggering: store.startupErrors.length > 0 ? "bad" : null,
+    // A denied Accessibility permission belongs here for the same reason a
+    // hotkey that would not register does: the hotkey fires and nothing
+    // happens, and this is the only pane that explains why (ADR-0013).
+    triggering:
+      store.startupErrors.length > 0 || store.inputPermission === "denied" ? "bad" : null,
     appearance: null,
     defaults: store.models !== null && !store.models.live ? "warn" : null,
   };

@@ -4,24 +4,24 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 
 ## What this is
 
-Beckon is a Windows-only, tray-resident LLM shortcut built on Tauri v2: a Rust backend plus three webview surfaces, all React on shadcn/ui and Tailwind. Press a global hotkey → the Selection is grabbed by simulating Ctrl+C → a preset Action's prompt is sent to a DeepSeek/OpenAI-compatible API → the answer streams into a Popover next to the cursor.
+Beckon is a tray-resident LLM shortcut for Windows and macOS, built on Tauri v2: a Rust backend plus three webview surfaces, all React on shadcn/ui and Tailwind. Press a global hotkey → the Selection is grabbed by simulating the platform's copy shortcut → a preset Action's prompt is sent to a DeepSeek/OpenAI-compatible API → the answer streams into a Popover next to the cursor.
 
 Read before non-trivial changes:
 
 - [README.md](README.md) — MVP scope, out-of-scope list, decided behavior, config/Action TOML schema.
 - [CONTEXT.md](CONTEXT.md) — the ubiquitous language (Action, Input Source, Selection, Launcher, Direct Hotkey, Popover, Exchange) and the words to avoid. Naming in code and UI follows it.
-- [docs/adr/](docs/adr/) — ADR-0001…0012. Modules cite them by number; a change that contradicts one needs a new ADR, not a quiet edit.
+- [docs/adr/](docs/adr/) — ADR-0001…0013. Modules cite them by number; a change that contradicts one needs a new ADR, not a quiet edit.
 
 ## Commands
 
 ```powershell
 npm install                     # once
 npm run tauri dev               # run the app (spawns vite on :1420, then cargo)
-npm run tauri build             # MSI + NSIS bundle
+npm run tauri build             # MSI + NSIS on Windows, .app + .dmg on macOS
 npm run dev                     # vite only, no Rust (webviews will fail on invoke)
 npm run check                   # tsc --noEmit over the frontend
 npx shadcn@latest add <name>    # pull a shadcn/ui component into src/components/ui
-npm run icons                   # re-rasterize src-tauri/icons from assets/*.svg
+npm run icons                   # re-rasterize src-tauri/icons from assets/*.svg (pwsh scripts/gen-icons.ps1 on macOS)
 
 cargo test                      # workspace tests (all in src-tauri)
 cargo test action::tests::slugs_display_names        # one test
@@ -32,11 +32,13 @@ cargo fmt                       # rustfmt.toml: max_width = 100
 
 Tests are `#[cfg(test)]` modules beside the code. Platform- and network-touching code is deliberately untested; `platform::place_near_cursor` and `llm::sse` are pure functions precisely so they *can* be tested.
 
+Half of `src-tauri/src/platform/` does not compile on the machine you are on, whichever machine that is. [.github/workflows/ci.yml](.github/workflows/ci.yml) runs `tsc`, `vite build`, `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` on **both** windows-latest and macos-latest — it is the compiler for the half you cannot build, and a green run on one platform is not evidence about the other (ADR-0013). The `bundle` job is `workflow_dispatch` only.
+
 ## Architecture
 
 ### Rust owns state; the windows are views
 
-[src-tauri/src/state.rs](src-tauri/src/state.rs) holds every authoritative value (`Config`, `Registry`, `ExchangeManager`, `PopoverView`, hotkey bindings, pending Selection, previous foreground HWND). Frontend types in [src/lib/types.ts](src/lib/types.ts) mirror the serde shapes and are never a second source of truth. `PopoverPhase` — the resolution of `input_source` against the grab — is decided in Rust so the rule does not live in two places.
+[src-tauri/src/state.rs](src-tauri/src/state.rs) holds every authoritative value (`Config`, `Registry`, `ExchangeManager`, `PopoverView`, hotkey bindings, pending Selection, previous foreground window or app). Frontend types in [src/lib/types.ts](src/lib/types.ts) mirror the serde shapes and are never a second source of truth. `PopoverPhase` — the resolution of `input_source` against the grab — is decided in Rust so the rule does not live in two places.
 
 `AppState` is built in `load_state()` **before** `tauri::Builder`, because Tauri creates the configured windows during `build()` and a webview can invoke a command before `setup` runs.
 
@@ -85,9 +87,9 @@ Beckon's own compositions live one level up in [src/components/](src/components/
 
 **The Launcher's list and Settings' Actions list are one ruled row; every other pane is cards and the Popover is neither** (ADR-0009, ADR-0010, ADR-0012). Neither window adds a token, keyframe, or line of CSS of its own.
 
-- The Launcher's row is Settings' Actions row at picker density: the same four columns at the same fixed widths, so every Input Source parks at the same x. `SOURCES` / `SOURCE_ICON` / `sourceLabel` live in [lib/inputSource.ts](src/lib/inputSource.ts), the key chip in [components/Kbd.tsx](src/components/Kbd.tsx), and the trailing Input Source / Direct Hotkey / conflict cells in [components/ActionCells.tsx](src/components/ActionCells.tsx) — shared precisely so the two lists cannot drift. The inversion classes on those cells are unconditional; only the Launcher marks a row `aria-selected`.
+- The Launcher's row is Settings' Actions row at picker density: the same four columns at the same fixed widths, so every Input Source parks at the same x. `SOURCES` / `SOURCE_ICON` / `sourceLabel` live in [lib/inputSource.ts](src/lib/inputSource.ts), the key chip in [components/Kbd.tsx](src/components/Kbd.tsx) — drawn through `formatAccelerator` from [lib/platform.ts](src/lib/platform.ts), which is where every word and shortcut that differs between the two platforms lives, for the same reason `inputSource.ts` exists — and the trailing Input Source / Direct Hotkey / conflict cells in [components/ActionCells.tsx](src/components/ActionCells.tsx) — shared precisely so the two lists cannot drift. The inversion classes on those cells are unconditional; only the Launcher marks a row `aria-selected`.
 - The Popover has a fact the pane and picker do not: two speakers. So the side says who, and there is no label column and no hairline. Your input is a `--muted` card capped at 80% on the right, the answer runs left and bare capped at 11/12, and the gap between turns is the separator. **Both caps are proportions of the window** — they are two halves of one symmetry. A failure keeps a `Failed` marker over its sentence; a notice has no side, so the one notice that is an alarm (an Action needing a Selection, with none) is a `Callout` and the other two are ordinary prose at the same size. The three quiet buttons under a turn (reasoning disclosure, clamp toggle, Copy) sit at `--muted-quiet` as one shared constant. The header carries the Action, the model and the way out — and deliberately not the status, which the running turn already reports twice.
-- The frameless windows are `rounded-lg border bg-background` on the root and `bg-transparent` on `<body>`. No `box-shadow`: the card fills the window rect, so the shadow you see is DWM's.
+- The frameless windows are `rounded-lg border bg-background` on the root and `bg-transparent` on `<body>`. No `box-shadow`: the card fills the window rect, so the shadow you see is the compositor's.
 - The waiting indicator and streaming caret are `animate-pulse` with `motion-reduce:animate-none`; the seconds counter beside them is what proves the wait is progressing.
 - The composer grows with `field-sizing-content` between `min-h-9` and `max-h-30`.
 
@@ -117,7 +119,7 @@ The Popover's state machine is driven by events, not return values: `exchange:fi
 
 ### Filesystem is the source of truth ([src-tauri/src/action/](src-tauri/src/action/), [reload.rs](src-tauri/src/reload.rs))
 
-`%APPDATA%\Beckon\config.toml` + `actions\*.toml` (ADR-0003). Every mutation path — watcher event, Settings edit, startup — funnels through `reload::reload_config` / `reload_actions`, which re-read disk, re-derive hotkeys, and broadcast `config-changed` / `actions-changed`. Windows re-render from the snapshot; they never patch their own copy.
+`%APPDATA%\Beckon` on Windows, `~/Library/Application Support/Beckon` on macOS — `config.toml` plus `actions/*.toml` (ADR-0003). Every mutation path — watcher event, Settings edit, startup — funnels through `reload::reload_config` / `reload_actions`, which re-read disk, re-derive hotkeys, and broadcast `config-changed` / `actions-changed`. Windows re-render from the snapshot; they never patch their own copy.
 
 Rules that break subtly if ignored:
 
@@ -126,7 +128,7 @@ Rules that break subtly if ignored:
 - Writes go through `atomic::write_atomic`; the watcher ignores dotfiles/temp files and reloads the whole directory rather than interpreting event kinds.
 - A file that fails to parse is skipped and reported (`Registry::errors`), never fatal; the raw text stays editable via `read_action_raw` / `write_action_raw`.
 - Hotkey registration is **derived state**: `hotkey::apply` unregisters everything and rebuilds from config + registry. Conflicts resolve by filename order, losers land in `hotkey_errors` and are flagged red. Failures are never silent — tray error icon + one-time balloon.
-- The API key is only in the Windows Credential Manager (service `Beckon`, ADR-0005). "No credential", "read error" and "key rejected" must stay three distinguishable outcomes all the way to the UI.
+- The API key is only in the OS credential store — the Windows Credential Manager, the login Keychain on macOS (service `Beckon`, ADR-0005, ADR-0013). "No credential", "read error" and "key rejected" must stay three distinguishable outcomes all the way to the UI.
 - A missing config file or missing field is a default, never an error; a *corrupt* config is reported, never overwritten.
 
 ### The editing surface is an editor, not an owner ([src/settings/](src/settings/))
@@ -148,7 +150,16 @@ Keeping the forms out of the Launcher is what lets `WindowEvent::Focused(false)`
 
 ### Platform isolation ([src-tauri/src/platform/](src-tauri/src/platform/))
 
-All Win32 lives under `platform/windows/`, re-exported through `platform/mod.rs` with non-Windows stubs so the crate still compiles elsewhere (ADR-0001). Do not scatter `#[cfg]` into business logic. `selection.rs` documents the grab's step order — release physically-held modifiers, back up the clipboard, poll `GetClipboardSequenceNumber`, restore, drop the backup — and each step there fixes a specific failure.
+All Win32 lives under `platform/windows/`, all AppKit and CoreGraphics under `platform/macos/`, both re-exported through `platform/mod.rs` alongside `platform/fallback.rs` so the crate still compiles on a third platform (ADR-0001, ADR-0013). Those stubs are not a Linux promise — they are what a leaked `SendInput` or `NSPasteboard` breaks first. Do not scatter `#[cfg]` into business logic.
+
+- Each `selection.rs` documents the grab's step order, and the two are the same order: release physically-held modifiers, back up the clipboard, poll the change counter (`GetClipboardSequenceNumber` / `NSPasteboard.changeCount`), restore, drop the backup. Every step fixes a specific failure, on both.
+- `platform::cursor` is **not** per-platform and that is deliberate (ADR-0013): it asks Tauri, because tao already normalises macOS's bottom-left screen space into the top-left one `set_position` takes, and a second copy of that flip is a second place for it to be wrong.
+- `focus::window_handle` returns an `HWND` on Windows and *our own pid* on macOS, because the unit of focus there is the application. `is_ours` is asking the same question either way.
+- `permission::input_permission` is the one thing with no Windows counterpart: macOS refuses `CGEventPost` **silently** without Accessibility trust, so an empty grab is ambiguous and the state has to be read rather than inferred. Windows answers `NotRequired`, which the UI must treat as "say nothing", not as "granted".
+
+### macOS-only wiring that is easy to break
+
+`macOSPrivateApi` in [tauri.conf.json](src-tauri/tauri.conf.json) plus the `macos-private-api` cargo feature are what make the Launcher and Popover's transparency legal; removing either is a build error on Windows too, by design. `LSUIElement` in [src-tauri/Info.plist](src-tauri/Info.plist) and `ActivationPolicy::Accessory` in `setup` are both needed — the plist stops the Dock tile existing, the policy call is what a `cargo run` gets. Tauri's default macOS menu is left in place because it is the only reason Cmd+C/Cmd+V work in Settings' text fields, and it owns Cmd+Q, which is why `ExitRequested` is not refused on macOS (ADR-0013). The tray icon is explicitly **not** a template image: template mode renders from alpha alone and would erase the error state, which is colour.
 
 ### Icons are generated, not edited ([assets/](assets/))
 
@@ -158,7 +169,7 @@ There are three sources. `assets/logo.svg` is the app icon; its gradients, glow 
 
 ### Adding an IPC command
 
-`#[tauri::command]` in the matching file under [src-tauri/src/commands/](src-tauri/src/commands/) — `config`, `actions`, `secrets`, `models`, `windows` (validate + delegate, keep it thin; `commands/mod.rs` re-exports them flat) → register in `generate_handler!` in [src-tauri/src/main.rs](src-tauri/src/main.rs) → typed wrapper in [src/lib/ipc.ts](src/lib/ipc.ts) → payload type in [src/lib/types.ts](src/lib/types.ts). Any `file_name` arriving over IPC goes through `sanitize_file_name`. Errors are `String` for plain messages, `Failure { kind, message }` when the UI must react by cause.
+`#[tauri::command]` in the matching file under [src-tauri/src/commands/](src-tauri/src/commands/) — `config`, `actions`, `secrets`, `models`, `platform`, `windows` (validate + delegate, keep it thin; `commands/mod.rs` re-exports them flat) → register in `generate_handler!` in [src-tauri/src/main.rs](src-tauri/src/main.rs) → typed wrapper in [src/lib/ipc.ts](src/lib/ipc.ts) → payload type in [src/lib/types.ts](src/lib/types.ts). Any `file_name` arriving over IPC goes through `sanitize_file_name`. Errors are `String` for plain messages, `Failure { kind, message }` when the UI must react by cause.
 
 ## GitNexus
 

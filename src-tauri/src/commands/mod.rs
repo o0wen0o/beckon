@@ -2,19 +2,22 @@
 //! lets the reload path broadcast the result.
 //!
 //! One file per thing being commanded — the config, Actions, the credential,
-//! the model catalog, the windows. The re-exports below keep the surface flat,
-//! so `generate_handler!` in `main.rs` and the wrappers in `src/lib/ipc.ts`
-//! still name `commands::get_config` and never learn which file it lives in.
+//! the model catalog, the platform's permissions, the windows. The re-exports
+//! below keep the surface flat, so `generate_handler!` in `main.rs` and the
+//! wrappers in `src/lib/ipc.ts` still name `commands::get_config` and never
+//! learn which file it lives in.
 
 mod actions;
 mod config;
 mod models;
+mod platform;
 mod secrets;
 mod windows;
 
 pub use self::actions::*;
 pub use self::config::*;
 pub use self::models::*;
+pub use self::platform::*;
 pub use self::secrets::*;
 pub use self::windows::*;
 

@@ -1,6 +1,6 @@
 # Beckon
 
-A background-resident LLM shortcut for Windows: press a hotkey to summon it, send a preset prompt plus your current input to DeepSeek, and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
+A background-resident LLM shortcut for Windows and macOS: press a hotkey to summon it, send a preset prompt plus your current input to DeepSeek, and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
 
 For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see [docs/adr/](./docs/adr/).
 
@@ -8,10 +8,10 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 
 **In scope**
 
-- Lives in the tray, starts with Windows
+- Lives in the tray (the menu bar on macOS), starts with the machine
 - Global hotkey summons the Launcher (a searchable list of Actions)
 - An Action can also be bound to a Direct Hotkey — press it and go straight to the result with zero interaction
-- Simulated Ctrl+C to grab the Selection, with the clipboard restored afterwards
+- The platform's copy shortcut is simulated to grab the Selection — Ctrl+C, or Cmd+C on macOS — with the clipboard restored afterwards
 - Popover near the cursor: takes focus, streams output, supports follow-up turns, closes on Esc
 - Full settings window: API key, global hotkey, theme, global model defaults, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
 - Actions stored as TOML files, with a file watcher that reloads them automatically on external changes
@@ -27,15 +27,17 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 | "Replace the original text" write-back | [ADR-0002](./docs/adr/0002-selection-via-simulated-ctrl-c.md) |
 | Auto-popping a small icon after selecting text (PopClip style) | Requires globally polling the selection — power-hungry, easy to trigger by accident, and it fights the Ctrl+C grab approach |
 | Token usage display | A flash translation costs a fraction of a cent; seeing the number changes nothing |
-| macOS / Linux | [ADR-0001](./docs/adr/0001-tauri-v2-on-windows-only.md), but platform-specific code must stay isolated |
+| Linux | [ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md) ports the platform layer to macOS; nobody has asked for a third. The stubs in `platform/fallback.rs` keep the crate compiling elsewhere, and are not a promise |
+| Code signing and notarization | Not set up on either platform. On macOS this is the difference between "runs on the machine that built it" and "runs on anyone else's" — see ADR-0013 |
 
 ## Decided behavior
 
 **Triggering and grabbing text**
 
-- The global hotkey defaults to `Ctrl+Alt+Space`. This avoids Microsoft Pinyin's `Ctrl+Space` (Chinese/English toggle), `Shift+Space` (full-width/half-width), and `Win+Space` (switch IME), as well as `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools).
+- The global hotkey defaults to `Ctrl+Alt+Space` on Windows and `Cmd+Shift+Space` on macOS, because the conflicts differ: macOS ships `Ctrl+Option+Space` as "select the next input source". The Windows choice avoids Microsoft Pinyin's `Ctrl+Space` (Chinese/English toggle), `Shift+Space` (full-width/half-width), and `Win+Space` (switch IME), as well as `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools).
 - If the grab comes back empty, handle it according to the Action's `input_source` — this is **not an error**: `selection` shows a hint and sends no request, `auto` falls through to the input box.
-- The Popover always takes focus. Remember the previous foreground window handle before showing it, and hand focus back on close.
+- The Popover always takes focus. Remember what was in front before showing it — the window on Windows, the application on macOS — and hand focus back on close.
+- On macOS the grab needs Accessibility permission, and the OS refuses it **silently**: the Selection just comes back empty. Settings reads the permission directly and says so, with a link to the pane; the hotkey itself still fires either way.
 
 **Failure and waiting**
 
@@ -50,28 +52,31 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - When recording a hotkey in the settings window, **attempt to register it immediately**; if it is taken, flag it red on the spot and refuse to save a hotkey that cannot be registered.
 - A hotkey registration failure at startup is never silent: the tray icon switches to an error state plus a one-time balloon notification that opens settings when clicked.
 - The model is **chosen from a list, not typed**. The list is the endpoint's own `/v1/models` response when a key is stored and the request succeeds, and the officially documented DeepSeek models otherwise — no credential, a rejected key or a dead network downgrades the list and says why, but never empties it. A model already named in `config.toml` or in an Action stays selectable even when nothing vouches for it, flagged rather than rewritten.
-- On first run (no key readable from the Credential Manager), open the settings window directly, including a "Test connection" button — it sends a minimal request to verify the key and `base_url` on the spot.
+- On first run (no key readable from the credential store), open the settings window directly, including a "Test connection" button — it sends a minimal request to verify the key and `base_url` on the spot.
 - On first run, if `actions/` does not exist, write two example Actions (one `selection` type and one `prompt` type) covering both main paths. Once deleted, they are not regenerated.
-- The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose Windows app theme is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
+- The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose OS appearance is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
 
 ## Config file layout
 
 ```
-%APPDATA%\Beckon\
+%APPDATA%\Beckon\                        # Windows
+~/Library/Application Support/Beckon/    # macOS
 ├── config.toml        # global hotkey, autostart, theme, base_url, global model defaults
-└── actions\
+└── actions/
     ├── translate.toml
     └── ask.toml
 ```
 
-The API key is **not here** — it lives in the Windows Credential Manager under the service name `Beckon` ([ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md)). There is no plaintext secret file anywhere on disk.
+The API key is **not here** — it lives in the OS credential store (the Windows Credential Manager, or the login Keychain on macOS) under the service name `Beckon` ([ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md)). There is no plaintext secret file anywhere on disk.
+
+A config directory copies between the two platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super` all parse on both. Only the *defaults* differ, and only where a stock machine would refuse to register them.
 
 An Action's **identity is its filename**; the `name` field is only for display.
 
 ### config.toml
 
 ```toml
-launcher_hotkey = "Ctrl+Alt+Space"
+launcher_hotkey = "Ctrl+Alt+Space"   # "Cmd+Shift+Space" is the macOS default
 autostart = true
 theme = "light"                 # light | dark | system
 
@@ -118,6 +123,8 @@ thinking = true
 
 ## Tech stack
 
-Tauri v2 (Rust + web UI). For the reasoning and the rejected alternatives, see [ADR-0001](./docs/adr/0001-tauri-v2-on-windows-only.md).
+Tauri v2 (Rust + web UI). For the reasoning and the rejected alternatives, see [ADR-0001](./docs/adr/0001-tauri-v2-on-windows-only.md); for the macOS port and what it changed, [ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md).
+
+Both platforms are built on every push by [.github/workflows/ci.yml](./.github/workflows/ci.yml). Half of `src-tauri/src/platform/` cannot be compiled on a Windows machine and half cannot be compiled on a Mac, so a green build on one is not evidence about the other. What a compiler cannot check is in [docs/macos-testing.md](./docs/macos-testing.md), along with the one Windows behaviour the port touched.
 
 DeepSeek is accessed via the OpenAI-compatible format at `https://api.deepseek.com`. Current models are `deepseek-v4-flash` / `deepseek-v4-pro`, 1M context, with **thinking mode on by default** — which is why `thinking = false` exists in the global defaults: leaving thinking on for translation-type Actions adds several seconds of latency and a pile of reasoning tokens for nothing. The legacy names `deepseek-chat` / `deepseek-reasoner` were discontinued on 2026-07-24; Beckon still recognises them so an old config keeps working, but does not offer them.

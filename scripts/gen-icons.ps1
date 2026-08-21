@@ -11,10 +11,15 @@
 
     Rasterizing is done by `tauri icon`, which is already a devDependency, so
     this adds no toolchain. Two passes are needed for the app icon, because only
-    the default pass emits icon.ico and only a --png pass can ask for 256.
+    the default pass emits icon.ico and icon.icns, and only a --png pass
+    can ask for 256.
 
-    Everything else `tauri icon` writes (icns, Microsoft Store logos, android,
-    ios) is for platforms Beckon does not target and is left in the temp dir.
+    Everything else `tauri icon` writes (Microsoft Store logos, android, ios) is
+    for platforms Beckon does not target and is left in the temp dir.
+
+    PowerShell rather than Node only because that is what the repo already had;
+    `pwsh scripts/gen-icons.ps1` runs it on macOS, and both bundlers' icons come
+    out of the one pass.
 #>
 [CmdletBinding()]
 param()
@@ -65,6 +70,7 @@ try {
         '128x128@2x.png'  = Join-Path $full '128x128@2x.png'
         '256x256.png'     = Join-Path $px256 '256x256.png'
         'icon.ico'        = Join-Path $full 'icon.ico'
+        'icon.icns'       = Join-Path $full 'icon.icns'
         'tray-normal.png' = Join-Path $tray '32x32.png'
         'tray-error.png'  = Join-Path $trayError '32x32.png'
     }

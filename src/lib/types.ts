@@ -48,7 +48,7 @@ export interface RegistrySnapshot {
   hotkey_errors: Record<string, string>;
 }
 
-/** `system` follows the Windows app theme; `light` is what an absent setting is. */
+/** `system` follows the OS appearance; `light` is what an absent setting is. */
 export type Theme = "light" | "dark" | "system";
 
 export interface Config {
@@ -63,6 +63,16 @@ export type KeyStatus =
   | { kind: "present"; last4: string }
   | { kind: "no-credential" }
   | { kind: "read-error"; message: string };
+
+/**
+ * Whether the OS will let Beckon synthesise the copy keystroke the Selection is
+ * grabbed with (ADR-0002, ADR-0013).
+ *
+ * `not-required` is Windows, and is not the same statement as `granted`: there
+ * is nothing to grant, so Settings says nothing rather than reporting a
+ * permission the user has never heard of.
+ */
+export type InputPermission = "not-required" | "granted" | "denied";
 
 /** What a model does with thinking mode; `null` when Beckon knows nothing. */
 export type ThinkingSupport = "switchable" | "always-on" | "never";

@@ -4,6 +4,7 @@
 // belong to the window rather than to a field.
 import * as React from "react";
 import { hidePopover, Subscriptions } from "@/lib/ipc";
+import { hasCommandModifier, IS_MAC } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { Callout } from "@/components/Callout";
 import { Kbd } from "@/components/Kbd";
@@ -59,7 +60,7 @@ export function Popover() {
       }
       // Copy is the only export path, so it gets a shortcut that works while
       // the composer has focus.
-      if (event.key.toLowerCase() === "c" && event.ctrlKey && event.shiftKey) {
+      if (event.key.toLowerCase() === "c" && hasCommandModifier(event) && event.shiftKey) {
         const current = exchange.current;
         if (!current?.answer) return;
         event.preventDefault();
@@ -75,7 +76,7 @@ export function Popover() {
 
   return (
     // The frameless card fills the window rect exactly, so the drop shadow
-    // under it is DWM's rather than one painted here.
+    // under it is the compositor's rather than one painted here.
     <div className="bg-background flex h-screen flex-col overflow-hidden rounded-lg border">
       <PopoverHeader
         actionName={view?.action_name ?? "Beckon"}
@@ -106,7 +107,12 @@ export function Popover() {
             <p>
               <strong>{view?.action_name}</strong> works on a Selection, and nothing was selected.
             </p>
-            <p>Select some text and press the hotkey again. Elevated windows cannot be read at all.</p>
+            <p>
+              Select some text and press the hotkey again.{" "}
+              {IS_MAC
+                ? "Without Accessibility permission nothing can be read at all — Settings says so if that is what happened."
+                : "Elevated windows cannot be read at all."}
+            </p>
           </Callout>
         ) : store.notice === "awaiting-input" ? (
           // Body size and a bold name, matching `Callout`: all three notices

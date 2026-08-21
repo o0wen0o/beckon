@@ -79,6 +79,8 @@ fn main() {
             commands::test_connection,
             commands::get_models,
             commands::probe_hotkey,
+            commands::get_input_permission,
+            commands::open_input_permission_settings,
             commands::get_popover_view,
             commands::pick_action,
             commands::submit_input,
@@ -122,8 +124,15 @@ fn main() {
     app.run(|_app, event| {
         // No window is ever "the last window": Beckon lives in the tray and
         // quits only from the tray menu.
+        //
+        // macOS is the exception, and deliberately so (ADR-0013). Tauri fits
+        // every macOS app with a default menu — which is the only reason Cmd+C
+        // and Cmd+V work in Settings' text fields at all — and that menu owns
+        // Cmd+Q. Every source of an exit request there is a person asking to
+        // quit: Cmd+Q, the Dock, or logging out. There is no window-count exit
+        // to guard against, because every window refuses to close.
         if let RunEvent::ExitRequested { api, code, .. } = event {
-            if code.is_none() {
+            if code.is_none() && !cfg!(target_os = "macos") {
                 api.prevent_exit();
             }
         }
@@ -133,7 +142,7 @@ fn main() {
 /// Everything a window can query, prepared before the first window exists:
 /// seed the examples, read config and Actions, and build the state.
 fn load_state() -> AppState {
-    let paths = Paths::resolve().expect("could not locate %APPDATA%");
+    let paths = Paths::resolve().expect("could not locate the application-data directory");
     if let Err(err) = std::fs::create_dir_all(&paths.root) {
         // Without a config directory there is nothing to configure, but the
         // Settings window can still explain itself — so this is not fatal.
@@ -156,6 +165,13 @@ fn load_state() -> AppState {
 }
 
 fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std::error::Error>> {
+    // Beckon lives in the menu bar, so it is an accessory: no Dock tile, no
+    // Cmd+Tab entry, and — the part that matters — the Launcher can take focus
+    // without a Dock icon bouncing into view first. This is the macOS half of
+    // what `windows_subsystem = "windows"` does at the top of this file.
+    #[cfg(target_os = "macos")]
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
     let handle = app.handle().clone();
     let (paths, self_writes) = {
         let state = handle.state::<AppState>();

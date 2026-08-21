@@ -53,6 +53,10 @@ export function Settings() {
     actionStore.flush();
   }, []);
 
+  const recheckPermission = React.useCallback(() => {
+    void settings.refreshInputPermission();
+  }, []);
+
   React.useEffect(() => {
     // The first open builds the window, so `settings:opened` fires before
     // anything is listening — this component always loads itself.
@@ -88,11 +92,15 @@ export function Settings() {
 
     // The window can be hidden mid-edit; a blur is the last chance to write.
     window.addEventListener("blur", flush);
+    // Coming back is the signal that the Accessibility switch may have moved:
+    // it is thrown in System Settings, and nothing tells us when (ADR-0013).
+    window.addEventListener("focus", recheckPermission);
     return () => {
       window.removeEventListener("blur", flush);
+      window.removeEventListener("focus", recheckPermission);
       void subscriptions.dispose();
     };
-  }, [flush]);
+  }, [flush, recheckPermission]);
 
   const pendingDelete = actions.pendingDelete;
   const Pane = PANES[store.route];

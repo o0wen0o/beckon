@@ -4,6 +4,9 @@ import { FieldGroup } from "@/components/FieldGroup";
 import { HotkeyInput } from "@/components/HotkeyInput";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
+import { Button } from "@/components/ui/button";
+import { openInputPermissionSettings } from "@/lib/ipc";
+import { AUTOSTART_LABEL, TRAY } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
@@ -36,6 +39,34 @@ export function Triggering() {
         </Callout>
       ) : null}
 
+      {/* The one thing a hotkey can be registered for and still do nothing:
+          macOS drops the synthetic copy silently without Accessibility trust,
+          so an Action reading the Selection returns an empty grab and looks
+          broken (ADR-0013). `not-required` — every Windows run — says nothing
+          at all, and neither does `null`, which is only "not asked yet". */}
+      {store.inputPermission === "denied" ? (
+        <Callout tone="danger">
+          <p>
+            <strong>Beckon cannot read the Selection.</strong> Grabbing it means sending a Cmd+C to
+            whatever is in front, and macOS allows that only for an app you have trusted under
+            Privacy &amp; Security → Accessibility.
+          </p>
+          <p>
+            Hotkeys still fire and Actions that ask you to type still work. Turn Beckon on in the
+            list, then come back to this window.
+          </p>
+          <p>
+            <Button
+              variant="link"
+              className="h-auto p-0 underline"
+              onClick={() => void openInputPermissionSettings()}
+            >
+              Open Accessibility settings
+            </Button>
+          </p>
+        </Callout>
+      ) : null}
+
       {config ? (
         <FieldGroup title="Summoning">
           <Field
@@ -46,14 +77,14 @@ export function Triggering() {
           </Field>
 
           <Field
-            label="Start with Windows"
-            hint="Beckon lives in the tray; starting with Windows is the point."
+            label={AUTOSTART_LABEL}
+            hint={`Beckon lives in the ${TRAY}; starting with the machine is the point.`}
           >
             {({ id, describedBy }) => (
               <OnOffSwitch
                 id={id}
                 describedBy={describedBy}
-                label="Start with Windows"
+                label={AUTOSTART_LABEL}
                 checked={config.autostart}
                 onChange={(on) => store.editConfig((draft) => (draft.autostart = on), true)}
               />

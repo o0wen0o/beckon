@@ -10,6 +10,7 @@ import type {
   ErrorPayload,
   ExchangeIdPayload,
   Failure,
+  InputPermission,
   InterruptedPayload,
   KeyStatus,
   ModelCatalog,
@@ -55,6 +56,14 @@ export const getModels = (live: boolean) => invoke<ModelCatalog>("get_models", {
 // --- hotkeys --------------------------------------------------------------
 
 export const probeHotkey = (accelerator: string) => invoke<void>("probe_hotkey", { accelerator });
+
+// --- platform -------------------------------------------------------------
+
+/** Only macOS ever answers anything but `not-required`; see `InputPermission`. */
+export const getInputPermission = () => invoke<InputPermission>("get_input_permission");
+/** Opens a constant URL — the pane that grants it. */
+export const openInputPermissionSettings = () =>
+  invoke<void>("open_input_permission_settings");
 
 // --- windows and exchanges ------------------------------------------------
 

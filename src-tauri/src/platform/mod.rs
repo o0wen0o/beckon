@@ -1,55 +1,53 @@
-//! Platform facade (ADR-0001).
+//! Platform facade (ADR-0001, ADR-0013).
 //!
-//! Everything Win32 lives under `windows/`. The rest of the app calls the
-//! functions re-exported here, so porting means adding a sibling directory, not
-//! chasing `#[cfg]` through business logic.
+//! Every Win32 call lives under `windows/` and every AppKit/CoreGraphics call
+//! under `macos/`. The rest of the app calls the functions re-exported here, so
+//! adding a third platform means adding a sibling directory, not chasing
+//! `#[cfg]` through business logic.
 //!
-//! The geometry below is deliberately platform-free: it is the one part of this
+//! Two things are deliberately *not* per-platform: `cursor`, which Tauri
+//! already normalises for us, and the geometry below, which is the part of this
 //! layer that can be unit-tested.
+
+use serde::Serialize;
+
+pub mod cursor;
 
 #[cfg(windows)]
 mod windows;
-
 #[cfg(windows)]
-pub use self::windows::{cursor, focus, selection};
+pub use self::windows::{focus, permission, selection};
 
-#[cfg(not(windows))]
-pub mod cursor {
-    //! Non-Windows stub: the app is Windows-only for now (ADR-0001), but the
-    //! code must still compile elsewhere so the isolation stays honest.
-    use super::WorkArea;
-    pub fn cursor_position() -> Option<(i32, i32)> {
-        None
-    }
-    pub fn work_area_at(_x: i32, _y: i32) -> Option<WorkArea> {
-        None
-    }
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use self::macos::{focus, permission, selection};
+
+#[cfg(not(any(windows, target_os = "macos")))]
+mod fallback;
+#[cfg(not(any(windows, target_os = "macos")))]
+pub use self::fallback::{focus, permission, selection};
+
+/// Whether the OS will let Beckon synthesise the copy keystroke ADR-0002 is
+/// built on.
+///
+/// Windows asks nobody, so it answers `NotRequired` rather than `Granted`: the
+/// UI has to be able to say nothing about a permission that does not exist.
+/// macOS gates `CGEventPost` behind Accessibility, and refuses it *silently* —
+/// which is why this is surfaced instead of inferred from an empty grab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+// The other two variants are unreachable where nothing has to be granted, but
+// they are part of the shape the frontend switches on either way.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub enum InputPermission {
+    NotRequired,
+    Granted,
+    Denied,
 }
 
-#[cfg(not(windows))]
-pub mod focus {
-    pub fn foreground_window() -> Option<isize> {
-        None
-    }
-    pub fn window_handle(_window: &tauri::WebviewWindow) -> Option<isize> {
-        None
-    }
-    pub fn restore_foreground(_hwnd: isize) -> bool {
-        false
-    }
-}
-
-#[cfg(not(windows))]
-pub mod selection {
-    pub fn grab_selection() -> Option<String> {
-        None
-    }
-    pub fn write_clipboard_text(_text: &str) -> Result<(), String> {
-        Err("clipboard access is only implemented on Windows".to_string())
-    }
-}
-
-/// A monitor's usable area in physical pixels (taskbar excluded).
+/// A monitor's usable area in physical pixels (taskbar, Dock and menu bar
+/// excluded).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkArea {
     pub x: i32,
@@ -150,5 +148,25 @@ mod tests {
             height: 1040,
         };
         assert_eq!(place_near_cursor((-1800, 100), POPOVER, left), (-1788, 112));
+    }
+
+    /// A macOS work area starts below the menu bar, so the origin is not the
+    /// screen's — the same case as a secondary monitor, and the reason nothing
+    /// here may assume `area.y == 0`.
+    #[test]
+    fn a_work_area_inset_from_the_screen_top_is_respected() {
+        let mac = WorkArea {
+            x: 0,
+            y: 38,
+            width: 1512,
+            height: 892,
+        };
+        assert_eq!(place_near_cursor((10, 10), POPOVER, mac), (22, 38));
+    }
+
+    #[test]
+    fn serialises_the_permission_with_a_discriminant() {
+        let json = serde_json::to_string(&InputPermission::NotRequired).unwrap();
+        assert_eq!(json, r#""not-required""#);
     }
 }

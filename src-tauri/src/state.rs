@@ -17,7 +17,8 @@ use crate::config::Config;
 use crate::exchange::ExchangeManager;
 use crate::hotkey::HotkeyState;
 
-/// `%APPDATA%\Beckon\` and the two paths inside it (README).
+/// The Beckon directory and the two paths inside it (README): `%APPDATA%\Beckon\`
+/// on Windows, `~/Library/Application Support/Beckon/` on macOS.
 #[derive(Debug, Clone)]
 pub struct Paths {
     pub root: PathBuf,
@@ -27,21 +28,52 @@ pub struct Paths {
 
 impl Paths {
     /// Deliberately *not* Tauri's identifier-derived config dir: the README
-    /// promises `%APPDATA%\Beckon`.
+    /// promises a directory named after the app, not after `com.beckon.app`.
     ///
     /// Read straight from the environment rather than through `AppHandle`,
     /// because the state has to exist *before* the first window is created — a
     /// webview starts loading the moment it exists and can invoke a command
     /// before `setup` would have run.
     pub fn resolve() -> Result<Self, String> {
-        let appdata = std::env::var_os("APPDATA")
-            .ok_or_else(|| "APPDATA is not set; cannot locate the config directory".to_string())?;
-        let root = PathBuf::from(appdata).join("Beckon");
+        let root = Self::root()?.join("Beckon");
         Ok(Self {
             config_file: root.join("config.toml"),
             actions_dir: root.join("actions"),
             root,
         })
+    }
+
+    /// The per-user application-data directory Beckon's own folder sits in.
+    ///
+    /// Each platform names one place a resident tool's editable config belongs,
+    /// and it is the place its users already know to look — so this is a lookup
+    /// per platform, not one path with substitutions (ADR-0013).
+    fn root() -> Result<PathBuf, String> {
+        #[cfg(windows)]
+        {
+            std::env::var_os("APPDATA")
+                .map(PathBuf::from)
+                .ok_or_else(|| "APPDATA is not set; cannot locate the config directory".to_string())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            std::env::var_os("HOME")
+                .map(|home| {
+                    PathBuf::from(home)
+                        .join("Library")
+                        .join("Application Support")
+                })
+                .ok_or_else(|| "HOME is not set; cannot locate the config directory".to_string())
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
+        {
+            std::env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config"))
+                })
+                .ok_or_else(|| "HOME is not set; cannot locate the config directory".to_string())
+        }
     }
 }
 

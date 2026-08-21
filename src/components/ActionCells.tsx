@@ -8,6 +8,7 @@ import { TriangleAlertIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/Kbd";
 import { SOURCE_ICON, sourceLabel } from "@/lib/inputSource";
+import { formatAccelerator } from "@/lib/platform";
 import type { InputSource } from "@/lib/types";
 
 /** Outlined like the working chip beside it: still the Action's hotkey, just an
@@ -48,11 +49,11 @@ export function HotkeyCell({
         // Mono, so it takes 0.92em from the base layer and stays level with
         // the registered chip rather than a step above it.
         <Badge variant="outline" title={conflict} className={`${DANGER_CHIP} font-mono`}>
-          <TriangleAlertIcon className="size-3" /> {hotkey}
+          <TriangleAlertIcon className="size-3" /> {formatAccelerator(hotkey ?? "")}
         </Badge>
       ) : hotkey ? (
         <Kbd className="group-aria-selected:border-current/30 group-aria-selected:bg-transparent group-aria-selected:text-primary-foreground/70">
-          {hotkey}
+          {formatAccelerator(hotkey)}
         </Kbd>
       ) : null}
     </span>

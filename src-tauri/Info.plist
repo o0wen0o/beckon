@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the generated Info.plist by tauri-build (macOS only).
+
+  LSUIElement is the bundle-level half of `set_activation_policy(Accessory)` in
+  main.rs: the policy call makes Beckon an accessory once it is running, but a
+  Dock tile still appears for the instant before `setup` executes. Declaring it
+  here means the tile never exists at all. Both are kept, because a build that
+  loses this file must not silently gain a Dock icon.
+-->
+<plist version="1.0">
+  <dict>
+    <key>LSUIElement</key>
+    <true/>
+  </dict>
+</plist>

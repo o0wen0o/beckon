@@ -53,6 +53,14 @@ impl ApplyReport {
     }
 }
 
+/// The modifiers named in the "add one" message. Only the wording differs: the
+/// parser takes `Ctrl`, `Alt`, `Shift`, `Cmd`/`Super` on both platforms, so a
+/// config written on one machine still registers on the other.
+#[cfg(not(target_os = "macos"))]
+const MODIFIER_ADVICE: &str = "add Ctrl, Alt or Shift";
+#[cfg(target_os = "macos")]
+const MODIFIER_ADVICE: &str = "add Cmd, Control, Option or Shift";
+
 /// Parse the README's `"Ctrl+Alt+Space"` form.
 ///
 /// A bare key with no modifier is rejected: registering `T` globally would
@@ -66,7 +74,7 @@ pub fn parse(accelerator: &str) -> Result<Shortcut, String> {
         .map_err(|e| format!("\"{accelerator}\" is not a valid hotkey: {e}"))?;
     if shortcut.mods.is_empty() {
         return Err(format!(
-            "\"{accelerator}\" has no modifier; add Ctrl, Alt or Shift"
+            "\"{accelerator}\" has no modifier; {MODIFIER_ADVICE}"
         ));
     }
     Ok(shortcut)
@@ -197,6 +205,22 @@ mod tests {
     fn parses_a_direct_hotkey() {
         assert!(parse("Ctrl+Alt+T").is_ok());
         assert!(parse("Ctrl+Shift+F12").is_ok());
+    }
+
+    /// Every spelling of the Command/Super modifier parses on both platforms,
+    /// which is what makes a `config.toml` portable between them (ADR-0013).
+    #[test]
+    fn every_spelling_of_the_command_modifier_parses() {
+        let cmd = parse("Cmd+Shift+Space").unwrap();
+        assert_eq!(cmd, parse("Command+Shift+Space").unwrap());
+        assert_eq!(cmd, parse("Super+Shift+Space").unwrap());
+    }
+
+    /// Both platform defaults have to survive this function, or first run is
+    /// the tray's error icon.
+    #[test]
+    fn the_shipped_default_registers_as_a_shortcut() {
+        assert!(parse(crate::config::DEFAULT_LAUNCHER_HOTKEY).is_ok());
     }
 
     #[test]

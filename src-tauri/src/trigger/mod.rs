@@ -2,7 +2,8 @@
 //!
 //! Both paths share one grab, and the grab happens **before any window of ours
 //! is shown** (needs ADR-0006): once the Launcher has focus, the foreground
-//! window is Beckon, and a Ctrl+C sent then would copy from the wrong process.
+//! window is Beckon, and the copy shortcut sent then would reach the wrong
+//! process.
 //!
 //! This file is the flow and nothing else. [`window`] owns creating, sizing and
 //! placing the three windows; [`foreground`] owns remembering and handing back

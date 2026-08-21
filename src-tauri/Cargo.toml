@@ -1,7 +1,7 @@
 [package]
 name = "beckon"
 version = "0.1.0"
-description = "A background-resident LLM shortcut for Windows"
+description = "A background-resident LLM shortcut for Windows and macOS"
 edition = "2021"
 rust-version = "1.77"
 default-run = "beckon"
@@ -10,7 +10,14 @@ default-run = "beckon"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# `macos-private-api` is what makes a transparent window legal on macOS; the
+# Launcher and Popover are frameless cards over a transparent `<body>` on both
+# platforms (ADR-0013). It is inert on Windows.
+tauri = { version = "2", features = [
+    "tray-icon",
+    "image-png",
+    "macos-private-api",
+] }
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
@@ -34,10 +41,13 @@ reqwest = { version = "0.12", default-features = false, features = [
 # `notify` itself is used through the debouncer's re-export, so the two can
 # never drift onto incompatible versions.
 notify-debouncer-full = "0.5"
-keyring = { version = "3", features = ["windows-native"] }
+# The backend is chosen per target below; keyring's own default is a store that
+# refuses every operation, which is what a third platform would get.
+keyring = { version = "3", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
+keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -45,6 +55,17 @@ windows = { version = "0.61", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The login Keychain, the AppKit half of `platform/macos/`, and CoreGraphics for
+# the synthetic Cmd+C. Default features are left on deliberately: the objc2
+# crates gate every class behind its own feature, and a missing one is a link
+# error nobody on a Windows machine can see.
+keyring = { version = "3", features = ["apple-native"] }
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = "0.3"
+core-graphics = "0.24"
 
 [dev-dependencies]
 tempfile = "3"

@@ -22,9 +22,9 @@ export type Write = () => Promise<void>;
  * Read from the DOM as the event arrives rather than tracked in flags, which
  * only ever cover the fields that existed when they were written.
  *
- * `document.hasFocus()` matters on Windows: `activeElement` survives the window
- * losing OS focus, so without it an external edit made while Beckon is in the
- * background would never be adopted at all.
+ * `document.hasFocus()` is what makes this an *and*: `activeElement` survives
+ * the window losing OS focus, so without it an external edit made while Beckon
+ * is in the background would never be adopted at all.
  *
  * Selects, checkboxes and buttons deliberately do not count — they commit
  * immediately, so a snapshot arriving under one is never a surprise.

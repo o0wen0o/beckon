@@ -1,4 +1,16 @@
+---
+status: accepted
+---
+
 # Obtain the Selection by simulating Ctrl+C and hijacking the clipboard
+
+**Extended by [ADR-0013](0013-support-macos-alongside-windows.md):** read "Ctrl+C" as "the
+platform's copy shortcut" throughout — Cmd+C on macOS, posted with `CGEventPost`, with
+`NSPasteboard.changeCount` standing in for the clipboard sequence number. Every consequence below
+survives the substitution unchanged, and one is added: macOS gates the synthetic keystroke behind
+Accessibility trust and refuses it *silently*, which is indistinguishable from the empty grab this
+ADR already treats as normal. So the permission is read directly and reported, rather than
+inferred from a grab that came back empty.
 
 Windows has no clean, universal API for "read the text the user currently has selected." Our approach: back up the existing clipboard → send Ctrl+C to the foreground window → read the clipboard → restore the original contents. This is what mature tools such as Bob and PopClip all do, and its compatibility covers nearly every application.
 

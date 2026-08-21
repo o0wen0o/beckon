@@ -6,6 +6,7 @@ import { KeyboardIcon, XIcon } from "lucide-react";
 import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
 import { describeError, probeHotkey } from "@/lib/ipc";
+import { formatAccelerator, IS_MAC } from "@/lib/platform";
 
 interface HotkeyInputProps {
   value: string | null;
@@ -57,7 +58,7 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
               error !== null ? "border-destructive/60 text-destructive tabular-nums" : "tabular-nums"
             }
           >
-            {value}
+            {formatAccelerator(value)}
           </Kbd>
         ) : null}
         <Button
@@ -105,12 +106,18 @@ function toAccelerator(
   if (event.ctrlKey) mods.push("Ctrl");
   if (event.altKey) mods.push("Alt");
   if (event.shiftKey) mods.push("Shift");
-  if (event.metaKey) mods.push("Super");
+  // "Cmd" and "Super" are the same modifier to the parser on both platforms, so
+  // this is only about which one a person reading `config.toml` expects to see.
+  if (event.metaKey) mods.push(IS_MAC ? "Cmd" : "Super");
 
   const key = keyName(event.code);
   if (!key) return null;
   if (mods.length === 0) {
-    setError("Add Ctrl, Alt or Shift — a bare key would fire everywhere.");
+    setError(
+      IS_MAC
+        ? "Add Cmd, Control, Option or Shift — a bare key would fire everywhere."
+        : "Add Ctrl, Alt or Shift — a bare key would fire everywhere.",
+    );
     return null;
   }
   return [...mods, key].join("+");

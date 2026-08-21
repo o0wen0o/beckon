@@ -1,4 +1,13 @@
+---
+status: accepted
+---
+
 # Build on Tauri v2, and support only Windows in the first release
+
+**Superseded on the scope half by [ADR-0013](0013-support-macos-alongside-windows.md):** Beckon
+ships on macOS as well. The stack decision below stands unchanged, and so does the condition it
+was made under — platform-specific code stays concentrated in `src-tauri/src/platform/`, which is
+what made the port three files rather than an archaeology project.
 
 This is a tool that starts with the system and sits in the background all day, so memory footprint and startup speed decide whether it can be tolerated long-term — Electron's resident 150–300MB is too heavy for this role. Tauri v2 uses the system WebView, sits at around 30MB resident with an installer of a few MB, and its official global-shortcut, tray, clipboard, and autostart plugins cover nearly every native need this project has.
 

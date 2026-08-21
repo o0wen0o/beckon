@@ -1,8 +1,11 @@
-//! The API key, in the Windows Credential Manager (ADR-0005).
+//! The API key, in the OS credential store (ADR-0005, ADR-0013): the Windows
+//! Credential Manager, or the login Keychain on macOS. `keyring` picks the
+//! backend per target and the service/account pair is the same on both, so
+//! nothing above this module knows which store it is talking to.
 //!
 //! The three outcomes below must stay distinguishable all the way to the UI:
 //! "no credential" guides the user through reconfiguration, a read error points
-//! at the Credential Manager, and neither may ever be shown as "your key is
+//! at the credential store, and neither may ever be shown as "your key is
 //! invalid".
 
 use keyring::Entry;
@@ -19,7 +22,7 @@ pub enum KeyStatus {
     Present { last4: String },
     /// Nothing stored: this is the first-run condition (README, ADR-0005).
     NoCredential,
-    /// The Credential Manager itself failed.
+    /// The credential store itself failed.
     ReadError { message: String },
 }
 

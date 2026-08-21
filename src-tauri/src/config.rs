@@ -10,7 +10,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::atomic::write_atomic;
 
+/// The Launcher's out-of-the-box hotkey.
+///
+/// It differs per platform because the *conflicts* do: macOS ships
+/// Ctrl+Option+Space as "select the next input source", so the Windows default
+/// would fail to register on a stock Mac and the first thing a new user would
+/// see is the tray's error icon.
+#[cfg(not(target_os = "macos"))]
 pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Ctrl+Alt+Space";
+#[cfg(target_os = "macos")]
+pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Cmd+Shift+Space";
+
 pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
 pub const DEFAULT_MODEL: &str = "deepseek-v4-flash";
 pub const DEFAULT_TEMPERATURE: f64 = 1.3;
@@ -30,7 +40,7 @@ pub struct Config {
 /// Which palette the three surfaces paint in.
 ///
 /// `Light` is the default, so an absent `theme` resolves to light like every
-/// other missing field. `System` reads the Windows app theme — but only once it
+/// other missing field. `System` reads the OS appearance — but only once it
 /// has been *chosen*: the OS preference never applies on its own, which is why
 /// this is a three-valued setting rather than a bool plus a media query.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -166,7 +176,7 @@ mod tests {
                 .theme,
             Theme::Light
         );
-        // Not "whatever Windows is set to": `system` has to be asked for.
+        // Not "whatever the OS is set to": `system` has to be asked for.
         assert_eq!(toml::from_str::<Config>("").unwrap().theme, Theme::Light);
     }
 
@@ -210,10 +220,14 @@ mod tests {
         assert_eq!(parsed.launcher_hotkey, "Ctrl+Alt+K");
     }
 
+    /// The hotkey is interpolated rather than spelled out: it is the one
+    /// default that differs per platform, and the rest of the example is what
+    /// this test is actually about.
     #[test]
     fn readme_example_parses() {
-        let text = r#"
-launcher_hotkey = "Ctrl+Alt+Space"
+        let text = format!(
+            r#"
+launcher_hotkey = "{DEFAULT_LAUNCHER_HOTKEY}"
 autostart = true
 theme = "light"
 
@@ -224,9 +238,17 @@ base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
 thinking = false
 temperature = 1.3
-"#;
-        let parsed: Config = toml::from_str(text).unwrap();
+"#
+        );
+        let parsed: Config = toml::from_str(&text).unwrap();
         assert_eq!(parsed, Config::default());
+    }
+
+    /// Both defaults have to survive `hotkey::parse`, which is the only reason
+    /// the platform split above is safe to make.
+    #[test]
+    fn the_default_hotkey_has_a_modifier() {
+        assert!(DEFAULT_LAUNCHER_HOTKEY.contains('+'));
     }
 
     #[test]

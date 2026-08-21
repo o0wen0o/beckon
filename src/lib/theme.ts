@@ -13,7 +13,8 @@ const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)");
 let applied: Theme | null = null;
 
 // Registered once and left there: a no-op unless the theme is `system`, and the
-// windows outlive any reason to detach it (ADR-0007).
+// windows outlive any reason to detach it (ADR-0007). `prefers-color-scheme`
+// is the webview's own signal on both platforms, so nothing here is per-OS.
 systemIsDark.addEventListener("change", () => {
   if (applied === "system") paint("system");
 });
@@ -21,7 +22,7 @@ systemIsDark.addEventListener("change", () => {
 /**
  * Put `theme` on the document.
  *
- * The Windows app theme is consulted **only** for `system` — which is why
+ * The OS appearance is consulted **only** for `system` — which is why
  * globals.css carries no bare `prefers-color-scheme` rule: a machine set to
  * dark still gets the light default until the user asks otherwise.
  */
