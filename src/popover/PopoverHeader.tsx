@@ -9,6 +9,7 @@ import { XIcon } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 import type { ModelParams } from "@/lib/types";
 
 interface PopoverHeaderProps {
@@ -18,6 +19,8 @@ interface PopoverHeaderProps {
 }
 
 export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps) {
+  const t = useT();
+
   return (
     <header
       data-tauri-drag-region
@@ -37,13 +40,19 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
           so it is an outlined chip rather than a warning colour. */}
       {model?.thinking ? (
         <Badge variant="outline" className="text-muted-foreground text-meta font-normal">
-          thinking
+          {t.popover.thinking}
         </Badge>
       ) : null}
       {/* `icon-xs`, not `icon-sm`: a 32px hit target in a 34px bar leaves one
           pixel above and below it, so the hover fill reads as a band across the
           whole title bar rather than as a button in it. */}
-      <Button variant="ghost" size="icon-xs" aria-label="Close" title="Close" onClick={onClose}>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={t.popover.close}
+        title={t.popover.close}
+        onClick={onClose}
+      >
         <XIcon className="size-3.5" />
       </Button>
     </header>

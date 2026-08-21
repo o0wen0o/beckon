@@ -3,10 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Callout } from "@/components/Callout";
+import { useT } from "@/lib/i18n";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 
 export function RawFileEditor() {
+  const t = useT();
   const store = useStore(actionStore);
   const raw = store.raw;
   if (!raw) return null;
@@ -31,9 +33,9 @@ export function RawFileEditor() {
       {raw.error ? <p className="text-destructive mt-1 text-note">{raw.error}</p> : null}
 
       <div className="mt-3 flex items-center gap-2">
-        <Button onClick={() => void store.saveRaw()}>Save file</Button>
+        <Button onClick={() => void store.saveRaw()}>{t.settings.actions.saveFile}</Button>
         <span className="text-muted-foreground text-meta">
-          It reloads the moment it parses.
+          {t.settings.actions.reloadsWhenItParses}
         </span>
       </div>
     </>

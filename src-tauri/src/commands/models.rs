@@ -4,6 +4,9 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
+use crate::config::Language;
+
+use crate::i18n;
 use crate::llm::client;
 use crate::llm::models::{self, ModelOption};
 use crate::state::AppState;
@@ -37,7 +40,7 @@ pub struct ModelCatalog {
 #[tauri::command]
 pub async fn get_models(app: AppHandle, live: bool) -> ModelCatalog {
     // Locks are dropped before the await (state.rs).
-    let (base_url, configured, http) = {
+    let (base_url, configured, http, language) = {
         let state = app.state::<AppState>();
         let config = state.config.read().expect("config lock");
         let registry = state.registry.read().expect("registry lock");
@@ -48,30 +51,39 @@ pub async fn get_models(app: AppHandle, live: bool) -> ModelCatalog {
                 .iter()
                 .filter_map(|action| action.file.model.model.clone()),
         );
-        (config.api.base_url.clone(), configured, state.http.clone())
+        (
+            config.api.base_url.clone(),
+            configured,
+            state.http.clone(),
+            config.language,
+        )
     };
 
     // One decision, one literal: `live` cannot then disagree with the options.
     let (fetched, fallback) = if !live {
         (None, None)
     } else {
-        match fetch_model_ids(&http, &base_url).await {
+        match fetch_model_ids(&http, &base_url, language).await {
             Ok(ids) => (Some(ids), None),
             Err(failure) => (None, Some(failure)),
         }
     };
 
     ModelCatalog {
-        options: models::options(fetched.as_deref(), &configured),
+        options: models::options(fetched.as_deref(), &configured, language),
         live: fetched.is_some(),
         fallback,
     }
 }
 
-async fn fetch_model_ids(http: &reqwest::Client, base_url: &str) -> Result<Vec<String>, Failure> {
+async fn fetch_model_ids(
+    http: &reqwest::Client,
+    base_url: &str,
+    language: Language,
+) -> Result<Vec<String>, Failure> {
     // The cause only — the UI adds "so the documented list is shown", because
     // that consequence is the dropdown's to explain, not this layer's.
-    let key = require_api_key("Store one to list the models your endpoint actually serves.")?;
+    let key = require_api_key(i18n::models_need_key(language), language)?;
 
     let ids = client::list_models(http, base_url, &key)
         .await
@@ -79,7 +91,7 @@ async fn fetch_model_ids(http: &reqwest::Client, base_url: &str) -> Result<Vec<S
     if ids.is_empty() {
         // An endpoint that serves nothing would leave the user unable to change
         // model at all. Treat it as no answer.
-        return Err(Failure::new("empty", "Its list came back empty."));
+        return Err(Failure::new("empty", i18n::models_empty(language)));
     }
     Ok(ids)
 }

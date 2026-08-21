@@ -7,6 +7,7 @@
 import { TriangleAlertIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/Kbd";
+import { useT } from "@/lib/i18n";
 import { SOURCE_ICON, sourceLabel } from "@/lib/inputSource";
 import { formatAccelerator } from "@/lib/platform";
 import type { InputSource } from "@/lib/types";
@@ -19,16 +20,17 @@ const DANGER_CHIP =
 /** The Input Source column. Without a source it is the spacer that keeps a file
  *  that will not parse in the list rather than beside it. */
 export function SourceCell({ source }: { source?: InputSource }) {
+  const t = useT();
   if (!source) return <span className="w-23 flex-none" />;
 
   const Icon = SOURCE_ICON[source];
   return (
     <span
-      title={`Input Source: ${sourceLabel(source)}`}
+      title={t.inputSource.cell(sourceLabel(source, t))}
       className="text-muted-quiet group-aria-selected:text-primary-foreground/65 flex w-23 flex-none items-center gap-1.5 text-meta"
     >
       <Icon className="size-3" />
-      {sourceLabel(source)}
+      {sourceLabel(source, t)}
     </span>
   );
 }
@@ -63,10 +65,11 @@ export function HotkeyCell({
 /** Stands in the hotkey column for a file that does not parse: it cannot be run,
  *  so the row is a way to the raw editor instead. Sans, so it needs a size. */
 export function RepairCell() {
+  const t = useT();
   return (
     <span className="flex w-28 flex-none justify-end">
       <Badge variant="outline" className={`${DANGER_CHIP} text-meta`}>
-        <TriangleAlertIcon className="size-3" /> Repair
+        <TriangleAlertIcon className="size-3" /> {t.inputSource.repair}
       </Badge>
     </span>
   );

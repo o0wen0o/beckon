@@ -11,20 +11,23 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
+import { useT } from "@/lib/i18n";
 import { revealConfigDir } from "@/lib/ipc";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "./actions";
 import { settings, type SectionRoute } from "./store";
 
-const SECTIONS: { id: SectionRoute; label: string; icon: typeof PlugIcon }[] = [
-  { id: "connection", label: "Connection", icon: PlugIcon },
-  { id: "actions", label: "Actions", icon: ListIcon },
-  { id: "triggering", label: "Triggering", icon: KeyboardIcon },
-  { id: "appearance", label: "Appearance", icon: PaletteIcon },
-  { id: "defaults", label: "Model defaults", icon: SlidersIcon },
+/** The order, and the icon each one carries; the words are the catalog's. */
+const SECTIONS: { id: SectionRoute; icon: typeof PlugIcon }[] = [
+  { id: "connection", icon: PlugIcon },
+  { id: "actions", icon: ListIcon },
+  { id: "triggering", icon: KeyboardIcon },
+  { id: "appearance", icon: PaletteIcon },
+  { id: "defaults", icon: SlidersIcon },
 ];
 
 export function SettingsNav() {
+  const t = useT();
   const store = useStore(settings);
   const actions = useStore(actionStore);
 
@@ -52,7 +55,7 @@ export function SettingsNav() {
 
   return (
     <nav
-      aria-label="Settings"
+      aria-label={t.settings.nav.label}
       className="bg-sidebar flex w-52 min-h-0 flex-none flex-col border-r px-2.5 py-3.5"
     >
       <div className="font-display flex items-center gap-2 px-2 pt-0.5 pb-4.5 text-sm font-semibold">
@@ -94,14 +97,14 @@ export function SettingsNav() {
                 {/* An inherited colour change only animates where the child
                     declares the transition too, or the glyph snaps. */}
                 <Icon className="size-3.75 flex-none transition-colors duration-150 ease-out motion-reduce:transition-none" />
-                <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                <span className="min-w-0 flex-1 truncate">{t.settings.nav[section.id]}</span>
                 {/* Not drawn on the current row. A 6px dot on the inverted fill
                     is 2.7:1 at best and 1.3:1 for the warning tone — and it is
                     the one row whose problem is already on screen, in the pane
                     to the right. */}
                 {flags[section.id] && !active ? (
                   <span
-                    title="Something in this section needs attention"
+                    title={t.settings.nav.attention}
                     className={`size-1.5 flex-none rounded-full ${
                       flags[section.id] === "bad" ? "bg-destructive" : "bg-warning"
                     }`}
@@ -119,7 +122,7 @@ export function SettingsNav() {
           className="w-full justify-start"
           onClick={() => void revealConfigDir()}
         >
-          <FolderIcon className="size-3.5" /> Open folder
+          <FolderIcon className="size-3.5" /> {t.settings.nav.openFolder}
         </Button>
       </div>
     </nav>

@@ -6,7 +6,8 @@ import { KeyboardIcon, XIcon } from "lucide-react";
 import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
 import { describeError, probeHotkey } from "@/lib/ipc";
-import { formatAccelerator, IS_MAC, MODIFIER_ADVICE } from "@/lib/platform";
+import { useT } from "@/lib/i18n";
+import { formatAccelerator, IS_MAC } from "@/lib/platform";
 
 interface HotkeyInputProps {
   value: string | null;
@@ -16,6 +17,7 @@ interface HotkeyInputProps {
 }
 
 export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputProps) {
+  const t = useT();
   const [recording, setRecording] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -29,7 +31,11 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
       return;
     }
 
-    const accelerator = toAccelerator(event, setError);
+    const accelerator = toAccelerator(
+      event,
+      setError,
+      t.controls.hotkey.needsModifier(t.words.modifierAdvice),
+    );
     if (!accelerator) return; // modifiers only so far — keep listening
 
     try {
@@ -74,14 +80,14 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
           onBlur={() => setRecording(false)}
         >
           <KeyboardIcon className="size-3.5" />
-          {recording ? "Press keys…" : value ? "Change…" : "Record…"}
+          {recording ? t.controls.hotkey.recording : value ? t.controls.hotkey.change : t.controls.hotkey.record}
         </Button>
 
         {clearable && value && !recording ? (
           <Button
             variant="ghost"
             size="sm"
-            aria-label="Clear the Direct Hotkey"
+            aria-label={t.controls.hotkey.clear}
             className="flex-none"
             onClick={() => {
               setError(null);
@@ -98,9 +104,12 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
   );
 }
 
+/** `noModifiers` is passed in rather than looked up: this is a pure function
+ *  outside the tree, and the sentence is the catalog's (ADR-0015). */
 function toAccelerator(
   event: React.KeyboardEvent,
   setError: (message: string) => void,
+  noModifiers: string,
 ): string | null {
   const mods: string[] = [];
   if (event.ctrlKey) mods.push("Ctrl");
@@ -113,7 +122,7 @@ function toAccelerator(
   const key = keyName(event.code);
   if (!key) return null;
   if (mods.length === 0) {
-    setError(`Add ${MODIFIER_ADVICE} — a bare key would fire everywhere.`);
+    setError(noModifiers);
     return null;
   }
   return [...mods, key].join("+");

@@ -6,6 +6,7 @@ import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
 import { PaneHeader } from "@/components/PaneHeader";
 import { describeFailure } from "@/lib/failures";
+import { useT } from "@/lib/i18n";
 import {
   deleteApiKey,
   describeError,
@@ -14,13 +15,14 @@ import {
   setApiKey,
   testConnection,
 } from "@/lib/ipc";
-import { CREDENTIAL_STORE } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
 export function Connection() {
+  const t = useT();
   const store = useStore(settings);
   const config = store.config;
+  const credentialStore = t.words.credentialStore;
 
   async function saveKey() {
     const key = store.keyDraft.trim();
@@ -28,7 +30,7 @@ export function Connection() {
     try {
       const status = await setApiKey(key);
       store.setKeyDraft("");
-      store.setKeyResult(status, "Saved.");
+      store.setKeyResult(status, t.settings.connection.saved);
       void store.refreshModels();
     } catch (error) {
       store.setKeyResult(null, describeError(error).message);
@@ -37,7 +39,7 @@ export function Connection() {
 
   async function removeKey() {
     try {
-      store.setKeyResult(await deleteApiKey(), "Removed.");
+      store.setKeyResult(await deleteApiKey(), t.settings.connection.removed);
       void store.refreshModels();
     } catch (error) {
       store.setKeyResult(null, describeError(error).message);
@@ -48,11 +50,11 @@ export function Connection() {
     store.setTest({ state: "running" });
     try {
       await testConnection();
-      store.setTest({ state: "ok", message: "The key and base URL work." });
+      store.setTest({ state: "ok", message: t.settings.connection.testOk });
     } catch (error) {
       store.setTest({
         state: "failed",
-        message: describeFailure(describeError(error)),
+        message: describeFailure(describeError(error), t),
       });
     }
     store.setKeyResult(await getKeyStatus(), store.keyMessage);
@@ -60,34 +62,34 @@ export function Connection() {
 
   return (
     <>
-      <PaneHeader title="Connection">
-        Where requests go, and the credential they go with. The key lives in the {CREDENTIAL_STORE},
-        never in a file.
+      <PaneHeader title={t.settings.connection.title}>
+        {t.settings.connection.lede(credentialStore)}
       </PaneHeader>
 
       {store.firstRun ? (
         <Callout>
           <p>
-            <strong>Welcome.</strong> Beckon needs a DeepSeek API key before it can do anything.
+            <strong>{t.settings.connection.welcomeLead}</strong>
+            {t.settings.connection.welcomeBody}
           </p>
           <p>
             <Button
               variant="link"
               onClick={() => void openApiKeyPage()}
             >
-              Get a key from platform.deepseek.com
+              {t.settings.connection.getKey}
             </Button>
           </p>
         </Callout>
       ) : null}
 
-      <FieldGroup title="Credential">
+      <FieldGroup title={t.settings.connection.credential}>
         {/* The state line lives inside the field rather than after it: it is
             what the field currently holds, so it reads on the field's own
             rhythm — above the explanation, below the control. */}
         {/* Stacked: it is typed, and the two buttons share its line, so there is
             no width at which it could right-align against its own name. */}
-        <Field label="API key" stacked>
+        <Field label={t.settings.connection.apiKey} stacked>
           {({ id, describedBy }) => (
             <div className="flex flex-col gap-1.25">
               {/* The line, not the field, is what takes the wide measure: the
@@ -120,13 +122,13 @@ export function Connection() {
                   disabled={store.keyDraft.trim() === ""}
                   onClick={() => void saveKey()}
                 >
-                  Save
+                  {t.settings.connection.save}
                 </Button>
                 {store.keyStatus?.kind === "present" ? (
                   // Outlined, not filled: it sits beside Save, and a solid red
                   // button reads as the thing to press.
                   <Button variant="destructive-outline" onClick={() => void removeKey()}>
-                    Remove
+                    {t.settings.connection.remove}
                   </Button>
                 ) : null}
               </div>
@@ -136,16 +138,17 @@ export function Connection() {
                   unreadable. */}
               {store.keyStatus?.kind === "present" ? (
                 <p className="m-0 flex items-center gap-1 text-success text-note">
-                  <CheckIcon className="size-3.5" /> Stored — ends in{" "}
+                  <CheckIcon className="size-3.5" /> {t.settings.connection.stored}{" "}
                   <code className="font-mono">{store.keyStatus.last4}</code>
                 </p>
               ) : store.keyStatus?.kind === "no-credential" ? (
-                <p className="text-muted-foreground m-0 text-note">No key stored yet.</p>
+                <p className="text-muted-foreground m-0 text-note">
+                  {t.settings.connection.noKeyYet}
+                </p>
               ) : store.keyStatus?.kind === "read-error" ? (
                 <p className="text-destructive m-0 flex items-start gap-1 text-note">
                   <TriangleAlertIcon className="size-3.5 flex-none" />
-                  The {CREDENTIAL_STORE} could not be read: {store.keyStatus.message}. Save the key
-                  again to recreate the credential.
+                  {t.settings.connection.readError(credentialStore, store.keyStatus.message)}
                 </p>
               ) : null}
 
@@ -157,13 +160,13 @@ export function Connection() {
         </Field>
       </FieldGroup>
 
-      <FieldGroup title="Endpoint">
+      <FieldGroup title={t.settings.connection.endpoint}>
         {config ? (
           <Field
-            label="Base URL"
+            label={t.settings.connection.baseUrl}
             measure="field"
             stacked
-            hint="Any OpenAI-compatible endpoint. Requests go to /v1/chat/completions."
+            hint={t.settings.connection.baseUrlHint}
           >
             {({ id, describedBy }) => (
               <Input
@@ -180,7 +183,10 @@ export function Connection() {
           </Field>
         ) : null}
 
-        <Field label="Reachability" hint="Sends one small request with the stored key.">
+        <Field
+          label={t.settings.connection.reachability}
+          hint={t.settings.connection.reachabilityHint}
+        >
           {() => (
             <div className="flex items-center gap-2">
               <Button
@@ -188,7 +194,9 @@ export function Connection() {
                 onClick={() => void runTest()}
                 disabled={store.test.state === "running"}
               >
-                {store.test.state === "running" ? "Testing…" : "Test connection"}
+                {store.test.state === "running"
+                  ? t.settings.connection.testing
+                  : t.settings.connection.test}
               </Button>
               {store.test.message ? (
                 <span

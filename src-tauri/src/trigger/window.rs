@@ -11,7 +11,9 @@
 
 use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow};
 
+use crate::i18n;
 use crate::platform;
+use crate::state::AppState;
 
 use super::WINDOW_SETTINGS;
 
@@ -25,12 +27,13 @@ pub(super) const POPOVER_H: f64 = 500.0;
 pub(super) const POPOVER_HINT_H: f64 = 220.0;
 
 pub(super) fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    let language = app.state::<AppState>().config_snapshot().language;
     tauri::WebviewWindowBuilder::new(
         app,
         WINDOW_SETTINGS,
         WebviewUrl::App("settings.html".into()),
     )
-    .title("Beckon Settings")
+    .title(i18n::settings_window_title(language))
     // 240px of that width is the navigation column; the rest is the pane the
     // Action editor lives in, which is the widest thing in the product.
     .inner_size(980.0, 760.0)
@@ -39,6 +42,14 @@ pub(super) fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWin
     .resizable(true)
     .visible(false)
     .build()
+}
+
+/// The title bar is chrome, not markup, so `config-changed` does not reach it —
+/// the same gap `tray::retranslate` fills. Only Settings has one to redraw.
+pub fn retitle_settings(app: &AppHandle, language: crate::config::Language) {
+    if let Some(window) = app.get_webview_window(WINDOW_SETTINGS) {
+        let _ = window.set_title(i18n::settings_window_title(language));
+    }
 }
 
 pub(super) fn reveal(window: &WebviewWindow) {

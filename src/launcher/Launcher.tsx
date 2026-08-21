@@ -19,12 +19,14 @@ import {
   showSettings,
   Subscriptions,
 } from "@/lib/ipc";
+import { fill, useT } from "@/lib/i18n";
 import { COMMAND_MODIFIER, formatAccelerator, hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { ActionRow, BrokenRow } from "./ActionRow";
 import { actionStore } from "./actions";
 
 export function Launcher() {
+  const t = useT();
   const store = useStore(actionStore);
   const [query, setQuery] = React.useState("");
   // `null` until the user has done something. A summoned window draws no
@@ -165,13 +167,13 @@ export function Launcher() {
             // Enter — and an answer Enter will act on has to be visible.
             setWanted((at) => at ?? 0);
           }}
-          placeholder="Search Actions…"
+          placeholder={t.launcher.searchPlaceholder}
           spellCheck={false}
           autoComplete="off"
-          aria-label="Search Actions"
+          aria-label={t.launcher.searchLabel}
           className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-query outline-none"
         />
-        <Kbd>Esc</Kbd>
+        <Kbd>{t.launcher.escape}</Kbd>
       </div>
 
       {/* The rows are cards (ADR-0014), so the list is a gutter holding them
@@ -186,7 +188,7 @@ export function Launcher() {
           own — a tint plus a border draws one boundary twice. */}
       <ul
         role="listbox"
-        aria-label="Actions"
+        aria-label={t.launcher.listLabel}
         className="bg-muted flex min-h-0 flex-1 list-none flex-col gap-1.25 overflow-y-auto p-1.5 scrollbar-gutter-stable"
       >
         {snapshot.errors.map((error) => (
@@ -218,9 +220,9 @@ export function Launcher() {
             {snapshot.actions.length === 0 ? (
               <>
                 <BrandMark className="text-brand size-6" />
-                <p className="text-muted-foreground text-quiet">No Actions yet.</p>
+                <p className="text-muted-foreground text-quiet">{t.launcher.noActions}</p>
                 <Button size="sm" onClick={openSettings}>
-                  <SlidersHorizontalIcon /> Add one in Settings
+                  <SlidersHorizontalIcon /> {t.launcher.addInSettings}
                 </Button>
               </>
             ) : (
@@ -229,9 +231,11 @@ export function Launcher() {
                   {/* Bare mono, the way every other `code` in the product is
                       set: a box around it is `Kbd`'s job, and a second
                       slightly-off version of it reads as a key to press. */}
-                  Nothing matches <code className="text-foreground font-mono">{query}</code>.
+                  {fill(t.launcher.nothingMatches, {
+                    query: <code className="text-foreground font-mono">{query}</code>,
+                  })}
                 </p>
-                <p className="text-muted-quiet text-note">Backspace to widen the search.</p>
+                <p className="text-muted-quiet text-note">{t.launcher.widen}</p>
               </>
             )}
           </li>
@@ -243,19 +247,19 @@ export function Launcher() {
           keyboard-first. The legend goes when there is nothing to move through. */}
       <div className="text-muted-quiet flex h-8 flex-none items-center gap-3 border-t pr-1 pl-4 text-meta">
         <span className="flex-1 truncate">
-          {selectionChars > 0 ? `${selectionChars} characters selected` : "No selection"}
+          {selectionChars > 0 ? t.launcher.selected(selectionChars) : t.launcher.noSelection}
         </span>
         {matches.length > 0 ? (
           <span className="flex flex-none items-center gap-1" aria-hidden="true">
             <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> move <Kbd>↵</Kbd> run
+            <Kbd>↓</Kbd> {t.launcher.move} <Kbd>↵</Kbd> {t.launcher.run}
           </span>
         ) : null}
         <Button
           variant="ghost"
           size="icon-sm"
-          title={`Settings (${formatAccelerator(`${COMMAND_MODIFIER}+,`)})`}
-          aria-label="Settings"
+          title={t.launcher.settingsTitle(formatAccelerator(`${COMMAND_MODIFIER}+,`))}
+          aria-label={t.words.settings}
           onClick={openSettings}
         >
           <SlidersHorizontalIcon className="size-3.5" />

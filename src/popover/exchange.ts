@@ -117,10 +117,11 @@ class ExchangeStore extends Notifier {
     return this.view.phase === "empty-selection" ? "empty-selection" : "awaiting-input";
   }
 
-  /** What the bar along the bottom says a live turn is doing. `busy` decides
-   *  whether the bar is there at all; this is the same register. */
-  get runLabel() {
-    return this.current?.status === "streaming" ? "Streaming" : "Waiting";
+  /** Which of the two words the bar along the bottom says. `busy` decides
+   *  whether the bar is there at all; this picks between "streaming" and
+   *  "waiting", and the words themselves are the catalog's (ADR-0015). */
+  get streaming() {
+    return this.current?.status === "streaming";
   }
 
   // --- lifecycle ----------------------------------------------------------

@@ -1,6 +1,7 @@
 // The one surface whose entire hazard is focus and re-render, so the two rules
 // that stop a configured model being silently rewritten are both here.
 import * as React from "react";
+import { useT } from "@/lib/i18n";
 import type { ModelOption } from "@/lib/types";
 import {
   Select,
@@ -37,6 +38,8 @@ export function ModelSelect({
   describedBy,
   onChange,
 }: ModelSelectProps) {
+  const t = useT();
+
   // Split once per list rather than twice per render: the panes this sits in
   // re-render on every keystroke, and the split is the same both times.
   const [known, configured] = React.useMemo(
@@ -89,7 +92,7 @@ export function ModelSelect({
           // Quarantined rather than mixed in: nothing vouches for these but the
           // configuration file that names them.
           <SelectGroup>
-            <SelectLabel>Named by your configuration</SelectLabel>
+            <SelectLabel>{t.controls.model.configuredGroup}</SelectLabel>
             {configured.map((option) => (
               <SelectItem key={option.id} value={option.id}>
                 {option.label}

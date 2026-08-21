@@ -8,17 +8,13 @@ import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
 import { Temperature } from "@/components/Temperature";
 import { describeFailure } from "@/lib/failures";
+import { fill, useT } from "@/lib/i18n";
 import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
-const THINKING_HINT =
-  "DeepSeek thinks by default. Leaving it on adds seconds of latency to translation-shaped Actions, which is why this is off unless you ask for it.";
-
-const TEMPERATURE_HINT =
-  "How freely the model words its answer. Low is literal and repeatable — the right end for translation or reformatting; high is varied, and drifts. 0 to 2.";
-
 export function ModelDefaults() {
+  const t = useT();
   const store = useStore(settings);
   const config = store.config;
 
@@ -29,22 +25,25 @@ export function ModelDefaults() {
   // independently and three of them then scanned it for the same id — on every
   // render, which on this pane is every step of the temperature slider.
   const options = React.useMemo(() => modelOptions(model ?? "", catalog), [model, catalog]);
-  const modelHint = unknownModelHint(model, catalog);
+  const modelHint = unknownModelHint(model, catalog, t);
   const modelInfo = options.find((option) => option.id === model)?.description ?? "";
   const thinkingHint = config
-    ? thinkingWarning(config.defaults.model, config.defaults.thinking, catalog)
+    ? thinkingWarning(config.defaults.model, config.defaults.thinking, catalog, t)
     : null;
 
   const catalogNotice =
     !catalog || catalog.live || !catalog.fallback
       ? null
-      : `${describeFailure(catalog.fallback, "The model list could not be fetched")} — showing the documented models.`;
+      : t.settings.defaults.catalogNotice(
+          describeFailure(catalog.fallback, t, t.settings.defaults.catalogFallback),
+        );
 
   return (
     <>
-      <PaneHeader title="Model defaults">
-        What every Action inherits unless its own <code className="font-mono">[model]</code> table
-        says otherwise.
+      <PaneHeader title={t.settings.defaults.title}>
+        {fill(t.settings.defaults.lede, {
+          table: <code className="font-mono">[model]</code>,
+        })}
       </PaneHeader>
 
       {catalogNotice ? (
@@ -55,8 +54,12 @@ export function ModelDefaults() {
 
       {config ? (
         <>
-          <FieldGroup title="Model">
-            <Field label="Model" hint={modelHint ? undefined : modelInfo} error={modelHint}>
+          <FieldGroup title={t.settings.defaults.model}>
+            <Field
+              label={t.settings.defaults.model}
+              hint={modelHint ? undefined : modelInfo}
+              error={modelHint}
+            >
               {({ id, describedBy }) => (
                 <ModelSelect
                   id={id}
@@ -70,12 +73,16 @@ export function ModelDefaults() {
               )}
             </Field>
 
-            <Field label="Think before answering" warning={thinkingHint} hint={THINKING_HINT}>
+            <Field
+              label={t.settings.defaults.thinking}
+              warning={thinkingHint}
+              hint={t.settings.defaults.thinkingHint}
+            >
               {({ id, describedBy }) => (
                 <OnOffSwitch
                   id={id}
                   describedBy={describedBy}
-                  label="Think before answering"
+                  label={t.settings.defaults.thinking}
                   checked={config.defaults.thinking}
                   onChange={(on) =>
                     store.editConfig((draft) => (draft.defaults.thinking = on), true)
@@ -84,7 +91,10 @@ export function ModelDefaults() {
               )}
             </Field>
 
-            <Field label="Temperature" hint={TEMPERATURE_HINT}>
+            <Field
+              label={t.settings.defaults.temperature}
+              hint={t.settings.defaults.temperatureHint}
+            >
               {({ id, describedBy }) => (
                 <Temperature
                   id={id}
@@ -98,10 +108,10 @@ export function ModelDefaults() {
             </Field>
           </FieldGroup>
 
-          <FieldGroup title="Catalog">
+          <FieldGroup title={t.settings.defaults.catalog}>
             <Field
-              label="Model list"
-              hint="Refreshing asks the endpoint for its own list; the documented catalog is the fallback."
+              label={t.settings.defaults.modelList}
+              hint={t.settings.defaults.modelListHint}
             >
               {() => (
                 <div className="flex items-center gap-2">
@@ -110,11 +120,13 @@ export function ModelDefaults() {
                     onClick={() => void store.refreshModels()}
                     disabled={store.modelsLoading}
                   >
-                    {store.modelsLoading ? "Loading models…" : "Refresh models"}
+                    {store.modelsLoading
+                      ? t.settings.defaults.loading
+                      : t.settings.defaults.refresh}
                   </Button>
                   {store.models?.live ? (
                     <span className="text-muted-foreground text-meta">
-                      Listed by the endpoint at your base URL.
+                      {t.settings.defaults.live}
                     </span>
                   ) : null}
                 </div>

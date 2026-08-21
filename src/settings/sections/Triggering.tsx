@@ -5,14 +5,16 @@ import { HotkeyInput } from "@/components/HotkeyInput";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 import { openInputPermissionSettings } from "@/lib/ipc";
-import { AUTOSTART_LABEL, TRAY } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
 export function Triggering() {
+  const t = useT();
   const store = useStore(settings);
   const config = store.config;
+  const autostartLabel = t.words.autostart;
 
   function setLauncherHotkey(accelerator: string | null) {
     if (!accelerator) return;
@@ -21,21 +23,19 @@ export function Triggering() {
 
   return (
     <>
-      <PaneHeader title="Triggering">
-        How Beckon is summoned. Every hotkey is registered the moment you record it.
-      </PaneHeader>
+      <PaneHeader title={t.settings.triggering.title}>{t.settings.triggering.lede}</PaneHeader>
 
       {store.startupErrors.length > 0 ? (
         <Callout tone="danger">
           <p>
-            <strong>A hotkey is not active.</strong>
+            <strong>{t.settings.triggering.hotkeyDeadLead}</strong>
           </p>
           <ul>
             {store.startupErrors.map((error) => (
               <li key={error}>{error}</li>
             ))}
           </ul>
-          <p>Record a different combination below; it is registered the moment you record it.</p>
+          <p>{t.settings.triggering.hotkeyDeadBody}</p>
         </Callout>
       ) : null}
 
@@ -47,43 +47,36 @@ export function Triggering() {
       {store.inputPermission === "denied" ? (
         <Callout tone="danger">
           <p>
-            <strong>Beckon cannot read the Selection.</strong> Grabbing it means sending a Cmd+C to
-            whatever is in front, and macOS allows that only for an app you have trusted under
-            Privacy &amp; Security → Accessibility.
+            <strong>{t.settings.triggering.permissionLead}</strong>
+            {t.settings.triggering.permissionBody}
           </p>
-          <p>
-            Hotkeys still fire and Actions that ask you to type still work. Turn Beckon on in the
-            list, then come back to this window.
-          </p>
+          <p>{t.settings.triggering.permissionStillWorks}</p>
           <p>
             <Button
               variant="link"
               onClick={() => void openInputPermissionSettings()}
             >
-              Open Accessibility settings
+              {t.settings.triggering.openAccessibility}
             </Button>
           </p>
         </Callout>
       ) : null}
 
       {config ? (
-        <FieldGroup title="Summoning">
+        <FieldGroup title={t.settings.triggering.summoning}>
           <Field
-            label="Launcher hotkey"
-            hint="If the combination is already taken it goes red and is not saved."
+            label={t.settings.triggering.launcherHotkey}
+            hint={t.settings.triggering.launcherHotkeyHint}
           >
             {() => <HotkeyInput value={config.launcher_hotkey} onChange={setLauncherHotkey} />}
           </Field>
 
-          <Field
-            label={AUTOSTART_LABEL}
-            hint={`Beckon lives in the ${TRAY}; starting with the machine is the point.`}
-          >
+          <Field label={autostartLabel} hint={t.settings.triggering.autostartHint(t.words.tray)}>
             {({ id, describedBy }) => (
               <OnOffSwitch
                 id={id}
                 describedBy={describedBy}
-                label={AUTOSTART_LABEL}
+                label={autostartLabel}
                 checked={config.autostart}
                 onChange={(on) => store.editConfig((draft) => (draft.autostart = on), true)}
               />

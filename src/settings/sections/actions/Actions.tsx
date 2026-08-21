@@ -11,10 +11,11 @@ import { HotkeyCell, RepairCell, SourceCell } from "@/components/ActionCells";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/FieldGroup";
 import { PaneHeader } from "@/components/PaneHeader";
+import { useT } from "@/lib/i18n";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { ActionEditor } from "./ActionEditor";
-import { ActionDefinition, DEFINITION_SCREEN } from "./ActionDefinition";
+import { ActionDefinition } from "./ActionDefinition";
 import { RawFileEditor } from "./RawFileEditor";
 
 /** The ledger row, shared by the Actions and the files that will not parse: the
@@ -31,6 +32,7 @@ const CHEVRON =
   "text-muted-quiet group-hover:text-foreground group-focus-visible:text-foreground flex flex-none transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 motion-reduce:transition-none";
 
 export function Actions() {
+  const t = useT();
   const store = useStore(actionStore);
   const form = React.useRef<HTMLDivElement | null>(null);
 
@@ -53,11 +55,11 @@ export function Actions() {
     // On the Definition screen the heading is the screen and the Action's name is
     // the line under it — otherwise the name is the heading and its filename,
     // which is the identity (ADR-0003), sits underneath.
-    const title = onDefinition ? DEFINITION_SCREEN : name;
+    const title = onDefinition ? t.settings.actions.definition : name;
     const under = onDefinition
       ? name
       : editing.kind === "raw"
-        ? "does not parse — edited as text"
+        ? t.settings.actions.rawUnder
         : editing.file;
 
     return (
@@ -72,7 +74,9 @@ export function Actions() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={onDefinition ? `Back to ${name}` : "Back to Actions"}
+            aria-label={
+              onDefinition ? t.settings.actions.backTo(name) : t.settings.actions.back
+            }
             className="flex-none"
             onClick={() => (onDefinition ? store.showScreen("main") : store.close())}
           >
@@ -90,7 +94,7 @@ export function Actions() {
           {editing.kind === "raw" ? (
             <RawFileEditor />
           ) : !store.selected ? (
-            <p className="text-muted-foreground text-meta">That Action is gone.</p>
+            <p className="text-muted-foreground text-meta">{t.settings.actions.gone}</p>
           ) : onDefinition ? (
             <ActionDefinition />
           ) : (
@@ -104,21 +108,18 @@ export function Actions() {
   return (
     <div>
       <PaneHeader
-        title="Actions"
+        title={t.settings.actions.title}
         action={
           <Button onClick={() => void store.create()}>
-            <PlusIcon className="size-3.5" /> New Action
+            <PlusIcon className="size-3.5" /> {t.settings.actions.create}
           </Button>
         }
       >
-        One Action is one prompt, stored as its own file. The filename is its identity; the name is
-        only what you see.
+        {t.settings.actions.lede}
       </PaneHeader>
 
       {snapshot.actions.length > 0 ? (
-        <FieldGroup
-          title={`${snapshot.actions.length} ${snapshot.actions.length === 1 ? "Action" : "Actions"}`}
-        >
+        <FieldGroup title={t.settings.actions.count(snapshot.actions.length)}>
           <ul className="flex list-none flex-col p-0">
             {snapshot.actions.map((action) => {
               const conflict = snapshot.hotkey_errors[action.id];
@@ -156,7 +157,7 @@ export function Actions() {
       {/* A file that does not parse is reported, never dropped (ADR-0003), and
           the way back is the raw editor this row opens. */}
       {snapshot.errors.length > 0 ? (
-        <FieldGroup title="Will not parse">
+        <FieldGroup title={t.settings.actions.willNotParse}>
           <ul className="flex list-none flex-col p-0">
             {snapshot.errors.map((error) => (
               <li key={error.file_name}>
@@ -188,9 +189,7 @@ export function Actions() {
       ) : null}
 
       {snapshot.actions.length === 0 && snapshot.errors.length === 0 ? (
-        <p className="text-muted-foreground py-6">
-          No Actions yet. One Action is one prompt, stored as its own file.
-        </p>
+        <p className="text-muted-foreground py-6">{t.settings.actions.empty}</p>
       ) : null}
     </div>
   );

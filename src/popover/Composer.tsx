@@ -10,6 +10,7 @@ import * as React from "react";
 import { SendIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/lib/i18n";
 
 interface ComposerProps {
   placeholder: string;
@@ -17,6 +18,7 @@ interface ComposerProps {
 }
 
 export function Composer({ placeholder, onSend }: ComposerProps) {
+  const t = useT();
   const [draft, setDraft] = React.useState("");
   const box = React.useRef<HTMLTextAreaElement | null>(null);
 
@@ -54,7 +56,7 @@ export function Composer({ placeholder, onSend }: ComposerProps) {
           with the last line of a grown one — and a 14px glyph, because 16px
           against 14px text is the one size that reads as an icon set too big. */}
       <Button className="flex-none" disabled={draft.trim() === ""} onClick={send}>
-        <SendIcon className="size-3.5" /> Send
+        <SendIcon className="size-3.5" /> {t.popover.send}
       </Button>
     </div>
   );

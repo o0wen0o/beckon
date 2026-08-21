@@ -35,6 +35,8 @@
 
 use serde::Serialize;
 
+use crate::config::Language;
+
 /// What a model does with thinking mode — the property `deepseek` needs in
 /// order to put the right `thinking` object on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -49,11 +51,17 @@ pub enum Thinking {
 }
 
 /// One officially documented model.
+///
+/// The description is the one line in this table a person reads, so it is here
+/// in both languages rather than in `src/lib/i18n/`: keying a translation off a
+/// model id in the frontend would put half of one row in each half of the app,
+/// and the live list can name models this table has never heard of.
 #[derive(Debug, Clone, Copy)]
 pub struct CatalogEntry {
     pub id: &'static str,
     pub label: &'static str,
     pub description: &'static str,
+    pub description_zh: &'static str,
     pub thinking: Thinking,
     /// Withdrawn by the provider. Still recognised — an existing config must not
     /// break — but never offered as a new choice.
@@ -65,6 +73,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         id: "deepseek-v4-flash",
         label: "DeepSeek V4 Flash",
         description: "Fast and cheap, 1M context. Thinking can be switched off.",
+        description_zh: "快而便宜，100 万上下文。思考模式可关闭。",
         thinking: Thinking::Switchable,
         retired: false,
     },
@@ -72,6 +81,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         id: "deepseek-v4-pro",
         label: "DeepSeek V4 Pro",
         description: "The stronger V4, 1M context. Thinking can be switched off.",
+        description_zh: "更强的 V4，100 万上下文。思考模式可关闭。",
         thinking: Thinking::Switchable,
         retired: false,
     },
@@ -79,6 +89,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         id: "deepseek-chat",
         label: "DeepSeek Chat (retired)",
         description: "Legacy name for V4-Flash without thinking; withdrawn 2026-07-24.",
+        description_zh: "V4-Flash 不带思考的旧名称；已于 2026-07-24 下线。",
         thinking: Thinking::Never,
         retired: true,
     },
@@ -86,10 +97,21 @@ pub const CATALOG: &[CatalogEntry] = &[
         id: "deepseek-reasoner",
         label: "DeepSeek Reasoner (retired)",
         description: "Legacy name for V4-Flash with thinking; withdrawn 2026-07-24.",
+        description_zh: "V4-Flash 带思考的旧名称；已于 2026-07-24 下线。",
         thinking: Thinking::AlwaysOn,
         retired: true,
     },
 ];
+
+impl CatalogEntry {
+    /// The description in the reader's language.
+    pub fn description(&self, language: Language) -> &'static str {
+        match language {
+            Language::En => self.description,
+            Language::Zh => self.description_zh,
+        }
+    }
+}
 
 /// Model ids are matched case-insensitively, the way the API treats them.
 pub fn find(id: &str) -> Option<&'static CatalogEntry> {
@@ -145,7 +167,11 @@ pub struct ModelOption {
 /// otherwise. `selected` is every model id the configuration currently names —
 /// the global default plus each Action's override — so that a value we cannot
 /// vouch for still appears rather than being rewritten out from under the user.
-pub fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption> {
+pub fn options(
+    live: Option<&[String]>,
+    selected: &[String],
+    language: Language,
+) -> Vec<ModelOption> {
     let mut out: Vec<ModelOption> = Vec::new();
 
     match live {
@@ -153,7 +179,7 @@ pub fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption>
         // `base_url` happens to point at.
         Some(ids) => {
             for id in ids {
-                push_unique(&mut out, id, Origin::Live);
+                push_unique(&mut out, id, Origin::Live, language);
             }
             // The provider's order is arbitrary; catalog order is meaningful.
             // A stable sort keeps the provider's order among the ids we do not
@@ -162,33 +188,33 @@ pub fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption>
         }
         None => {
             for entry in CATALOG.iter().filter(|entry| !entry.retired) {
-                out.push(describe(entry.id, Origin::Documented));
+                out.push(describe(entry.id, Origin::Documented, language));
             }
         }
     }
 
     for id in selected {
-        push_unique(&mut out, id, Origin::Configured);
+        push_unique(&mut out, id, Origin::Configured, language);
     }
 
     out
 }
 
-fn push_unique(out: &mut Vec<ModelOption>, id: &str, origin: Origin) {
+fn push_unique(out: &mut Vec<ModelOption>, id: &str, origin: Origin, language: Language) {
     let id = id.trim();
     if id.is_empty() || out.iter().any(|option| option.id.eq_ignore_ascii_case(id)) {
         return;
     }
-    out.push(describe(id, origin));
+    out.push(describe(id, origin, language));
 }
 
-fn describe(id: &str, origin: Origin) -> ModelOption {
+fn describe(id: &str, origin: Origin, language: Language) -> ModelOption {
     let id = id.trim();
     match find(id) {
         Some(entry) => ModelOption {
             id: entry.id.to_string(),
             label: entry.label.to_string(),
-            description: entry.description.to_string(),
+            description: entry.description(language).to_string(),
             thinking: Some(entry.thinking),
             origin,
         },
@@ -219,6 +245,37 @@ mod tests {
 
     fn strings(ids: &[&str]) -> Vec<String> {
         ids.iter().map(|id| id.to_string()).collect()
+    }
+
+    /// The option *set* is what these tests are about, and it is the same in
+    /// both languages; `describes_a_model_in_both_languages` covers the rest.
+    fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption> {
+        super::options(live, selected, Language::En)
+    }
+
+    #[test]
+    fn describes_a_model_in_both_languages() {
+        let entry = find(crate::config::DEFAULT_MODEL).unwrap();
+        assert_ne!(
+            entry.description(Language::En),
+            entry.description(Language::Zh)
+        );
+        let zh = super::options(None, &[], Language::Zh);
+        let flash = zh
+            .iter()
+            .find(|o| o.id == crate::config::DEFAULT_MODEL)
+            .unwrap();
+        assert_eq!(flash.description, entry.description_zh);
+    }
+
+    /// Every documented model carries both descriptions: a row added with only
+    /// the English one would read as translated and would not be.
+    #[test]
+    fn the_catalog_is_translated_throughout() {
+        for entry in CATALOG {
+            assert!(!entry.description_zh.is_empty(), "{}", entry.id);
+            assert_ne!(entry.description, entry.description_zh, "{}", entry.id);
+        }
     }
 
     #[test]

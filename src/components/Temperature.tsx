@@ -3,6 +3,7 @@
 // the slider is the affordance.
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { useT } from "@/lib/i18n";
 
 interface TemperatureProps {
   value: number;
@@ -12,6 +13,8 @@ interface TemperatureProps {
 }
 
 export function Temperature({ value, id, describedBy, onChange }: TemperatureProps) {
+  const t = useT();
+
   /**
    * `min`/`max` on a number input constrain the spinner, not typing: "9" is
    * accepted and would reach disk. Clamp on the way out, and drop anything
@@ -38,14 +41,14 @@ export function Temperature({ value, id, describedBy, onChange }: TemperaturePro
             max={2}
             step={0.1}
             value={[value]}
-            aria-label="Temperature"
+            aria-label={t.settings.defaults.temperature}
             aria-describedby={describedBy}
             onValueChange={([next]) => commit(next)}
           />
           <div className="text-muted-foreground flex justify-between text-micro">
-            <span>0 · precise</span>
-            <span>1</span>
-            <span>2 · loose</span>
+            <span>{t.controls.temperature.low}</span>
+            <span>{t.controls.temperature.mid}</span>
+            <span>{t.controls.temperature.high}</span>
           </div>
         </div>
         {/* A caption on the slider, not a field of its own: at an input's full

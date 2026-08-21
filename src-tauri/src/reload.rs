@@ -23,16 +23,33 @@ pub fn reload_config(app: &AppHandle) {
     if let Some(error) = &loaded.error {
         log::warn!("{error}");
     }
+    let language = loaded.config.language;
+    let language_changed = state.config.read().expect("config lock").language != language;
     *state.config.write().expect("config lock") = loaded.config;
+
+    // Neither the tray nor a title bar is markup, so no `config-changed` event
+    // redraws either of them.
+    if language_changed {
+        tray::retranslate(app, language);
+        crate::trigger::window::retitle_settings(app, language);
+    }
 
     // The Launcher hotkey may have changed.
     apply_hotkeys(app);
     emit_config(app);
+
+    // Every per-Action diagnostic — a file that will not parse, a Direct Hotkey
+    // that lost its conflict — was phrased in the *previous* language. They are
+    // derived state (ADR-0003), so re-deriving them is the whole fix.
+    if language_changed {
+        reload_actions(app);
+    }
 }
 
 pub fn reload_actions(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let registry = Registry::load(&state.paths.actions_dir);
+    let language = state.config.read().expect("config lock").language;
+    let registry = Registry::load(&state.paths.actions_dir, language);
     *state.registry.write().expect("registry lock") = registry;
 
     // Direct Hotkeys are declared in the files, so they are re-derived too.
@@ -42,11 +59,13 @@ pub fn reload_actions(app: &AppHandle) {
 
 /// Re-register every hotkey and reflect the outcome on the tray.
 pub fn apply_hotkeys(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let language = state.config.read().expect("config lock").language;
     let report = hotkey::apply(app);
     if report.is_clean() {
         tray::set_normal(app);
     } else {
-        tray::set_error(app, &report.summary());
+        tray::set_error(app, &report.summary(language));
     }
 }
 

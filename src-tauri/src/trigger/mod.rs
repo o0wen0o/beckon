@@ -10,7 +10,7 @@
 //! the window that had focus before us.
 
 mod foreground;
-mod window;
+pub mod window;
 
 use tauri::{AppHandle, Emitter, Manager};
 

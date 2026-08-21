@@ -11,6 +11,8 @@ use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
+use crate::config::Language;
+use crate::i18n;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,10 +41,10 @@ impl ApplyReport {
     }
 
     /// One line per problem, for the tray balloon.
-    pub fn summary(&self) -> String {
+    pub fn summary(&self, language: Language) -> String {
         let mut lines = Vec::new();
         if let Some(error) = &self.launcher_error {
-            lines.push(format!("Launcher hotkey: {error}"));
+            lines.push(format!("{}: {error}", i18n::hotkey_launcher(language)));
         }
         let mut ids: Vec<&String> = self.action_errors.keys().collect();
         ids.sort();
@@ -53,29 +55,22 @@ impl ApplyReport {
     }
 }
 
-/// The modifiers named in the "add one" message. Only the wording differs: the
-/// parser takes `Ctrl`, `Alt`, `Shift`, `Cmd`/`Super` on both platforms, so a
-/// config written on one machine still registers on the other.
-#[cfg(not(target_os = "macos"))]
-const MODIFIER_ADVICE: &str = "add Ctrl, Alt or Shift";
-#[cfg(target_os = "macos")]
-const MODIFIER_ADVICE: &str = "add Cmd, Control, Option or Shift";
-
 /// Parse the README's `"Ctrl+Shift+Space"` form.
 ///
 /// A bare key with no modifier is rejected: registering `T` globally would
 /// swallow the letter everywhere, which no user means to ask for.
-pub fn parse(accelerator: &str) -> Result<Shortcut, String> {
+///
+/// `language` is carried in because every refusal here is read by the person
+/// recording the hotkey: the wording lives in [`i18n`], the rule lives here.
+pub fn parse(accelerator: &str, language: Language) -> Result<Shortcut, String> {
     let accelerator = accelerator.trim();
     if accelerator.is_empty() {
-        return Err("no hotkey given".to_string());
+        return Err(i18n::hotkey_missing(language).to_string());
     }
     let shortcut = Shortcut::from_str(accelerator)
-        .map_err(|e| format!("\"{accelerator}\" is not a valid hotkey: {e}"))?;
+        .map_err(|e| i18n::hotkey_invalid(language, accelerator, &e.to_string()))?;
     if shortcut.mods.is_empty() {
-        return Err(format!(
-            "\"{accelerator}\" has no modifier; {MODIFIER_ADVICE}"
-        ));
+        return Err(i18n::hotkey_needs_modifier(language, accelerator));
     }
     Ok(shortcut)
 }
@@ -83,7 +78,8 @@ pub fn parse(accelerator: &str) -> Result<Shortcut, String> {
 /// Try to register `accelerator` right now, then let it go again. This is what
 /// makes the Settings recorder able to flag a taken hotkey on the spot (README).
 pub fn probe(app: &AppHandle, accelerator: &str) -> Result<(), String> {
-    let shortcut = parse(accelerator)?;
+    let language = app.state::<AppState>().config_snapshot().language;
+    let shortcut = parse(accelerator, language)?;
 
     // Already ours: registering it again would fail for the wrong reason.
     let already_ours = {
@@ -98,7 +94,7 @@ pub fn probe(app: &AppHandle, accelerator: &str) -> Result<(), String> {
     let manager = app.global_shortcut();
     manager
         .register(shortcut)
-        .map_err(|e| format!("\"{accelerator}\" could not be registered: {e}"))?;
+        .map_err(|e| i18n::hotkey_not_registered(language, accelerator, &e.to_string()))?;
     let _ = manager.unregister(shortcut);
     Ok(())
 }
@@ -108,8 +104,14 @@ pub fn probe(app: &AppHandle, accelerator: &str) -> Result<(), String> {
 /// incrementally patched.
 pub fn apply(app: &AppHandle) -> ApplyReport {
     let state = app.state::<AppState>();
-    let launcher_accelerator = state.config_snapshot().launcher_hotkey;
-    let plan = state.registry.read().expect("registry lock").hotkey_plan();
+    let config = state.config_snapshot();
+    let language = config.language;
+    let launcher_accelerator = config.launcher_hotkey;
+    let plan = state
+        .registry
+        .read()
+        .expect("registry lock")
+        .hotkey_plan(language);
 
     let manager = app.global_shortcut();
     let _ = manager.unregister_all();
@@ -121,14 +123,16 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
     };
     let mut bindings: HashMap<Shortcut, Target> = HashMap::new();
 
-    match parse(&launcher_accelerator) {
+    match parse(&launcher_accelerator, language) {
         Ok(shortcut) => match manager.register(shortcut) {
             Ok(()) => {
                 bindings.insert(shortcut, Target::Launcher);
             }
             Err(err) => {
-                report.launcher_error = Some(format!(
-                    "\"{launcher_accelerator}\" could not be registered: {err}"
+                report.launcher_error = Some(i18n::hotkey_not_registered(
+                    language,
+                    &launcher_accelerator,
+                    &err.to_string(),
                 ));
             }
         },
@@ -136,7 +140,7 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
     }
 
     for (accelerator, action_id) in plan.assignments {
-        let shortcut = match parse(&accelerator) {
+        let shortcut = match parse(&accelerator, language) {
             Ok(shortcut) => shortcut,
             Err(err) => {
                 report.action_errors.insert(action_id, err);
@@ -147,7 +151,7 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
             // Only the loser's message needs a display name, so it is looked up
             // here rather than mapped for every Action on every apply.
             let owner = match existing {
-                Target::Launcher => "the Launcher hotkey".to_string(),
+                Target::Launcher => i18n::hotkey_owner_launcher(language).to_string(),
                 Target::Action(id) => {
                     let registry = state.registry.read().expect("registry lock");
                     let name = registry
@@ -158,7 +162,7 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
             };
             report.action_errors.insert(
                 action_id,
-                format!("{accelerator} is already used by {owner}"),
+                i18n::hotkey_taken(language, &accelerator, &owner),
             );
             continue;
         }
@@ -169,7 +173,7 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
             Err(err) => {
                 report.action_errors.insert(
                     action_id,
-                    format!("\"{accelerator}\" could not be registered: {err}"),
+                    i18n::hotkey_not_registered(language, &accelerator, &err.to_string()),
                 );
             }
         }
@@ -194,6 +198,12 @@ pub fn target_for(app: &AppHandle, shortcut: &Shortcut) -> Option<Target> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The language only decides how a refusal is *worded*; every test below is
+    /// about whether the accelerator parses at all.
+    fn parse(accelerator: &str) -> Result<Shortcut, String> {
+        super::parse(accelerator, Language::En)
+    }
 
     #[test]
     fn parses_the_readme_default() {
@@ -242,6 +252,14 @@ mod tests {
             .action_errors
             .insert("translate".into(), "taken".into());
         assert!(!report.is_clean());
-        assert_eq!(report.summary(), "Launcher hotkey: taken\ntranslate: taken");
+        assert_eq!(
+            report.summary(Language::En),
+            "Launcher hotkey: taken\ntranslate: taken"
+        );
+        // The same report, read by someone who set `language = "zh"`.
+        assert_eq!(
+            report.summary(Language::Zh),
+            "启动器热键: taken\ntranslate: taken"
+        );
     }
 }

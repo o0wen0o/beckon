@@ -18,6 +18,8 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::config::Language;
+use crate::i18n;
 use crate::state::AppState;
 use crate::trigger;
 
@@ -26,10 +28,26 @@ pub const TRAY_ID: &str = "beckon";
 const ICON_NORMAL: &[u8] = include_bytes!("../icons/tray-normal.png");
 const ICON_ERROR: &[u8] = include_bytes!("../icons/tray-error.png");
 
+/// The menu, built from scratch per language.
+///
+/// Rebuilt rather than relabelled: `tauri::menu` hands back items by id, and
+/// keeping two handles alive in state so their text can be set later is more
+/// machinery than a two-item menu is worth (`retranslate` below).
+fn menu(app: &AppHandle, language: Language) -> tauri::Result<Menu<tauri::Wry>> {
+    let settings = MenuItem::with_id(
+        app,
+        "settings",
+        i18n::tray_settings(language),
+        true,
+        None::<&str>,
+    )?;
+    let quit = MenuItem::with_id(app, "quit", i18n::tray_quit(language), true, None::<&str>)?;
+    Menu::with_items(app, &[&settings, &quit])
+}
+
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit Beckon", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&settings, &quit])?;
+    let language = app.state::<AppState>().config_snapshot().language;
+    let menu = menu(app, language)?;
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::from_bytes(ICON_NORMAL)?)
@@ -61,6 +79,19 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Redraw the menu in the language the config now names.
+///
+/// The tray is the one surface no `config-changed` event reaches: it is not a
+/// window, so nothing re-renders it. `reload::reload_config` calls this.
+pub fn retranslate(app: &AppHandle, language: Language) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    if let Ok(menu) = menu(app, language) {
+        let _ = tray.set_menu(Some(menu));
+    }
+}
+
 /// Switch to the error icon and, the first time only, show the balloon.
 pub fn set_error(app: &AppHandle, summary: &str) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
@@ -82,13 +113,12 @@ pub fn set_error(app: &AppHandle, summary: &str) {
         }
     }
 
+    let language = app.state::<AppState>().config_snapshot().language;
     let _ = app
         .notification()
         .builder()
-        .title("Beckon: a hotkey is not active")
-        .body(format!(
-            "{summary}\n\nClick the Beckon icon to open Settings and fix it."
-        ))
+        .title(i18n::tray_error_title(language))
+        .body(i18n::tray_error_body(language, summary))
         .show();
 }
 

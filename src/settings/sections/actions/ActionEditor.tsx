@@ -16,30 +16,13 @@ import { NavCard } from "@/components/NavCard";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { Segmented } from "@/components/Segmented";
 import { Temperature } from "@/components/Temperature";
+import { useT } from "@/lib/i18n";
 import { SOURCES as SOURCE_ORDER, sourceLabel } from "@/lib/inputSource";
 import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
-import type { Action, InputSource } from "@/lib/types";
+import type { Action } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 import { settings } from "../../store";
-import { DEFINITION_SCREEN } from "./ActionDefinition";
-
-/** Derived rather than restated: this is the one place an Input Source is
- *  chosen, so a third hand-written copy of the three values and their labels is
- *  the copy most likely to disagree with the two lists that display them. */
-const SOURCES = SOURCE_ORDER.map((value) => ({ value, label: sourceLabel(value) }));
-
-const SOURCE_HINT: Record<InputSource, string> = {
-  selection: "Uses the Selection only. An empty grab shows a hint and sends nothing.",
-  prompt: "Uses typed input only. Any Selection is ignored.",
-  auto: "Uses the Selection if there is one, otherwise asks for typed input.",
-};
-
-const TEMPERATURE_HINT =
-  "How freely the model words its answer. Low is literal and repeatable — the right end for translation or reformatting; high is varied, and drifts. 0 to 2.";
-
-const THINKING_HINT =
-  "Adds seconds before the first word. Worth it where the Action needs the model to reason, not where it reformats.";
 
 interface ActionEditorProps {
   /** The snapshot's copy — for identity and snapshot-derived errors only. Field
@@ -48,8 +31,14 @@ interface ActionEditorProps {
 }
 
 export function ActionEditor({ action }: ActionEditorProps) {
+  const t = useT();
   const store = useStore(actionStore);
   const config = useStore(settings).config;
+
+  /** Derived rather than restated: this is the one place an Input Source is
+   *  chosen, so a third hand-written copy of the three values and their labels
+   *  is the copy most likely to disagree with the two lists that display them. */
+  const sources = SOURCE_ORDER.map((value) => ({ value, label: sourceLabel(value, t) }));
 
   const draft = store.draft;
   const defaults = config?.defaults;
@@ -70,8 +59,8 @@ export function ActionEditor({ action }: ActionEditorProps) {
     [effectiveModel, catalog],
   );
   const modelHint = React.useMemo(
-    () => unknownModelHint(effectiveModel || null, catalog),
-    [effectiveModel, catalog],
+    () => unknownModelHint(effectiveModel || null, catalog, t),
+    [effectiveModel, catalog, t],
   );
 
   if (!draft || !defaults) return null;
@@ -81,9 +70,9 @@ export function ActionEditor({ action }: ActionEditorProps) {
   // field's problem must survive being one click away.
   const definitionWarning =
     draft.name.trim() === ""
-      ? "Without a name this Action shows as its file name in the Launcher."
+      ? t.settings.actions.nameWarning
       : draft.prompt.user && !draft.prompt.user.includes("{{input}}")
-        ? "The user template never includes the input."
+        ? t.settings.actions.templateWarningShort
         : null;
   // The same two lines Model defaults draws under its own Model row: what the
   // model is, and a `thinking` setting it cannot honour. Both read the effective
@@ -91,7 +80,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
   const modelInfo =
     modelOverrideOptions.find((option) => option.id === effectiveModel)?.description ?? "";
   const effectiveThinking = draft.model.thinking ?? defaults.thinking;
-  const thinkingHint = thinkingWarning(effectiveModel, effectiveThinking, catalog);
+  const thinkingHint = thinkingWarning(effectiveModel, effectiveThinking, catalog, t);
 
   return (
     <>
@@ -101,16 +90,16 @@ export function ActionEditor({ action }: ActionEditorProps) {
         // the Action can be saved. Say so, and offer the way out.
         <Callout tone="danger">
           <p>
-            <strong>This Action&apos;s Direct Hotkey is not active.</strong> {hotkeyConflict}
+            <strong>{t.settings.actions.hotkeyDeadLead}</strong> {hotkeyConflict}
           </p>
-          <p>No change to this Action can be saved until the hotkey is cleared or changed.</p>
+          <p>{t.settings.actions.hotkeyDeadBody}</p>
           <p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => store.editDraft((next) => (next.hotkey = null), true)}
             >
-              Clear the Direct Hotkey
+              {t.settings.actions.clearHotkey}
             </Button>
           </p>
         </Callout>
@@ -123,28 +112,34 @@ export function ActionEditor({ action }: ActionEditorProps) {
           set — it is the other half of this Action. */}
       <FieldGroup>
         <NavCard
-          label={DEFINITION_SCREEN}
-          hint="The name, what it is for, and the two prompts it sends."
+          label={t.settings.actions.definition}
+          hint={t.settings.actions.definitionHint}
           warning={definitionWarning}
           onClick={() => store.showScreen("definition")}
         />
       </FieldGroup>
 
-      <FieldGroup title="Trigger">
-        <Field label="Input Source" hint={SOURCE_HINT[draft.input_source]}>
+      <FieldGroup title={t.settings.actions.trigger}>
+        <Field
+          label={t.settings.actions.inputSource}
+          hint={t.settings.actions.sourceHint[draft.input_source]}
+        >
           {({ id, describedBy }) => (
             <Segmented
               id={id}
               describedBy={describedBy}
-              label="Input Source"
+              label={t.settings.actions.inputSource}
               value={draft.input_source}
-              options={SOURCES}
+              options={sources}
               onChange={(source) => store.editDraft((next) => (next.input_source = source), true)}
             />
           )}
         </Field>
 
-        <Field label="Direct Hotkey" hint="Optional. Without one, the Action is Launcher-only.">
+        <Field
+          label={t.settings.actions.directHotkey}
+          hint={t.settings.actions.directHotkeyHint}
+        >
           {() => (
             <HotkeyInput
               value={draft.hotkey ?? null}
@@ -166,9 +161,9 @@ export function ActionEditor({ action }: ActionEditorProps) {
           rest. This was three bordered boxes indented into the value column,
           and the only thing on the pane that was not a row of its own
           (ADR-0011). */}
-      <FieldGroup title="Model overrides" note="Unmarked rows follow Model defaults">
+      <FieldGroup title={t.settings.actions.overrides} note={t.settings.actions.overridesNote}>
         <Field
-          label="Model"
+          label={t.settings.defaults.model}
           hint={modelHint ? undefined : modelInfo}
           error={modelHint}
           override={{
@@ -192,12 +187,12 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Field>
 
         <Field
-          label="Think before answering"
+          label={t.settings.defaults.thinking}
           warning={thinkingHint}
-          hint={THINKING_HINT}
+          hint={t.settings.actions.thinkingHint}
           override={{
             overridden: draft.model.thinking !== null,
-            defaultReading: defaults.thinking ? "on" : "off",
+            defaultReading: defaults.thinking ? t.controls.field.on : t.controls.field.off,
             onRevert: () => store.editDraft((next) => (next.model.thinking = null), true),
           }}
         >
@@ -205,7 +200,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
             <OnOffSwitch
               id={id}
               describedBy={describedBy}
-              label="Think before answering"
+              label={t.settings.defaults.thinking}
               checked={effectiveThinking}
               onChange={(value) => store.editDraft((next) => (next.model.thinking = value), true)}
             />
@@ -213,8 +208,8 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Field>
 
         <Field
-          label="Temperature"
-          hint={TEMPERATURE_HINT}
+          label={t.settings.defaults.temperature}
+          hint={t.settings.defaults.temperatureHint}
           override={{
             overridden: draft.model.temperature !== null,
             defaultReading: String(defaults.temperature),
@@ -235,17 +230,17 @@ export function ActionEditor({ action }: ActionEditorProps) {
       {/* A card like every other, under a head of its own: with no hairlines
           left on the pane there is no divider to sit above, and a group head is
           what now says "this is not one of the settings". */}
-      <FieldGroup title="This file">
+      <FieldGroup title={t.settings.actions.thisFile}>
         <Field
-          label="Delete this Action"
-          hint={`Removes ${action.file_name} from disk. This cannot be undone.`}
+          label={t.settings.actions.deleteLabel}
+          hint={t.settings.actions.deleteHint(action.file_name)}
         >
           {/* Destructive up front, not only once the pointer is over it: hover is
               not a state a keyboard user passes through. The outline carries that
               at rest; solid red is the confirmation dialog's. */}
           {() => (
             <Button variant="destructive-outline" onClick={() => store.askDelete(action)}>
-              Delete Action
+              {t.settings.actions.deleteButton}
             </Button>
           )}
         </Field>

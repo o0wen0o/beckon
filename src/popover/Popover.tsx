@@ -4,7 +4,8 @@
 // belong to the window rather than to a field.
 import * as React from "react";
 import { hidePopover, Subscriptions } from "@/lib/ipc";
-import { EMPTY_GRAB_CAUSE, hasCommandModifier } from "@/lib/platform";
+import { fill, useT } from "@/lib/i18n";
+import { hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { Callout } from "@/components/Callout";
 import { Kbd } from "@/components/Kbd";
@@ -18,6 +19,7 @@ import { exchange } from "./exchange";
 const STICK_WITHIN = 48;
 
 export function Popover() {
+  const t = useT();
   const store = useStore(exchange);
   const scroller = React.useRef<HTMLDivElement | null>(null);
   // Whether the stream should still be followed. Written on scroll rather than
@@ -99,16 +101,18 @@ export function Popover() {
             of the product uses for one — a rule, not a box; the other two are
             ordinary prose. */}
         {store.notice === "no-view" ? (
-          <p className="text-muted-foreground">Nothing to show.</p>
+          <p className="text-muted-foreground">{t.popover.nothingToShow}</p>
         ) : store.notice === "empty-selection" ? (
           // `mb-0`: the margin baked into a callout is the ledger's rhythm
           // below one, and this scroller spaces its children with a gap.
           <Callout tone="warn" className="mb-0">
             <p>
-              <strong>{view?.action_name}</strong> works on a Selection, and nothing was selected.
+              {fill(t.popover.needsSelection, {
+                name: <strong>{view?.action_name}</strong>,
+              })}
             </p>
             <p>
-              Select some text and press the hotkey again. {EMPTY_GRAB_CAUSE}
+              {t.popover.selectAndRetry} {t.words.emptyGrabCause}
             </p>
           </Callout>
         ) : store.notice === "awaiting-input" ? (
@@ -116,8 +120,11 @@ export function Popover() {
           // land in the same slot, so a step of difference between them says
           // nothing a reader can act on.
           <p className="text-muted-foreground">
-            Type what you want to send to{" "}
-            <strong className="text-foreground font-bold">{view?.action_name}</strong>.
+            {fill(t.popover.typeYourInput, {
+              name: (
+                <strong className="text-foreground font-bold">{view?.action_name}</strong>
+              ),
+            })}
           </p>
         ) : null}
 
@@ -133,10 +140,10 @@ export function Popover() {
         <div className="flex h-11 flex-none items-center gap-2 border-t pr-2 pl-3.5">
           <span className="text-muted-quiet flex flex-1 items-center gap-2 text-meta">
             <span className="bg-foreground size-1.5 flex-none animate-pulse rounded-full motion-reduce:animate-none" />
-            {store.runLabel}
+            {store.streaming ? t.popover.runningStreaming : t.popover.runningWaiting}
           </span>
           <Button variant="outline" size="sm" onClick={() => exchange.cancel()}>
-            Stop <Kbd className="bg-transparent">Esc</Kbd>
+            {t.popover.stop} <Kbd className="bg-transparent">{t.launcher.escape}</Kbd>
           </Button>
         </div>
       ) : null}
@@ -146,7 +153,7 @@ export function Popover() {
           // A fresh element per trigger: the draft and the grown height are the
           // browser's, and remounting is what clears both (ADR-0007).
           key={store.epoch}
-          placeholder={empty ? "Your input…" : "Ask a follow-up…"}
+          placeholder={empty ? t.popover.firstInput : t.popover.followUp}
           onSend={(text) => void exchange.send(text)}
         />
       ) : null}

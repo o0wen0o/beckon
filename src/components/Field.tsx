@@ -11,6 +11,7 @@ import * as React from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useT } from "@/lib/i18n";
 
 /**
  * The card, and the only place its geometry is written. No fill and no shadow:
@@ -88,6 +89,7 @@ export function Field({
   override,
   children,
 }: FieldProps) {
+  const t = useT();
   const id = React.useId();
   const descriptionId = `${id}-description`;
   const hintId = `${id}-hint`;
@@ -95,7 +97,7 @@ export function Field({
   const describedBy =
     [error || warning ? descriptionId : null, hint ? hintId : null].filter(Boolean).join(" ") ||
     undefined;
-  const revertLabel = override ? `Use the default (${override.defaultReading})` : "";
+  const revertLabel = override ? t.controls.field.useDefault(override.defaultReading) : "";
   const described = Boolean(error || warning || hint);
 
   const control = measure ? (

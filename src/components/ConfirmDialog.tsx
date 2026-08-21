@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -36,6 +37,8 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const t = useT();
+
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <AlertDialogContent className="max-w-105">
@@ -48,7 +51,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           {/* Cancel comes first, and Radix focuses it: the default action of a
               destructive dialog must not be the destructive one. */}
-          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>{t.words.cancel}</AlertDialogCancel>
           {/* Filled, not outlined: this is the button that does the irreversible
               thing, and an outline reads as the quieter of the two on offer. */}
           <AlertDialogAction

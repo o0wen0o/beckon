@@ -10,6 +10,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use super::Action;
+use crate::config::Language;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ActionError {
@@ -46,7 +47,11 @@ pub struct HotkeyPlan {
 impl Registry {
     /// A missing directory is an empty registry, not an error: first run has no
     /// `actions/` yet, and seeding it is a separate decision (README).
-    pub fn load(dir: &Path) -> Self {
+    ///
+    /// `language` is spent only on the errors: a file that cannot be read is
+    /// reported rather than dropped (ADR-0003), and that report is read by a
+    /// person in Settings.
+    pub fn load(dir: &Path, language: Language) -> Self {
         let mut registry = Registry::default();
 
         let entries = match fs::read_dir(dir) {
@@ -55,7 +60,7 @@ impl Registry {
             Err(err) => {
                 registry.errors.push(ActionError {
                     file_name: String::new(),
-                    message: format!("actions directory could not be read: {err}"),
+                    message: crate::i18n::actions_dir_unreadable(language, &err.to_string()),
                 });
                 return registry;
             }
@@ -79,7 +84,7 @@ impl Registry {
                 },
                 Err(err) => registry.errors.push(ActionError {
                     file_name,
-                    message: format!("could not be read: {err}"),
+                    message: crate::i18n::action_file_unreadable(language, &err.to_string()),
                 }),
             }
         }
@@ -102,7 +107,7 @@ impl Registry {
     /// Resolve Direct Hotkeys. Two Actions claiming the same accelerator: the
     /// first by filename wins, the loser is flagged — same "skip and flag"
     /// treatment ADR-0003 gives unparseable files.
-    pub fn hotkey_plan(&self) -> HotkeyPlan {
+    pub fn hotkey_plan(&self, language: Language) -> HotkeyPlan {
         let mut plan = HotkeyPlan::default();
         let mut claimed: HashMap<String, String> = HashMap::new();
 
@@ -119,7 +124,7 @@ impl Registry {
                 Some(winner) => {
                     plan.conflicts.insert(
                         action.id.clone(),
-                        format!("{hotkey} is already claimed by \"{winner}\""),
+                        crate::i18n::hotkey_claimed(language, hotkey, winner),
                     );
                 }
                 None => {
@@ -160,7 +165,7 @@ mod tests {
 
     #[test]
     fn missing_directory_is_empty_not_an_error() {
-        let registry = Registry::load(Path::new("does-not-exist-anywhere"));
+        let registry = Registry::load(Path::new("does-not-exist-anywhere"), Language::En);
         assert!(registry.actions.is_empty());
         assert!(registry.errors.is_empty());
     }
@@ -172,7 +177,7 @@ mod tests {
         write(dir.path(), "b.toml", "name = \"B\"\n[prompt\n");
         write(dir.path(), "c.toml", &valid("C"));
 
-        let registry = Registry::load(dir.path());
+        let registry = Registry::load(dir.path(), Language::En);
         let ids: Vec<&str> = registry.actions.iter().map(|a| a.id.as_str()).collect();
         assert_eq!(ids, vec!["a", "c"]);
         assert_eq!(registry.errors.len(), 1);
@@ -187,7 +192,7 @@ mod tests {
         write(dir.path(), ".a.toml.beckon-tmp", "garbage");
         write(dir.path(), ".#a.toml", "garbage");
 
-        let registry = Registry::load(dir.path());
+        let registry = Registry::load(dir.path(), Language::En);
         assert_eq!(registry.actions.len(), 1);
         assert!(registry.errors.is_empty());
     }
@@ -206,7 +211,7 @@ mod tests {
             "name = \"Z\"\nhotkey = \"alt+ctrl+t\"\n[prompt]\nsystem = \"s\"\n",
         );
 
-        let plan = Registry::load(dir.path()).hotkey_plan();
+        let plan = Registry::load(dir.path(), Language::En).hotkey_plan(Language::En);
         assert_eq!(
             plan.assignments,
             vec![("Ctrl+Alt+T".to_string(), "aaa".to_string())]
@@ -218,7 +223,7 @@ mod tests {
     fn actions_without_hotkeys_are_launcher_only() {
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), "a.toml", &valid("A"));
-        let plan = Registry::load(dir.path()).hotkey_plan();
+        let plan = Registry::load(dir.path(), Language::En).hotkey_plan(Language::En);
         assert!(plan.assignments.is_empty());
         assert!(plan.conflicts.is_empty());
     }

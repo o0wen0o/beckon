@@ -2,6 +2,7 @@
 // where that promise is kept visible — and the one place a failed write is
 // reported, rather than a banner competing with the form above it.
 import { CheckIcon, LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 interface StatusBarProps {
   busy: boolean;
@@ -16,6 +17,8 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ busy, error, note = null }: StatusBarProps) {
+  const t = useT();
+
   return (
     <div
       role="status"
@@ -27,19 +30,19 @@ export function StatusBar({ busy, error, note = null }: StatusBarProps) {
       {error ? (
         <>
           <TriangleAlertIcon className="size-3.5 flex-none" />
-          <span>Not saved — {error}</span>
+          <span>{t.settings.status.notSaved(error)}</span>
         </>
       ) : busy ? (
         <>
           {/* A frozen spinner reads as a stalled write, so the reduced-motion
               form is a static ring rather than a stopped one. */}
           <LoaderCircleIcon className="text-primary size-3.5 flex-none animate-spin motion-reduce:animate-none motion-reduce:opacity-50" />
-          <span>Saving…</span>
+          <span>{t.settings.status.saving}</span>
         </>
       ) : (
         <>
           <CheckIcon className="size-3.5 flex-none" />
-          <span>{note ?? "Changes are written to disk as you make them."}</span>
+          <span>{note ?? t.settings.status.standing}</span>
         </>
       )}
     </div>

@@ -162,9 +162,20 @@
      text at or below 12px, and using it on every hint meant the pane changed
      typeface halfway down each row — a difference you can see without being
      able to name, which reads as unfinished. Display is the one real switch,
-     and it happens once per pane, on the title. */
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+     and it happens once per pane, on the title.
+
+     The CJK faces are named rather than left to the browser's last resort: a
+     Chinese string set in Segoe UI falls through to whatever the engine picks,
+     which on Windows is a bitmap-era face a size heavier than the Latin around
+     it. Each platform's own UI face is listed first, so a mixed line — "打开
+     Beckon" — stays one weight. Latin comes first in the stack either way, so
+     an English build is byte-for-byte the face it was (ADR-0015). */
+  --font-sans:
+    "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei UI", "PingFang SC",
+    "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+  --font-display:
+    "Segoe UI Variable Display", "Segoe UI", system-ui, "Microsoft YaHei UI", "PingFang SC",
+    "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 

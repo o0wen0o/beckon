@@ -7,6 +7,7 @@ mod commands;
 mod config;
 mod exchange;
 mod hotkey;
+mod i18n;
 mod llm;
 mod platform;
 mod reload;
@@ -160,7 +161,7 @@ fn load_state() -> AppState {
     if let Some(error) = &loaded.error {
         log::warn!("{error}");
     }
-    let registry = Registry::load(&paths.actions_dir);
+    let registry = Registry::load(&paths.actions_dir, loaded.config.language);
     AppState::new(paths, loaded.config, registry)
 }
 

@@ -2,6 +2,7 @@
 // piece of state and every write lives in a store — the global config in
 // store.ts, the Actions in actions.ts (ADR-0003).
 import * as React from "react";
+import { fill, useT } from "@/lib/i18n";
 import { onActionsChanged, onConfigChanged, onSettingsOpened, Subscriptions } from "@/lib/ipc";
 import { PaneProvider } from "@/lib/pane";
 import { IS_MAC } from "@/lib/platform";
@@ -30,6 +31,7 @@ const PANES: Record<SectionRoute, React.ComponentType> = {
 };
 
 export function Settings() {
+  const t = useT();
   const store = useStore(settings);
   const actions = useStore(actionStore);
 
@@ -143,11 +145,7 @@ export function Settings() {
         <StatusBar
           busy={store.configSlot.busy || actions.slot.busy}
           error={store.saveError ?? actions.slot.error}
-          note={
-            actions.editing?.kind === "raw"
-              ? "This file does not parse, so it is written with the button above — not as you type."
-              : null
-          }
+          note={actions.editing?.kind === "raw" ? t.settings.status.rawFile : null}
         />
       </div>
 
@@ -156,15 +154,18 @@ export function Settings() {
           editor, and a dialog whose own container disappears goes with it. */}
       <ConfirmDialog
         open={pendingDelete !== null}
-        title={`Delete “${pendingDelete?.name || pendingDelete?.file_name}”?`}
-        confirmLabel="Delete file"
+        title={t.settings.actions.deleteTitle(
+          pendingDelete?.name || pendingDelete?.file_name || "",
+        )}
+        confirmLabel={t.settings.actions.deleteConfirm}
         destructive
         onConfirm={() => pendingDelete && void actionStore.deleteAction(pendingDelete)}
         onCancel={() => actionStore.askDelete(null)}
       >
         <p>
-          The file <code className="font-mono">{pendingDelete?.file_name}</code> is removed from
-          disk. This cannot be undone.
+          {fill(t.settings.actions.deleteBody, {
+            file: <code className="font-mono">{pendingDelete?.file_name}</code>,
+          })}
         </p>
       </ConfirmDialog>
     </PaneProvider>

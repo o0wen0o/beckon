@@ -18,16 +18,12 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CARD, Field } from "@/components/Field";
+import { useT } from "@/lib/i18n";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
 
-/** The screen's name, in one place: the card that opens it and the heading it
- *  opens with have to read as the same thing. What the Action *is* — its name,
- *  what it is for, and what it says to the model — as against the main screen,
- *  which is how it fires and what it fires at. */
-export const DEFINITION_SCREEN = "Definition";
-
 export function ActionDefinition() {
+  const t = useT();
   const store = useStore(actionStore);
   const draft = store.draft;
 
@@ -35,18 +31,15 @@ export function ActionDefinition() {
 
   const templateWarning =
     draft.prompt.user && !draft.prompt.user.includes("{{input}}")
-      ? "This template never includes the input."
+      ? t.settings.actions.templateWarning
       : null;
-  const nameWarning =
-    draft.name.trim() === ""
-      ? "Without a name this Action shows as its file name in the Launcher."
-      : null;
+  const nameWarning = draft.name.trim() === "" ? t.settings.actions.nameWarning : null;
 
   return (
     // The card's own padding, and the fields spaced by the air a card would have
     // put between them — no inner rule and no inner edge.
     <div className={`${CARD} flex flex-col gap-6`}>
-      <Field label="Name" stacked bare warning={nameWarning}>
+      <Field label={t.settings.actions.name} stacked bare warning={nameWarning}>
         {({ id, describedBy }) => (
           <Input
             id={id}
@@ -61,10 +54,10 @@ export function ActionDefinition() {
       </Field>
 
       <Field
-        label="Description"
+        label={t.settings.actions.description}
         stacked
         bare
-        hint="Shown under the name in the Launcher, and searched."
+        hint={t.settings.actions.descriptionHint}
       >
         {({ id, describedBy }) => (
           <Input
@@ -80,10 +73,10 @@ export function ActionDefinition() {
       </Field>
 
       <Field
-        label="System prompt"
+        label={t.settings.actions.systemPrompt}
         stacked
         bare
-        hint="How the model should behave. Sent ahead of every input."
+        hint={t.settings.actions.systemPromptHint}
       >
         {({ id, describedBy }) => (
           <Textarea
@@ -100,11 +93,11 @@ export function ActionDefinition() {
       </Field>
 
       <Field
-        label="User template"
+        label={t.settings.actions.userTemplate}
         stacked
         bare
         warning={templateWarning}
-        hint="{{input}} is replaced by the Selection or the typed input. Empty means just the input."
+        hint={t.settings.actions.userTemplateHint}
       >
         {({ id, describedBy }) => (
           <Input

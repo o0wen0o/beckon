@@ -37,3 +37,19 @@ _Avoid_: result window, floating window, toast, panel
 **Exchange**:
 The multi-turn conversation opened by one Action trigger, with a lifetime equal to that of the Popover. Discarded when the window closes; never persisted.
 _Avoid_: session, Session, Conversation, history
+
+### The same words in Chinese
+
+Beckon ships in English and Simplified Chinese (ADR-0015), so each term above has exactly one
+Chinese form, and `src/lib/i18n/zh.ts` is where it is kept. A second rendering of one of these is
+the same failure as a synonym in English.
+
+| Term | 中文 | Note |
+| --- | --- | --- |
+| Action | Action | Untranslated on purpose: it is also the file in `actions/`, and the filename is the identity |
+| Input Source | 输入来源 | Its three values are 选中内容 / 手动输入 / 自动 — the *values* stay `selection` / `prompt` / `auto` on disk |
+| Selection | 选中内容 | _Avoid_: 选区, 选中文本 |
+| Launcher | 启动器 | |
+| Direct Hotkey | 专属热键 | _Avoid_: 快捷键 alone, which is any hotkey |
+| Popover | 浮窗 | _Avoid_: 弹窗, which is a dialog |
+| Exchange | 对话 | Only ever the one a Popover holds |

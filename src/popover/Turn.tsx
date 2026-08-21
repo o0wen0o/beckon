@@ -9,6 +9,7 @@
 import { CheckIcon, CopyIcon, RotateCcwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeFailure } from "@/lib/failures";
+import { useT } from "@/lib/i18n";
 import { showSettings } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { exchange, isSettled, settlesInSettings, type Turn } from "./exchange";
@@ -33,11 +34,13 @@ const CARD = "bg-muted max-w-4/5 rounded-lg border px-3 py-1.5 whitespace-pre-wr
 const QUIET = "text-muted-quiet";
 
 export function TurnView({ turn, index }: { turn: Turn; index: number }) {
+  const t = useT();
+
   /** The cause named first, then the provider's own words — the same sentence
    *  Settings builds, rather than a raw reqwest chain. */
   const failure =
     turn.status === "error"
-      ? describeFailure({ kind: turn.errorKind ?? "error", message: turn.note ?? "" })
+      ? describeFailure({ kind: turn.errorKind ?? "error", message: turn.note ?? "" }, t)
       : null;
 
   const settled = isSettled(turn.status);
@@ -61,7 +64,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
               className={cn(QUIET, "-mr-1.5")}
               onClick={() => exchange.expandQuestion(turn)}
             >
-              {turn.questionExpanded ? "Show less" : "Show all"}
+              {turn.questionExpanded ? t.popover.showLess : t.popover.showAll}
             </Button>
           ) : null}
         </div>
@@ -75,7 +78,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         {/* Nothing else on this side says the turn went wrong once the label
             column is gone, so the failure keeps a marker of its own. */}
         {failure ? (
-          <span className="text-destructive text-meta font-medium">Failed</span>
+          <span className="text-destructive text-meta font-medium">{t.popover.failed}</span>
         ) : null}
 
         {turn.reasoning ? (
@@ -93,7 +96,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
               className={cn(QUIET, "-ml-1.5")}
               onClick={() => exchange.toggleReasoning(turn)}
             >
-              {turn.reasoningOpen ? "Hide" : "Show what it thought"}
+              {turn.reasoningOpen ? t.popover.hideThinking : t.popover.showThinking}
             </Button>
           </>
         ) : null}
@@ -104,7 +107,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
           <div className="flex w-full max-w-75 flex-col gap-2">
             <div className="bg-muted-foreground h-0.5 animate-pulse rounded-full motion-reduce:animate-none motion-reduce:opacity-60" />
             <span className="text-muted-quiet tabular-nums text-meta">
-              Waiting for the first token
+              {t.popover.waiting}
               {exchange.waitedSeconds > 0 ? ` · ${exchange.waitedSeconds}s` : ""}
             </span>
           </div>
@@ -129,13 +132,13 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
             mildest one. */}
         {turn.status === "interrupted" ? (
           <p className="text-warning text-note">
-            {turn.answer ? "Interrupted" : "Interrupted before any output"}
+            {turn.answer ? t.popover.interrupted : t.popover.interruptedEmpty}
             {turn.note ? ` — ${turn.note}` : ""}
           </p>
         ) : null}
 
         {turn.status === "cancelled" ? (
-          <p className="text-warning text-note">Cancelled.</p>
+          <p className="text-warning text-note">{t.popover.cancelled}</p>
         ) : null}
 
         {failure ? (
@@ -143,11 +146,11 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
             <p className="text-quiet">{failure}</p>
             <div className="mt-1 flex gap-2">
               <Button size="sm" onClick={() => void exchange.retry()}>
-                <RotateCcwIcon className="size-3.5" /> Retry
+                <RotateCcwIcon className="size-3.5" /> {t.popover.retry}
               </Button>
               {settlesInSettings(turn.errorKind) ? (
                 <Button variant="outline" size="sm" onClick={() => void showSettings()}>
-                  Open Settings
+                  {t.popover.openSettings}
                 </Button>
               ) : null}
             </div>
@@ -166,7 +169,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
             onClick={() => void exchange.copy(turn.answer, index)}
           >
             {copied ? <CheckIcon /> : <CopyIcon />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t.popover.copied : t.popover.copy}
           </Button>
         ) : null}
       </div>

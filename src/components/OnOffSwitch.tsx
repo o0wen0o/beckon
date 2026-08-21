@@ -6,6 +6,7 @@
 // checkbox reads as "will be applied when you save", which there is no way to
 // do here (ADR-0003).
 import { Switch } from "@/components/ui/switch";
+import { useT } from "@/lib/i18n";
 
 interface OnOffSwitchProps {
   checked: boolean;
@@ -17,6 +18,8 @@ interface OnOffSwitchProps {
 }
 
 export function OnOffSwitch({ checked, label, id, describedBy, onChange }: OnOffSwitchProps) {
+  const t = useT();
+
   return (
     <div className="flex items-center gap-2 self-start">
       <Switch
@@ -30,7 +33,7 @@ export function OnOffSwitch({ checked, label, id, describedBy, onChange }: OnOff
           reading "On" after "on" is noise. Fixed width and flush left, or the
           row twitches every time it is thrown. */}
       <span aria-hidden className="text-muted-foreground min-w-5.5 text-left text-meta">
-        {checked ? "On" : "Off"}
+        {checked ? t.controls.field.on : t.controls.field.off}
       </span>
     </div>
   );

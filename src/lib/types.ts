@@ -51,10 +51,18 @@ export interface RegistrySnapshot {
 /** `system` follows the OS appearance; `light` is what an absent setting is. */
 export type Theme = "light" | "dark" | "system";
 
+/**
+ * Which language every surface is written in; `en` is what an absent setting
+ * is. There is no `system` arm the way `Theme` has one — the OS locale is a
+ * guess about a reader rather than a setting (ADR-0015).
+ */
+export type Language = "en" | "zh";
+
 export interface Config {
   launcher_hotkey: string;
   autostart: boolean;
   theme: Theme;
+  language: Language;
   api: { base_url: string };
   defaults: ModelParams;
 }

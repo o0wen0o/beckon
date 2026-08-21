@@ -1,42 +1,25 @@
-// The handful of things that differ between the Windows build and the macOS
-// one, in one place — the same reason `inputSource.ts` exists. Three surfaces
-// render these words and a hotkey chip appears in two lists; a per-component
-// `isMac` test is how they drift.
+// What differs between the Windows build and the macOS one and is *not* prose:
+// the test itself, the command modifier as an accelerator token, and how an
+// accelerator is drawn. A per-component `isMac` test is how those drift.
+//
+// The platform-specific *words* moved to `lib/i18n/` when the second language
+// arrived (ADR-0015): "Keychain" against "Windows Credential Manager" is one
+// choice, but each of them then has a Chinese form, and a `const` can only hold
+// one dimension. `IS_MAC` is exported for the catalogs to branch on.
 //
 // The test is the user agent rather than an IPC call: this decides labels that
 // are rendered on the first frame, and the webview already knows the answer
 // synchronously. Rust stays the source of truth for everything that is *state*
-// (ADR-0013) — the input permission below is a command, not a guess.
+// (ADR-0013) — the input permission is a command, not a guess.
 
 import type * as React from "react";
 
 export const IS_MAC = /\bMac(intosh| OS X)\b/.test(navigator.userAgent);
 
-/** What the OS calls the place the API key is kept (ADR-0005). */
-export const CREDENTIAL_STORE = IS_MAC ? "Keychain" : "Windows Credential Manager";
-
-/** Where Beckon sits when no window is open. */
-export const TRAY = IS_MAC ? "menu bar" : "tray";
-
-/** The autostart switch's name, which is the platform's own phrase for it. */
-export const AUTOSTART_LABEL = IS_MAC ? "Start at login" : "Start with Windows";
-
-/** What `theme = "system"` follows. */
-export const SYSTEM_APPEARANCE = IS_MAC ? "macOS appearance" : "Windows preference";
-
 /** The modifier the two window shortcuts use, as an accelerator token — the
- *  glyph is `formatAccelerator`'s to draw, so ⌘ stays in one place. */
+ *  glyph is `formatAccelerator`'s to draw, so ⌘ stays in one place. A token, not
+ *  a word: it is parsed, and it is the same in both languages. */
 export const COMMAND_MODIFIER = IS_MAC ? "Cmd" : "Ctrl";
-
-/** Which modifiers `hotkey::parse` accepts, in the platform's own names. The
- *  Rust side says the same thing in `MODIFIER_ADVICE`; this is the copy the
- *  recorder can show without a round trip. */
-export const MODIFIER_ADVICE = IS_MAC ? "Cmd, Control, Option or Shift" : "Ctrl, Alt or Shift";
-
-/** Why an empty grab happens here, which is not the same reason on both. */
-export const EMPTY_GRAB_CAUSE = IS_MAC
-  ? "Without Accessibility permission nothing can be read at all — Settings says so if that is what happened."
-  : "Elevated windows cannot be read at all.";
 
 /** True when the event carries this platform's command modifier. */
 export function hasCommandModifier(event: KeyboardEvent | React.KeyboardEvent) {

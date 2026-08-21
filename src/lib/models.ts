@@ -6,6 +6,7 @@
 // always among the options" invariant is what stops a select from silently
 // rewriting a configured model, and an invariant that load-bearing should be
 // readable without a DOM around it.
+import type { Strings } from "./i18n";
 import type { ModelCatalog, ModelOption } from "./types";
 
 /**
@@ -28,13 +29,15 @@ export function modelOption(id: string, catalog: ModelCatalog | null): ModelOpti
 }
 
 /** A model only the config vouches for: say so instead of dropping it. */
-export function unknownModelHint(id: string | null, catalog: ModelCatalog | null): string | null {
+export function unknownModelHint(
+  id: string | null,
+  catalog: ModelCatalog | null,
+  t: Strings,
+): string | null {
   if (!id) return null;
   if (modelOption(id, catalog)?.origin !== "configured") return null;
-  const missing = catalog?.live
-    ? "not in the endpoint's model list"
-    : "not one of the models Beckon knows";
-  return `${id} is ${missing}. Kept because your configuration names it.`;
+  const missing = catalog?.live ? t.controls.model.unknownLive : t.controls.model.unknownCatalog;
+  return t.controls.model.unknown(id, missing);
 }
 
 /**
@@ -47,9 +50,10 @@ export function thinkingWarning(
   model: string,
   thinking: boolean,
   catalog: ModelCatalog | null,
+  t: Strings,
 ): string | null {
   const support = modelOption(model, catalog)?.thinking;
-  if (support === "always-on" && !thinking) return `${model} always thinks; it cannot be turned off.`;
-  if (support === "never" && thinking) return `${model} cannot think; the request would be refused.`;
+  if (support === "always-on" && !thinking) return t.controls.model.alwaysThinks(model);
+  if (support === "never" && thinking) return t.controls.model.neverThinks(model);
   return null;
 }

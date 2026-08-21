@@ -37,6 +37,7 @@ pub struct Config {
     /// Declared before the tables: `toml` serializes in field order and a
     /// scalar written after a table would land inside it.
     pub theme: Theme,
+    pub language: Language,
     pub api: ApiConfig,
     pub defaults: ModelDefaults,
 }
@@ -54,6 +55,20 @@ pub enum Theme {
     Light,
     Dark,
     System,
+}
+
+/// Which language the three surfaces are written in.
+///
+/// `En` is the default, so an absent `language` resolves to English like every
+/// other missing field. There is no `system` arm the way [`Theme`] has one: the
+/// OS locale is a guess about a *reader*, not a setting, and a wrong guess here
+/// replaces every word in the product rather than its palette.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    #[default]
+    En,
+    Zh,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -80,6 +95,7 @@ impl Default for Config {
             launcher_hotkey: DEFAULT_LAUNCHER_HOTKEY.to_string(),
             autostart: true,
             theme: Theme::default(),
+            language: Language::default(),
             api: ApiConfig::default(),
             defaults: ModelDefaults::default(),
         }
@@ -185,6 +201,32 @@ mod tests {
     }
 
     #[test]
+    fn absent_language_is_english() {
+        assert_eq!(Config::default().language, Language::En);
+        assert_eq!(toml::from_str::<Config>("").unwrap().language, Language::En);
+        // Not the OS locale: Chinese has to be asked for.
+        assert_eq!(
+            toml::from_str::<Config>("language = \"zh\"\n")
+                .unwrap()
+                .language,
+            Language::Zh
+        );
+    }
+
+    #[test]
+    fn language_survives_a_toml_round_trip() {
+        for language in [Language::En, Language::Zh] {
+            let config = Config {
+                language,
+                ..Config::default()
+            };
+            let text = toml::to_string_pretty(&config).unwrap();
+            assert!(!text.contains("[api]\nlanguage"), "{text}");
+            assert_eq!(toml::from_str::<Config>(&text).unwrap(), config);
+        }
+    }
+
+    #[test]
     fn every_theme_round_trips_through_toml() {
         for theme in [Theme::Light, Theme::Dark, Theme::System] {
             let config = Config {
@@ -234,6 +276,7 @@ mod tests {
 launcher_hotkey = "{DEFAULT_LAUNCHER_HOTKEY}"
 autostart = true
 theme = "light"
+language = "en"
 
 [api]
 base_url = "https://api.deepseek.com"

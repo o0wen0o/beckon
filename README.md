@@ -1,5 +1,7 @@
 # Beckon
 
+English | [简体中文](./README.zh-CN.md)
+
 A background-resident LLM shortcut for Windows and macOS: press a hotkey to summon it, send a preset prompt plus your current input to DeepSeek, and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
 
 For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see [docs/adr/](./docs/adr/).
@@ -13,7 +15,8 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - An Action can also be bound to a Direct Hotkey — press it and go straight to the result with zero interaction
 - The platform's copy shortcut is simulated to grab the Selection — Ctrl+C, or Cmd+C on macOS — with the clipboard restored afterwards
 - Popover near the cursor: takes focus, streams output, supports follow-up turns, closes on Esc
-- Full settings window: API key, global hotkey, theme, global model defaults, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
+- Full settings window: API key, global hotkey, theme, language, global model defaults, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
+- English and Simplified Chinese, switched in Settings ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md))
 - Actions stored as TOML files, with a file watcher that reloads them automatically on external changes
 - OpenAI-compatible API, with a configurable `base_url`
 
@@ -55,13 +58,14 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - On first run (no key readable from the credential store), open the settings window directly, including a "Test connection" button — it sends a minimal request to verify the key and `base_url` on the spot.
 - On first run, if `actions/` does not exist, write two example Actions (one `selection` type and one `prompt` type) covering both main paths. Once deleted, they are not regenerated.
 - The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose OS appearance is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
+- The language is `en` or `zh`, and it applies to all three surfaces *and* the tray menu at once. **The default is `en`**, on a Chinese machine too, and there is no `system` arm: an OS locale is a guess about a reader rather than a setting, and a wrong guess replaces every word in the product — including the words explaining how to change it back ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)). Your Actions are never translated in either direction: they are your words, in your files.
 
 ## Config file layout
 
 ```
 %APPDATA%\Beckon\                        # Windows
 ~/Library/Application Support/Beckon/    # macOS
-├── config.toml        # global hotkey, autostart, theme, base_url, global model defaults
+├── config.toml        # global hotkey, autostart, theme, language, base_url, global model defaults
 └── actions/
     ├── translate.toml
     └── ask.toml
@@ -79,6 +83,7 @@ An Action's **identity is its filename**; the `name` field is only for display.
 launcher_hotkey = "Ctrl+Shift+Space" # "Cmd+Shift+Space" is the macOS default
 autostart = true
 theme = "light"                 # light | dark | system
+language = "en"                 # en | zh
 
 [api]
 base_url = "https://api.deepseek.com"
