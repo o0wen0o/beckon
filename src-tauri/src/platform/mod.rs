@@ -39,9 +39,13 @@ pub use self::fallback::{focus, permission, selection, snip};
 /// which is why this is surfaced instead of inferred from an empty grab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-// The other two variants are unreachable where nothing has to be granted, but
-// they are part of the shape the frontend switches on either way.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+// Every target constructs a proper subset: Windows and the fallback only ever
+// answer `NotRequired`, macOS only ever `Granted` or `Denied`. The variants the
+// current target cannot reach are still part of the shape the frontend switches
+// on, and `NotRequired`'s only macOS construction is in `mod tests`, which the
+// bin target's dead-code pass does not see — so the exemption is unconditional
+// rather than one target's leftovers.
+#[allow(dead_code)]
 pub enum InputPermission {
     NotRequired,
     Granted,
