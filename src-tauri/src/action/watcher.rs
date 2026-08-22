@@ -32,7 +32,10 @@ pub struct SelfWrites {
 impl SelfWrites {
     pub fn mark(&self, path: &Path) {
         let mut map = self.inner.lock().expect("self-write lock");
-        map.insert(path.to_path_buf(), Instant::now());
+        // Keyed the way the watcher will report it, not the way we wrote it: on
+        // macOS the two differ whenever the config directory is reached through a
+        // symlink, and an unrecognised echo is a reload mid-edit.
+        map.insert(crate::platform::watch_path(path), Instant::now());
         map.retain(|_, at| at.elapsed() < SUPPRESSION);
     }
 
@@ -40,7 +43,7 @@ impl SelfWrites {
     /// genuine external edit right after our own write is not swallowed twice.
     pub fn take(&self, path: &Path) -> bool {
         let mut map = self.inner.lock().expect("self-write lock");
-        match map.remove(path) {
+        match map.remove(&crate::platform::watch_path(path)) {
             Some(at) => at.elapsed() < SUPPRESSION,
             None => false,
         }
@@ -72,6 +75,15 @@ where
     F: Fn(Change) + Send + 'static,
 {
     std::fs::create_dir_all(&watched.actions_dir).map_err(|e| e.to_string())?;
+
+    // Classify against the reported form of each path, resolved after the
+    // directories exist. Without this, macOS reports every event under the
+    // symlink-free path and `classify` matches none of them.
+    let watched = Watched {
+        root: crate::platform::watch_path(&watched.root),
+        config_file: crate::platform::watch_path(&watched.config_file),
+        actions_dir: crate::platform::watch_path(&watched.actions_dir),
+    };
 
     let (tx, rx) = std::sync::mpsc::channel::<DebounceEventResult>();
     let mut debouncer = new_debouncer(DEBOUNCE, None, tx).map_err(|e| e.to_string())?;

@@ -10,6 +10,8 @@
 //! snip produced rather than how to produce them, and the geometry below. Those
 //! are the parts of this layer that can be unit-tested.
 
+use std::path::{Path, PathBuf};
+
 use serde::Serialize;
 
 pub mod capture;
@@ -50,6 +52,36 @@ pub enum InputPermission {
     NotRequired,
     Granted,
     Denied,
+}
+
+/// Rewrite a path into the form the OS watcher will report it in (ADR-0003).
+///
+/// macOS FSEvents resolves symlinks before it reports, so a config directory
+/// reached through one — `$TMPDIR`'s `/var` → `/private/var`, a symlinked home —
+/// arrives under a path that never equals the one we asked to watch, and every
+/// edit is silently classified as belonging to neither `config.toml` nor
+/// `actions/`. Windows is deliberately left alone: `canonicalize` there returns
+/// a `\\?\` verbatim path, which is *not* what `ReadDirectoryChangesW` — and so
+/// `notify` — reports, so resolving would break the match it fixes on macOS.
+#[cfg(target_os = "macos")]
+pub fn watch_path(path: &Path) -> PathBuf {
+    // Resolve the parent rather than the path: `mark` runs before the write, and
+    // a rename's "from" path is already gone, so the file itself often does not
+    // exist. The directory holding it always does.
+    match (path.parent(), path.file_name()) {
+        (Some(parent), Some(name)) => match parent.canonicalize() {
+            Ok(dir) => dir.join(name),
+            // An unresolvable parent leaves both sides unresolved, which still
+            // agree with each other.
+            Err(_) => path.to_path_buf(),
+        },
+        _ => path.canonicalize().unwrap_or_else(|_| path.to_path_buf()),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn watch_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 /// A monitor's usable area in physical pixels (taskbar, Dock and menu bar
