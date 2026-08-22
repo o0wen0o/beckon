@@ -216,9 +216,17 @@ export function ActionEditor({ action }: ActionEditorProps) {
         >
           {/* Destructive up front, not only once the pointer is over it: hover is
               not a state a keyboard user passes through. The outline carries that
-              at rest; solid red is the confirmation dialog's. */}
+              at rest; solid red is the confirmation dialog's.
+
+              Sized like the controls above it rather than as the pane's one
+              filled button: the colour is what makes this row findable, so the
+              extra box only made deleting look like the thing to do here. */}
           {() => (
-            <Button variant="destructive-outline" onClick={() => store.askDelete(action)}>
+            <Button
+              variant="destructive-outline"
+              size="sm-note"
+              onClick={() => store.askDelete(action)}
+            >
               {t.settings.actions.deleteButton}
             </Button>
           )}

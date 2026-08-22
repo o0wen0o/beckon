@@ -189,8 +189,14 @@ export function Connection() {
         >
           {() => (
             <div className="flex items-center gap-2">
+              {/* One register down, like Refresh models on the pane it shares a
+                  purpose with: this is a check, not a commit, and the readout
+                  beside it is already 12px. `font-medium` over `outline`'s own
+                  400 — at 12px the light weight goes thinner than the label. */}
               <Button
                 variant="outline"
+                size="sm"
+                className="text-note font-medium"
                 onClick={() => void runTest()}
                 disabled={store.test.state === "running"}
               >

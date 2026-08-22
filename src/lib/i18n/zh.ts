@@ -257,6 +257,7 @@ export const ZH: Strings = {
       change: "更改…",
       recording: "请按下按键…",
       clear: "清除专属热键",
+      clearShort: "清除",
       needsModifier: (advice: string) => `请加上 ${advice} —— 无修饰键的热键会在任何地方触发。`,
     },
     model: {

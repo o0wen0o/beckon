@@ -48,13 +48,24 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        // Beckon's addition, for the Popover's quiet buttons alone. `text-note`
-        // rather than Tailwind's `text-xs`: the same 12px, on our scale. The
-        // padding is deliberately *not* split by `has-[>svg]` — narrowing a
-        // button with an icon is right for a boxed control and wrong for a
-        // borderless one, where it parks the labels 2px apart.
+        // Beckon's addition, for the quiet buttons that carry no box: the
+        // Popover's, and the hotkey row in Settings, which is a chip plus the two
+        // buttons that change it. `text-note` rather than Tailwind's `text-xs`:
+        // the same 12px, on our scale. The padding is deliberately *not* split by
+        // `has-[>svg]` — narrowing a button with an icon is right for a boxed
+        // control and wrong for a borderless one, where it parks the labels 2px
+        // apart.
         xs: "h-6 gap-1.5 rounded-md px-1.5 text-note [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
+        // Beckon's addition, and `xs`'s boxed sibling: the same 12px register,
+        // still carrying a box. The Settings panes read one register down since
+        // ADR-0019/ADR-0020, so a 36px 14px button beside those controls read as
+        // the thing to press on a pane whose point is the rows above it. The
+        // weight is part of the size, not the call site's business: `outline`
+        // and `ghost` drop to 400, and at 12px that is thinner than the label
+        // beside it — cva emits `size` after `variant`, so saying it here is
+        // what keeps two panes from each answering it differently.
+        "sm-note": "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-note font-medium",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
         icon: "size-9",
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",

@@ -20,11 +20,11 @@ export function ModelDefaults() {
   const catalog = store.models;
   const model = config?.defaults.model ?? null;
 
-  // One option list, derived from once, rather than the four independent calls
-  // three of which then scanned it for the same id. The memo still earns its
-  // keep after the temperature slider left: `modelOptions` allocates a fresh
-  // array for a configured-but-unknown model, and `ModelSelect` memoises its
-  // own filtering on `[options]`, so a new identity here re-filters there.
+  // Memoised for identity, not for the list-building: `modelOptions` allocates a
+  // fresh array for a configured-but-unknown model, and `ModelSelect` memoises
+  // its own filtering on `[options]`, so a new identity here re-filters there.
+  // The two hint helpers below still rebuild the list internally — cheap enough
+  // to leave alone, and passing it in would be a signature change in lib/models.
   const options = React.useMemo(() => modelOptions(model ?? "", catalog), [model, catalog]);
   const modelHint = unknownModelHint(model, catalog, t);
   const modelInfo = options.find((option) => option.id === model)?.description ?? "";
@@ -102,6 +102,7 @@ export function ModelDefaults() {
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
+                    size="sm-note"
                     onClick={() => void store.refreshModels()}
                     disabled={store.modelsLoading}
                   >

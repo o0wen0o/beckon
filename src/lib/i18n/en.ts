@@ -295,6 +295,10 @@ export const EN = {
       change: "Change…",
       recording: "Press keys…",
       clear: "Clear the Direct Hotkey",
+      // The button's visible word, separate from the sentence above it: the
+      // label a screen reader reads has to name *which* hotkey, and the same
+      // sentence on a 12px button would make Clear the widest thing in the row.
+      clearShort: "Clear",
       needsModifier: (advice: string) => `Add ${advice} — a bare key would fire everywhere.`,
     },
     model: {
