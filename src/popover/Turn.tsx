@@ -67,11 +67,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
                   className="max-h-40 rounded border object-contain"
                 />
                 <span className={cn(QUIET, "text-meta")}>
-                  {t.popover.captureMeta(
-                    capture.width,
-                    capture.height,
-                    Math.round(capture.bytes / 1024),
-                  )}
+                  {t.popover.captureMeta(capture.width, capture.height, capture.bytes)}
                 </span>
               </>
             ) : null}

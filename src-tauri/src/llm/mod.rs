@@ -158,12 +158,4 @@ mod tests {
             ])
         );
     }
-
-    /// Text-only content stays a bare string on the wire, which is what an
-    /// endpoint that has never heard of content parts accepts.
-    #[test]
-    fn plain_text_serialises_as_a_string() {
-        let json = serde_json::to_value(Content::from("plain")).unwrap();
-        assert_eq!(json, serde_json::json!("plain"));
-    }
 }

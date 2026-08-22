@@ -128,6 +128,11 @@ not rejected — `input_source` is where it would go.
 - Two new dependencies, both narrow: `base64`, and `image` with `png`/`bmp`/`tiff` only — the
   clipboard hands over a BMP on Windows and a TIFF on macOS, and neither is a format the provider
   takes.
+- `platform/capture.rs` hands up a `Fault` — the *fact* that the snip was over the ceiling, with the
+  number — and never the sentence about it. `platform/` has no `Language` in reach, so the size
+  refusal is phrased by `i18n::capture_too_large` where the config is known
+  ([ADR-0015](./0015-english-and-chinese-from-one-config-field.md)). The sibling `capture-unreadable`
+  message stays the decoder's own words, which are a cause quoted verbatim.
 - Beckon knows nothing about which models read images, so `llm::models::CatalogEntry` has no
   `vision` column and `deepseek::build_body` has no image guard. A Capture sent to a text-only model
   surfaces the provider's own error through the existing failure path, in its words rather than

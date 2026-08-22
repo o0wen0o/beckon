@@ -91,7 +91,8 @@ pub fn write_clipboard_text(text: &str) -> Result<(), String> {
 
 /// The pasteboard's own change counter — the exact analogue of Win32's
 /// clipboard sequence number, and the reason neither platform has to sleep.
-fn change_count() -> isize {
+/// `pub(super)` because the Capture grab reads the same counter (ADR-0016).
+pub(super) fn change_count() -> isize {
     NSPasteboard::generalPasteboard().changeCount()
 }
 

@@ -29,7 +29,17 @@ import {
   Subscriptions,
 } from "../lib/ipc";
 import { Notifier } from "../lib/store";
-import type { Capture, Failure, PopoverView } from "../lib/types";
+import type { Capture, CapturePayload, Failure, PopoverView } from "../lib/types";
+
+/**
+ * Whether there is anything to send. A Capture is input on its own: the Action's
+ * own prompt is the question being asked about it (ADR-0016).
+ *
+ * A free function rather than a getter, because the draft lives in the composer
+ * and the guard lives in the store — one rule, read from both sides.
+ */
+export const sendable = (text: string, capture: Capture | null) =>
+  text !== "" || capture !== null;
 
 export type Status =
   | "waiting-first-token"
@@ -123,12 +133,6 @@ class ExchangeStore extends Notifier {
     return this.view !== null && (this.view.phase === "needs-input" || this.canFollowUp);
   }
 
-  /** Whether there is anything to send. A Capture is input on its own: the
-   *  Action's own prompt is the question being asked about it (ADR-0016). */
-  get sendable() {
-    return this.capture !== null;
-  }
-
   /** `PopoverPhase` is resolved in Rust so the rule lives in one place; picking
    *  the notice here keeps the second half of it out of markup. */
   get notice(): Notice {
@@ -155,9 +159,7 @@ class ExchangeStore extends Notifier {
       .add(onPopoverView(() => void this.load()))
       .add(
         onPopoverCapture((payload) => {
-          this.capture = payload.capture;
-          this.captureCancelled = payload.cancelled;
-          this.captureError = payload.error;
+          this.#adoptCapture(payload);
           this.notify();
         }),
       )
@@ -233,9 +235,11 @@ class ExchangeStore extends Notifier {
     // A Capture belongs to the Popover that was showing, so a fresh trigger
     // starts with nothing attached — and Rust says so, rather than this
     // assuming it.
-    this.capture = this.view?.capture ?? null;
-    this.captureCancelled = this.view?.capture_cancelled ?? false;
-    this.captureError = this.view?.capture_error ?? null;
+    this.#adoptCapture({
+      capture: this.view?.capture ?? null,
+      cancelled: this.view?.capture_cancelled ?? false,
+      error: this.view?.capture_error ?? null,
+    });
     if (!this.view) {
       this.turns = [];
       this.notify();
@@ -263,13 +267,11 @@ class ExchangeStore extends Notifier {
   // --- the user's side ----------------------------------------------------
 
   async send(text: string) {
-    if ((text === "" && !this.sendable) || this.busy) return;
+    if (!sendable(text, this.capture) || this.busy) return;
     // Taken now: Rust consumes it as the turn is started, and the turn keeps it
     // for its own question card.
     const capture = this.capture;
-    this.capture = null;
-    this.captureCancelled = false;
-    this.captureError = null;
+    this.#adoptCapture({ capture: null, cancelled: false, error: null });
 
     if (this.view && this.view.exchange_id && this.turns.length > 0) {
       this.turns = [...this.turns, this.#newTurn(text, capture)];
@@ -287,15 +289,10 @@ class ExchangeStore extends Notifier {
     try {
       const exchangeId = await submitInput(text);
       if (this.view) {
-        this.view = {
-          ...this.view,
-          phase: "running",
-          exchange_id: exchangeId,
-          input: text,
-          capture: null,
-          capture_cancelled: false,
-          capture_error: null,
-        };
+        // The three capture fields are deliberately left as they were: they are
+        // only ever read by `load`, which replaces the whole view with Rust's
+        // own (ADR-0003), so nulling them here would be a write nothing reads.
+        this.view = { ...this.view, phase: "running", exchange_id: exchangeId, input: text };
         this.notify();
       }
     } catch (error) {
@@ -358,6 +355,14 @@ class ExchangeStore extends Notifier {
   }
 
   // --- internals ----------------------------------------------------------
+
+  /** Rust owns all three (ADR-0003); they arrive together and are adopted
+   *  together, from the event and from a fresh view alike. */
+  #adoptCapture(payload: CapturePayload) {
+    this.capture = payload.capture;
+    this.captureCancelled = payload.cancelled;
+    this.captureError = payload.error;
+  }
 
   #newTurn(question: string, capture: Capture | null = null): Turn {
     this.#startWaiting();

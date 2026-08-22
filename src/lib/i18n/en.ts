@@ -118,9 +118,10 @@ export const EN = {
     captureCancelled: "Nothing was captured.",
     captureRetry: (accelerator: string) => `Press ${accelerator} to try again.`,
     captureNote: "Add a note about the screenshot…",
-    /** Beside the thumbnail: what was captured, and how big it is. */
-    captureMeta: (width: number, height: number, kilobytes: number) =>
-      `${width}×${height} · PNG ${kilobytes} KB`,
+    /** Beside the thumbnail: what was captured, and how big it is. Takes the
+     *  raw byte count, so the two thumbnails cannot round it differently. */
+    captureMeta: (width: number, height: number, bytes: number) =>
+      `${width}×${height} · PNG ${Math.round(bytes / 1024)} KB`,
   },
 
   settings: {

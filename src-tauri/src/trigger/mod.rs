@@ -14,13 +14,14 @@ pub mod window;
 
 use std::sync::atomic::Ordering;
 
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::action::InputSource;
 use crate::exchange;
 use crate::llm::Content;
 use crate::platform;
-use crate::platform::capture::Outcome;
+use crate::platform::capture::{Capture, CaptureError};
 use crate::state::{AppState, PopoverPhase, PopoverView};
 
 use self::foreground::{remember_foreground, restore_foreground_if_idle};
@@ -177,19 +178,23 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
 /// attached to, so sending consumes it (ADR-0016).
 pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
     let state = app.state::<AppState>();
-    let view = state
+    // Only the identity is read from the view here. Cloning the whole thing
+    // would copy the attached Capture's base64 — megabytes — to reach one
+    // `String`, and the Capture itself is moved out below.
+    let action_id = state
         .popover_view
         .lock()
         .expect("popover view lock")
-        .clone()
+        .as_ref()
+        .map(|view| view.action_id.clone())
         .ok_or_else(|| "there is no Action to send".to_string())?;
 
     let (action, defaults) = {
         let registry = state.registry.read().expect("registry lock");
         let action = registry
-            .get(&view.action_id)
+            .get(&action_id)
             .cloned()
-            .ok_or_else(|| format!("the Action \"{}\" no longer exists", view.action_id))?;
+            .ok_or_else(|| format!("the Action \"{action_id}\" no longer exists"))?;
         (action, state.config_snapshot().defaults)
     };
 
@@ -197,9 +202,16 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
     let exchange_id = state
         .exchanges
         .create(&action.file.prompt.system, params.clone());
+    let content = {
+        let mut slot = state.popover_view.lock().expect("popover view lock");
+        // Consumed by the turn: it is in the history now, and leaving it
+        // attached would send it a second time with the next follow-up.
+        let capture = slot.as_mut().and_then(PopoverView::take_capture);
+        user_content(&action.render_user(text), capture)
+    };
     let plan = state
         .exchanges
-        .begin_turn(&exchange_id, user_content(&action.render_user(text), &view))
+        .begin_turn(&exchange_id, content)
         .ok_or_else(|| "the Exchange disappeared".to_string())?;
 
     {
@@ -209,11 +221,6 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
             view.input = Some(text.to_string());
             view.exchange_id = Some(exchange_id.clone());
             view.model = params;
-            // Consumed by the turn: it is in the history now, and leaving it
-            // attached would send it a second time with the next follow-up.
-            view.capture = None;
-            view.capture_cancelled = false;
-            view.capture_error = None;
         }
     }
 
@@ -226,28 +233,18 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
 /// A Capture attached after the first answer belongs to this turn, exactly as
 /// one attached before the first did.
 pub fn follow_up(app: &AppHandle, exchange_id: &str, text: &str) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let content = {
-        let mut slot = state.popover_view.lock().expect("popover view lock");
-        match slot.as_mut() {
-            Some(view) => {
-                let content = user_content(text, view);
-                view.capture = None;
-                view.capture_cancelled = false;
-                view.capture_error = None;
-                content
-            }
-            // No view is not a state a follow-up can reach; text alone is the
-            // answer that cannot be wrong if it ever does.
-            None => Content::from(text),
-        }
-    };
-    let plan = state
-        .exchanges
-        .begin_turn(exchange_id, content)
-        .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
-    exchange::spawn_turn(app.clone(), plan);
-    Ok(())
+    let capture = app
+        .state::<AppState>()
+        .popover_view
+        .lock()
+        .expect("popover view lock")
+        .as_mut()
+        // No view is not a state a follow-up can reach; nothing attached is the
+        // answer that cannot be wrong if it ever does.
+        .and_then(PopoverView::take_capture);
+    // Straight into `retry`, which is exactly "begin this content and spawn the
+    // turn" — the only difference between the two is where the content is from.
+    retry(app, exchange_id, user_content(text, capture))
 }
 
 /// Resend a turn verbatim. A retry repeats the message that failed — the same
@@ -265,9 +262,13 @@ pub fn retry(app: &AppHandle, exchange_id: &str, content: Content) -> Result<(),
 /// One turn worth of content: the rendered text, plus the attached Capture when
 /// there is one. The only place the two are joined, so "the image goes with the
 /// words typed beside it" is a single rule (ADR-0016).
-fn user_content(text: &str, view: &PopoverView) -> Content {
-    match &view.capture {
-        Some(capture) => Content::with_image(text, capture.data_url.clone()),
+///
+/// The Capture arrives by value because every caller has just taken it out of
+/// the view: its base64 is megabytes, and it is moved onto the wire rather than
+/// copied there.
+fn user_content(text: &str, capture: Option<Capture>) -> Content {
+    match capture {
+        Some(capture) => Content::with_image(text, capture.data_url),
         None => Content::from(text),
     }
 }
@@ -296,13 +297,11 @@ pub fn start_capture(app: &AppHandle) {
         }
         let mut slot = state.popover_view.lock().expect("popover view lock");
         match slot.as_mut() {
-            // A second attempt clears the first one outcome, so the window
+            // A second attempt clears what the first one said, so the window
             // cannot come back saying "nothing was captured" over a fresh
-            // Capture.
-            Some(view) => {
-                view.capture_cancelled = false;
-                view.capture_error = None;
-            }
+            // Capture. Only the notices: the Capture already attached stays
+            // until this snip lands.
+            Some(view) => view.clear_capture_notices(),
             // Nothing to capture *for*: no Action is loaded. The flag has to go
             // back down on the way out, or the button is dead for good.
             None => {
@@ -325,26 +324,13 @@ pub fn start_capture(app: &AppHandle) {
 
         {
             let state = app.state::<AppState>();
+            // Read after the snip, not before it: the user had up to 45 seconds
+            // in the snip tool, and the sentence belongs in the language the
+            // config holds now (ADR-0015).
+            let language = state.config_snapshot().language;
             let mut slot = state.popover_view.lock().expect("popover view lock");
             if let Some(view) = slot.as_mut() {
-                // A snip that produced nothing leaves the previous Capture
-                // alone: the user pressed Esc in the snip tool, not in the
-                // Popover.
-                match outcome {
-                    Outcome::Captured(capture) => {
-                        view.capture = Some(capture);
-                        view.capture_cancelled = false;
-                        view.capture_error = None;
-                    }
-                    Outcome::Nothing => {
-                        view.capture_cancelled = true;
-                        view.capture_error = None;
-                    }
-                    Outcome::Failed(error) => {
-                        view.capture_cancelled = false;
-                        view.capture_error = Some(error);
-                    }
-                }
+                view.apply_capture(outcome, language);
             }
         }
 
@@ -367,32 +353,40 @@ pub fn discard_capture(app: &AppHandle) {
         let state = app.state::<AppState>();
         let mut slot = state.popover_view.lock().expect("popover view lock");
         let Some(view) = slot.as_mut() else { return };
-        view.capture = None;
-        view.capture_cancelled = false;
-        view.capture_error = None;
+        view.clear_capture();
     }
     emit_capture(app);
 }
 
-/// The two fields of the view a Capture can change, as one payload. The window
-/// is told what they now are, rather than told to go and look: looking means
-/// `get_popover_view`, which is the new-trigger path.
+/// The three fields of the view a Capture can change, as one payload.
+///
+/// Borrowed from the view rather than cloned into a `serde_json::Value`: the
+/// base64 is megabytes and Tauri serialises the payload anyway, so a `Value` in
+/// between would be one whole copy of the image for nothing. `Clone` is what
+/// `emit_to` asks for, and cloning this copies two references rather than the
+/// megabytes behind them.
+#[derive(Serialize, Clone, Default)]
+struct CapturePayload<'a> {
+    capture: Option<&'a Capture>,
+    cancelled: bool,
+    error: Option<&'a CaptureError>,
+}
+
+/// Tell the window what the three fields now are, rather than telling it to go
+/// and look: looking means `get_popover_view`, which is the new-trigger path.
+///
+/// The guard is held across the emit, which is allowed — this is a plain `std`
+/// lock and `emit_to` is not a suspension point.
 fn emit_capture(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let payload = {
-        let slot = state.popover_view.lock().expect("popover view lock");
-        match slot.as_ref() {
-            Some(view) => serde_json::json!({
-                "capture": view.capture,
-                "cancelled": view.capture_cancelled,
-                "error": view.capture_error,
-            }),
-            None => serde_json::json!({
-                "capture": null,
-                "cancelled": false,
-                "error": null,
-            }),
-        }
+    let slot = state.popover_view.lock().expect("popover view lock");
+    let payload = match slot.as_ref() {
+        Some(view) => CapturePayload {
+            capture: view.capture.as_ref(),
+            cancelled: view.capture_cancelled,
+            error: view.capture_error.as_ref(),
+        },
+        None => CapturePayload::default(),
     };
     let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_CAPTURE, payload);
 }

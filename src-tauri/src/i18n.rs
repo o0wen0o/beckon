@@ -184,6 +184,28 @@ pub fn test_needs_key(language: Language) -> &'static str {
     }
 }
 
+// --- the Capture ----------------------------------------------------------
+
+/// A screenshot over Beckon's ceiling (ADR-0016). Beckon's own prose with
+/// Beckon's own advice, so it belongs here rather than in `platform/`, which
+/// hands up the two numbers and has no `Language` in reach.
+///
+/// Said in whole mebibytes: the numbers are megabyte-scale, and a byte count is
+/// not something a reader can act on.
+pub fn capture_too_large(language: Language, bytes: usize, max: usize) -> String {
+    let mib = |value: usize| (value as f64) / (1024.0 * 1024.0);
+    let (bytes, max) = (mib(bytes), mib(max));
+    match language {
+        Language::En => format!(
+            "the screenshot is {bytes:.1} MB, over Beckon's {max:.0} MB limit; \
+             capture a smaller region"
+        ),
+        Language::Zh => {
+            format!("这张截图有 {bytes:.1} MB，超过 Beckon 的 {max:.0} MB 上限；请截取更小的范围")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +234,7 @@ mod tests {
             models_need_key(Language::En).to_string(),
             models_empty(Language::En).to_string(),
             test_needs_key(Language::En).to_string(),
+            capture_too_large(Language::En, 1, 2),
         ];
         let zh = [
             tray_settings(Language::Zh).to_string(),
@@ -233,6 +256,7 @@ mod tests {
             models_need_key(Language::Zh).to_string(),
             models_empty(Language::Zh).to_string(),
             test_needs_key(Language::Zh).to_string(),
+            capture_too_large(Language::Zh, 1, 2),
         ];
         for (english, chinese) in en.iter().zip(zh.iter()) {
             assert_ne!(english, chinese, "untranslated: {english}");
@@ -249,6 +273,11 @@ mod tests {
             assert!(hotkey_invalid(language, "Banana+T", "why").contains("why"));
             assert!(hotkey_needs_modifier(language, "T").contains("T"));
             assert!(tray_error_body(language, "summary").contains("summary"));
+            // Both numbers, or a reader who hits the ceiling cannot tell what
+            // to aim under.
+            let too_large = capture_too_large(language, 9 * 1024 * 1024, 8 * 1024 * 1024);
+            assert!(too_large.contains("9.0"), "{too_large}");
+            assert!(too_large.contains("8 MB"), "{too_large}");
         }
     }
 }

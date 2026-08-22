@@ -17,14 +17,15 @@
 //!    silently and that is handled by the Action's `input_source`.
 
 use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use windows::Win32::System::DataExchange::GetClipboardSequenceNumber;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
     KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_RCONTROL, VK_RMENU,
     VK_RSHIFT, VK_RWIN,
 };
+
+use super::clipboard;
 
 /// `C`. Spelled out because the named constant is not in every `windows`
 /// release, and this value is fixed by the platform.
@@ -56,14 +57,15 @@ pub fn grab_selection() -> Option<String> {
     sleep(MODIFIER_SETTLE);
 
     let backup = read_clipboard_text();
-    let before = sequence_number();
+    let before = clipboard::sequence_number();
 
     if let Err(err) = send_ctrl_c() {
         log::warn!("could not synthesise Ctrl+C: {err}");
         return None;
     }
 
-    let grabbed = poll_for_new_clipboard_text(before);
+    let grabbed =
+        clipboard::poll_until_written(before, POLL_CAP, POLL_INTERVAL, read_clipboard_text);
 
     // Restore before returning, whatever happened, and let the backup drop at
     // the end of this scope — no long-lived copy of the user's clipboard.
@@ -78,11 +80,6 @@ pub fn write_clipboard_text(text: &str) -> Result<(), String> {
     clipboard_win::set_clipboard_string(text).map_err(|e| e.to_string())
 }
 
-fn sequence_number() -> u32 {
-    // Safe: no arguments, no handles, returns 0 if we lack clipboard access.
-    unsafe { GetClipboardSequenceNumber() }
-}
-
 fn read_clipboard_text() -> Option<String> {
     clipboard_win::get_clipboard_string().ok()
 }
@@ -94,24 +91,6 @@ fn restore_clipboard(backup: Option<String>) {
     if let Err(err) = clipboard_win::set_clipboard_string(&text) {
         log::warn!("could not restore the clipboard: {err}");
     }
-}
-
-/// Poll the sequence number until it moves, then read. Returns `None` on
-/// timeout: elevated windows never respond and must not hang the trigger.
-fn poll_for_new_clipboard_text(before: u32) -> Option<String> {
-    let deadline = Instant::now() + POLL_CAP;
-    while Instant::now() < deadline {
-        if sequence_number() != before {
-            // The number changes when the owner *opens* the clipboard, which
-            // can happen a beat before the data is readable; a failed read is
-            // retried on the next tick.
-            if let Some(text) = read_clipboard_text() {
-                return Some(text);
-            }
-        }
-        sleep(POLL_INTERVAL);
-    }
-    None
 }
 
 fn release_held_modifiers() {

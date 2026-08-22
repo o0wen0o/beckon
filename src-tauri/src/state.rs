@@ -13,10 +13,10 @@ use serde::Serialize;
 use crate::action::registry::Registry;
 use crate::action::watcher::{SelfWrites, WatcherGuard};
 use crate::action::ModelParams;
-use crate::config::Config;
+use crate::config::{Config, Language};
 use crate::exchange::ExchangeManager;
 use crate::hotkey::HotkeyState;
-use crate::platform::capture::{Capture, CaptureError};
+use crate::platform::capture::{self, Capture, CaptureError, Fault, Outcome};
 
 /// The Beckon directory and the two paths inside it (README): `%APPDATA%\Beckon\`
 /// on Windows, `~/Library/Application Support/Beckon/` on macOS.
@@ -103,6 +103,62 @@ pub struct PopoverView {
     /// bytes no decoder recognised. Distinct from `capture_cancelled`, because
     /// the two have different advice attached.
     pub capture_error: Option<CaptureError>,
+}
+
+/// The three capture fields are only ever moved through these, because the
+/// difference between the three moves is the whole subtlety (ADR-0016): a snip
+/// that produced nothing must leave a previously attached Capture alone, while
+/// sending one must not leave it attached to be sent twice. Field-by-field at
+/// the call sites is how one of the three drifts.
+impl PopoverView {
+    /// Take the attached Capture for the turn that is starting, and drop what
+    /// the last snip had to say with it.
+    pub fn take_capture(&mut self) -> Option<Capture> {
+        self.clear_capture_notices();
+        self.capture.take()
+    }
+
+    /// Nothing attached, and nothing said — the remove-the-screenshot button.
+    pub fn clear_capture(&mut self) {
+        self.take_capture();
+    }
+
+    /// Only what the last snip said. What a *new* snip starts with: the Capture
+    /// already attached stays until this one lands, so an Esc leaves the user
+    /// with what they had.
+    pub fn clear_capture_notices(&mut self) {
+        self.capture_cancelled = false;
+        self.capture_error = None;
+    }
+
+    /// Record what one run of the snip tool produced.
+    ///
+    /// `Nothing` and `Failed` deliberately leave `capture` alone: the user
+    /// pressed Esc in the snip tool, not in the Popover.
+    pub fn apply_capture(&mut self, outcome: Outcome, language: Language) {
+        self.clear_capture_notices();
+        match outcome {
+            Outcome::Captured(capture) => self.capture = Some(capture),
+            Outcome::Nothing => self.capture_cancelled = true,
+            Outcome::Failed(fault) => self.capture_error = Some(describe_fault(language, fault)),
+        }
+    }
+}
+
+/// A [`Fault`] as the kind-plus-message pair the Popover reads.
+///
+/// The kind is a contract string the frontend catalogs key on; the message is
+/// either Beckon's own sentence in the reader's language or a cause quoted
+/// verbatim from a decoder that does not speak it (ADR-0015). `platform/` hands
+/// up the fact precisely so this choice is made where the language is known.
+fn describe_fault(language: Language, fault: Fault) -> CaptureError {
+    match fault {
+        Fault::TooLarge { bytes } => CaptureError::new(
+            "capture-too-large",
+            crate::i18n::capture_too_large(language, bytes, capture::MAX_BYTES),
+        ),
+        Fault::Unreadable(detail) => CaptureError::new("capture-unreadable", detail),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

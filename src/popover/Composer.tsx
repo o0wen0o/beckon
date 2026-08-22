@@ -18,10 +18,12 @@ import { describeFailure } from "@/lib/failures";
 import { useT } from "@/lib/i18n";
 import { COMMAND_MODIFIER, formatAccelerator } from "@/lib/platform";
 import type { Capture, Failure } from "@/lib/types";
+import { sendable } from "./exchange";
 
-/** The Popover-local shortcut for a screenshot, drawn in the platform's own
- *  spelling. Not a global hotkey: it only means anything with this window up. */
-export const CAPTURE_ACCELERATOR = `${COMMAND_MODIFIER}+Shift+S`;
+/** The Popover-local shortcut for a screenshot, drawn once in the platform's
+ *  own spelling. Not a global hotkey: it only means anything with this window
+ *  up, and `Popover.tsx` is what listens for the chord. */
+const CAPTURE_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+S`);
 
 interface ComposerProps {
   placeholder: string;
@@ -60,14 +62,11 @@ export function Composer({
     if (capture) box.current?.focus();
   }, [capture]);
 
-  const accelerator = formatAccelerator(CAPTURE_ACCELERATOR);
   const text = draft.trim();
-  // A Capture is input on its own: the Action's prompt is the question being
-  // asked about it, so an empty box is not an empty turn (ADR-0016).
-  const sendable = text !== "" || capture !== null;
+  const canSend = sendable(text, capture);
 
   const send = () => {
-    if (!sendable) return;
+    if (!canSend) return;
     setDraft("");
     onSend(text);
   };
@@ -85,7 +84,7 @@ export function Composer({
       ) : captureCancelled ? (
         // Not an alarm: nothing was captured, so nothing was sent.
         <p className="text-muted-quiet text-note">
-          {t.popover.captureCancelled} {t.popover.captureRetry(accelerator)}
+          {t.popover.captureCancelled} {t.popover.captureRetry(CAPTURE_ACCELERATOR)}
         </p>
       ) : null}
 
@@ -95,11 +94,7 @@ export function Composer({
         <div className="bg-muted flex items-center gap-2 self-start rounded-md border py-1 pr-1 pl-2">
           <img src={capture.data_url} alt="" className="h-8 w-12 rounded border object-cover" />
           <span className="text-muted-foreground text-quiet">
-            {t.popover.captureMeta(
-              capture.width,
-              capture.height,
-              Math.round(capture.bytes / 1024),
-            )}
+            {t.popover.captureMeta(capture.width, capture.height, capture.bytes)}
           </span>
           <Button
             variant="ghost"
@@ -120,8 +115,8 @@ export function Composer({
           variant="outline"
           size="icon"
           className="flex-none"
-          aria-label={t.popover.captureTooltip(accelerator)}
-          title={t.popover.captureTooltip(accelerator)}
+          aria-label={t.popover.captureTooltip(CAPTURE_ACCELERATOR)}
+          title={t.popover.captureTooltip(CAPTURE_ACCELERATOR)}
           onClick={onCapture}
         >
           <CameraIcon className="size-3.5" />
@@ -144,7 +139,7 @@ export function Composer({
         {/* Full height, so it lines up with the empty box beside it rather than
             with the last line of a grown one — and a 14px glyph, because 16px
             against 14px text is the one size that reads as an icon set too big. */}
-        <Button className="flex-none" disabled={!sendable} onClick={send}>
+        <Button className="flex-none" disabled={!canSend} onClick={send}>
           <SendIcon className="size-3.5" /> {t.popover.send}
         </Button>
       </div>

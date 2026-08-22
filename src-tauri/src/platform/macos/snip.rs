@@ -9,7 +9,9 @@
 //!   the wait ends when the tool exits;
 //! - it reports a cancel. `screencapture` exits non-zero when the user presses
 //!   Esc, and even where it does not, the pasteboard's `changeCount` has not
-//!   moved. Both are checked, because only one of them is documented.
+//!   moved. Both are checked, because only one of them is documented. That
+//!   counter is `selection`'s: the Capture reads it once rather than in a loop,
+//!   because the child process is the thing that says when to look.
 //!
 //! ADR-0002's clipboard restore deliberately does not apply: nothing was
 //! synthesised here, so the pasteboard write is the user's own action.
@@ -18,7 +20,8 @@ use std::process::Command;
 
 use objc2_app_kit::{NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeTIFF};
 
-use crate::platform::capture::{self, Outcome};
+use super::selection::change_count;
+use crate::platform::capture::Outcome;
 
 /// The tool's absolute path. Not looked up on `PATH`: this runs in a GUI process
 /// whose environment is the launch agent's, not a shell's.
@@ -45,19 +48,7 @@ pub fn grab_capture() -> Outcome {
         return Outcome::Nothing;
     }
 
-    let Some(bytes) = read_clipboard_image() else {
-        return Outcome::Nothing;
-    };
-    match capture::from_clipboard_bytes(&bytes) {
-        Ok(capture) => Outcome::Captured(capture),
-        Err(error) => Outcome::Failed(error),
-    }
-}
-
-/// The same counter the Selection grab polls, read once here rather than in a
-/// loop: the child process is the thing that says when to look.
-fn change_count() -> isize {
-    NSPasteboard::generalPasteboard().changeCount()
+    Outcome::from_clipboard(read_clipboard_image())
 }
 
 /// PNG first, TIFF second. `screencapture -c` has written TIFF historically and

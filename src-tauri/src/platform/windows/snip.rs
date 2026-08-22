@@ -12,18 +12,20 @@
 //! 2. The poll cap is [`SNIP_CAP`], not 300ms. A person is dragging a
 //!    rectangle; the wait is theirs, not the network's.
 //!
+//! The polling itself is [`clipboard::poll_until_written`], the same code the
+//! Selection grab runs — only the two constants and the reader differ, which is
+//! exactly what ADR-0016 means by "the way the Selection grab does".
+//!
 //! `ms-screenclip:` reports nothing back — not whether it opened, not whether
 //! the user pressed Esc. A cancelled snip is therefore indistinguishable from a
 //! slow one until the cap runs out, which is the whole reason the cap is
 //! generous and the Popover comes back with a plain "nothing was captured".
 
 use std::process::Command;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use windows::Win32::System::DataExchange::GetClipboardSequenceNumber;
-
-use crate::platform::capture::{self, Outcome};
+use super::clipboard;
+use crate::platform::capture::Outcome;
 
 /// How long the user gets to drag a rectangle before we give up waiting.
 const SNIP_CAP: Duration = Duration::from_secs(45);
@@ -37,20 +39,19 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// refused the verb: all three left nothing on the clipboard, which is a phase
 /// rather than an error.
 pub fn grab_capture() -> Outcome {
-    let before = sequence_number();
+    let before = clipboard::sequence_number();
 
     if let Err(err) = launch_snip() {
         log::warn!("could not open the screen snip tool: {err}");
         return Outcome::Nothing;
     }
 
-    let Some(bytes) = poll_for_new_clipboard_image(before) else {
-        return Outcome::Nothing;
-    };
-    match capture::from_clipboard_bytes(&bytes) {
-        Ok(capture) => Outcome::Captured(capture),
-        Err(error) => Outcome::Failed(error),
-    }
+    Outcome::from_clipboard(clipboard::poll_until_written(
+        before,
+        SNIP_CAP,
+        POLL_INTERVAL,
+        read_clipboard_image,
+    ))
 }
 
 /// Through the shell, not through `SnippingTool.exe`: the executable's name and
@@ -65,30 +66,11 @@ fn launch_snip() -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-fn sequence_number() -> u32 {
-    // Safe: no arguments, no handles, returns 0 if we lack clipboard access.
-    unsafe { GetClipboardSequenceNumber() }
-}
-
-/// Poll the sequence number until it moves, then read an image off it.
-///
 /// The registered `PNG` format is preferred over `CF_BITMAP`: the snip tools
 /// offer both, and the PNG is the tool's own encoding rather than a DIB we would
 /// re-encode from. Neither is guaranteed, hence the fall-through.
-fn poll_for_new_clipboard_image(before: u32) -> Option<Vec<u8>> {
-    let deadline = Instant::now() + SNIP_CAP;
-    while Instant::now() < deadline {
-        if sequence_number() != before {
-            // The number moves when the owner *opens* the clipboard, which can
-            // be a beat before the data is readable; a failed read is retried
-            // on the next tick.
-            if let Some(bytes) = read_clipboard_png().or_else(read_clipboard_bitmap) {
-                return Some(bytes);
-            }
-        }
-        sleep(POLL_INTERVAL);
-    }
-    None
+fn read_clipboard_image() -> Option<Vec<u8>> {
+    read_clipboard_png().or_else(read_clipboard_bitmap)
 }
 
 fn read_clipboard_png() -> Option<Vec<u8>> {
@@ -105,8 +87,8 @@ mod tests {
     use super::*;
 
     /// The Selection's cap is 300ms because an app either answers a keystroke or
-    /// does not. This one is a person with a mouse, and the two must not drift
-    /// back together.
+    /// does not. This one is a person with a mouse, and the two now share a
+    /// poll loop, so only the constants keep them apart.
     #[test]
     fn the_snip_wait_is_a_human_wait() {
         assert!(SNIP_CAP >= Duration::from_secs(30));

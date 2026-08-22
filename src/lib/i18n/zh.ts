@@ -92,8 +92,8 @@ export const ZH: Strings = {
     captureCancelled: "没有截到任何内容。",
     captureRetry: (accelerator: string) => `按 ${accelerator} 再试一次。`,
     captureNote: "为这张截图写一句说明…",
-    captureMeta: (width: number, height: number, kilobytes: number) =>
-      `${width}×${height} · PNG ${kilobytes} KB`,
+    captureMeta: (width: number, height: number, bytes: number) =>
+      `${width}×${height} · PNG ${Math.round(bytes / 1024)} KB`,
   },
 
   settings: {

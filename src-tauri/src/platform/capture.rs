@@ -13,6 +13,11 @@
 //!   reaches disk and so has no URL of its own (ADR-0004);
 //! - a snip of a 6K display is a real image, so there is a size ceiling and it
 //!   is checked before a request is built rather than after one is refused.
+//!
+//! What is deliberately *not* here is the sentence a person reads about a
+//! [`Fault`]: this module has no `Language` in reach, and English prose written
+//! one layer below the one that does is how a Chinese reader ends up reading
+//! half a message (ADR-0015). A Fault carries the *fact*; `trigger` phrases it.
 
 use std::io::Cursor;
 
@@ -20,6 +25,10 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use image::ImageFormat;
 use serde::Serialize;
+
+/// The `data:` URL prefix every Capture carries. Named because the encoder
+/// writes straight into the buffer behind it, and the tests strip it back off.
+const DATA_URL_PREFIX: &str = "data:image/png;base64,";
 
 /// The ceiling on an encoded Capture.
 ///
@@ -46,12 +55,26 @@ pub struct Capture {
     pub bytes: usize,
 }
 
-/// Why a Capture that *was* taken cannot be used.
+/// Why a Capture that *was* taken cannot be used — the fact, not the sentence.
 ///
-/// Shaped like `commands::Failure` on purpose — kind plus message — because it
-/// reaches the Popover through the same path and is read by the same
-/// `describeFailure`: the cause is named in the reader's language and the detail
-/// is quoted verbatim.
+/// Two arms, because the two have different advice attached: shrink the region,
+/// against something is wrong with the clipboard. `trigger::describe_fault`
+/// turns either into the kind-plus-message pair the Popover reads.
+#[derive(Debug)]
+pub enum Fault {
+    /// Over [`MAX_BYTES`]. Carries the encoded length, because the sentence
+    /// names both numbers and only `i18n` knows how to say them.
+    TooLarge { bytes: usize },
+    /// Bytes no decoder recognised. Carries the decoder's own words, which are
+    /// a cause quoted verbatim rather than something Beckon phrases.
+    Unreadable(String),
+}
+
+/// The kind-plus-message pair a [`Fault`] becomes on its way to the Popover.
+///
+/// Shaped like `commands::Failure` on purpose, because it reaches the Popover
+/// through the same path and is read by the same `describeFailure`: the cause is
+/// named in the reader's language and the detail is quoted verbatim.
 #[derive(Debug, Clone, Serialize)]
 pub struct CaptureError {
     pub kind: String,
@@ -59,7 +82,7 @@ pub struct CaptureError {
 }
 
 impl CaptureError {
-    fn new(kind: &str, message: String) -> Self {
+    pub(crate) fn new(kind: &str, message: String) -> Self {
         Self {
             kind: kind.to_string(),
             message,
@@ -77,7 +100,23 @@ pub enum Outcome {
     Captured(Capture),
     /// Cancelled, or a tool that never answered. Not an error.
     Nothing,
-    Failed(CaptureError),
+    Failed(Fault),
+}
+
+impl Outcome {
+    /// Normalise the bytes a snip tool left behind, or say why not.
+    ///
+    /// The tail both platform halves end with, so "an empty clipboard is a
+    /// phase, unusable bytes are a Fault" is decided in one place.
+    pub fn from_clipboard(bytes: Option<Vec<u8>>) -> Self {
+        let Some(bytes) = bytes else {
+            return Outcome::Nothing;
+        };
+        match from_clipboard_bytes(&bytes) {
+            Ok(capture) => Outcome::Captured(capture),
+            Err(fault) => Outcome::Failed(fault),
+        }
+    }
 }
 
 /// Normalise whatever the clipboard held into a PNG Capture.
@@ -90,40 +129,32 @@ pub enum Outcome {
 /// A PNG in is still decoded and re-encoded. It costs a few tens of
 /// milliseconds on a snip-sized image, and it buys the dimensions, one code
 /// path, and a guarantee that what we send is a PNG we produced.
-pub fn from_clipboard_bytes(bytes: &[u8]) -> Result<Capture, CaptureError> {
-    let image = image::load_from_memory(bytes)
-        .map_err(|e| CaptureError::new("capture-unreadable", e.to_string()))?;
+pub fn from_clipboard_bytes(bytes: &[u8]) -> Result<Capture, Fault> {
+    let image = image::load_from_memory(bytes).map_err(|e| Fault::Unreadable(e.to_string()))?;
 
     let mut png = Cursor::new(Vec::new());
     image
         .write_to(&mut png, ImageFormat::Png)
-        .map_err(|e| CaptureError::new("capture-unreadable", e.to_string()))?;
+        .map_err(|e| Fault::Unreadable(e.to_string()))?;
     let png = png.into_inner();
 
     if png.len() > MAX_BYTES {
-        return Err(CaptureError::new(
-            "capture-too-large",
-            too_large_message(png.len()),
-        ));
+        return Err(Fault::TooLarge { bytes: png.len() });
     }
 
+    // Encoded into the finished `data:` URL rather than into a string of its
+    // own: the base64 of a snip is megabytes, and `format!` over it would
+    // allocate and copy the whole thing a second time.
+    let mut data_url = String::with_capacity(DATA_URL_PREFIX.len() + png.len().div_ceil(3) * 4);
+    data_url.push_str(DATA_URL_PREFIX);
+    STANDARD.encode_string(&png, &mut data_url);
+
     Ok(Capture {
-        data_url: format!("data:image/png;base64,{}", STANDARD.encode(&png)),
+        data_url,
         width: image.width(),
         height: image.height(),
         bytes: png.len(),
     })
-}
-
-/// Said in whole mebibytes: the numbers are megabyte-scale, and a byte count
-/// is not something a reader can act on.
-fn too_large_message(bytes: usize) -> String {
-    let mib = |value: usize| (value as f64) / (1024.0 * 1024.0);
-    format!(
-        "the screenshot is {:.1} MB, over Beckon's {:.0} MB limit; capture a smaller region",
-        mib(bytes),
-        mib(MAX_BYTES)
-    )
 }
 
 #[cfg(test)]
@@ -144,7 +175,7 @@ mod tests {
     fn a_clipboard_bitmap_becomes_a_png_data_url() {
         let capture = from_clipboard_bytes(&bmp(2, 3)).unwrap();
         assert_eq!((capture.width, capture.height), (2, 3));
-        assert!(capture.data_url.starts_with("data:image/png;base64,"));
+        assert!(capture.data_url.starts_with(DATA_URL_PREFIX));
         assert!(capture.bytes > 0);
     }
 
@@ -153,44 +184,34 @@ mod tests {
     #[test]
     fn the_data_url_decodes_to_png_bytes() {
         let capture = from_clipboard_bytes(&bmp(4, 4)).unwrap();
-        let payload = capture
-            .data_url
-            .strip_prefix("data:image/png;base64,")
-            .unwrap();
+        let payload = capture.data_url.strip_prefix(DATA_URL_PREFIX).unwrap();
         let decoded = STANDARD.decode(payload).unwrap();
         assert_eq!(decoded.len(), capture.bytes);
         assert_eq!(image::guess_format(&decoded).unwrap(), ImageFormat::Png);
     }
 
-    /// Two kinds, because the two have different advice attached: shrink the
-    /// region, against something is wrong with the clipboard.
+    /// The decoder's own words travel with the Fault, because they are the
+    /// cause the Popover quotes verbatim.
     #[test]
-    fn an_unusable_clipboard_says_which_kind_of_unusable() {
-        let err = from_clipboard_bytes(b"not an image at all").unwrap_err();
-        assert_eq!(err.kind, "capture-unreadable");
-        assert!(!err.message.is_empty());
+    fn unreadable_bytes_carry_the_decoders_own_words() {
+        match from_clipboard_bytes(b"not an image at all").unwrap_err() {
+            Fault::Unreadable(detail) => assert!(!detail.is_empty()),
+            other => panic!("expected Unreadable, got {other:?}"),
+        }
     }
 
-    /// The ceiling is stated in the message, so a user who hits it knows what
-    /// to aim under.
+    /// The tail both platform halves share: nothing on the clipboard is a
+    /// phase, bytes that will not decode are a Fault.
     #[test]
-    fn the_size_ceiling_names_both_numbers() {
-        let message = too_large_message(9 * 1024 * 1024);
-        assert!(message.contains("9.0 MB"), "{message}");
-        assert!(message.contains("8 MB"), "{message}");
-    }
-
-    /// The kinds are read by the frontend catalogs, so they are part of the
-    /// contract rather than log text.
-    #[test]
-    fn the_two_kinds_are_the_ones_the_catalogs_carry() {
-        assert_eq!(
-            CaptureError::new("capture-too-large", String::new()).kind,
-            "capture-too-large"
-        );
-        assert_eq!(
-            CaptureError::new("capture-unreadable", String::new()).kind,
-            "capture-unreadable"
-        );
+    fn nothing_on_the_clipboard_is_nothing_rather_than_a_fault() {
+        assert!(matches!(Outcome::from_clipboard(None), Outcome::Nothing));
+        assert!(matches!(
+            Outcome::from_clipboard(Some(bmp(1, 1))),
+            Outcome::Captured(_)
+        ));
+        assert!(matches!(
+            Outcome::from_clipboard(Some(b"junk".to_vec())),
+            Outcome::Failed(Fault::Unreadable(_))
+        ));
     }
 }
