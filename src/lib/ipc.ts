@@ -3,6 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
 import type {
   ActionFile,
   CapturePayload,
@@ -76,13 +77,75 @@ export const followUp = (exchangeId: string, text: string) =>
 export const cancelExchange = (exchangeId: string) =>
   invoke<void>("cancel_exchange", { exchangeId });
 export const retryExchange = (exchangeId: string) => invoke<void>("retry_exchange", { exchangeId });
-/** Runs the OS snip tool; the result arrives as `popover:capture` (ADR-0016). */
+/**
+ * Runs the OS snip tool; the result arrives as `popover:capture` (ADR-0016).
+ *
+ * There is deliberately nothing worth awaiting and no "capturing" flag anywhere:
+ * the window hides while the snip tool owns the screen, so it is not there to
+ * show one.
+ */
 export const startCapture = () => invoke<void>("start_capture");
-export const discardCapture = () => invoke<void>("discard_capture");
+/** One tile's remove button, by position in the attached list (ADR-0017). */
+export const discardCapture = (index: number) => invoke<void>("discard_capture", { index });
 export const hidePopover = () => invoke<void>("hide_popover");
 export const hideLauncher = () => invoke<void>("hide_launcher");
 export const showSettings = () => invoke<void>("show_settings");
 export const copyToClipboard = (text: string) => invoke<void>("copy_to_clipboard", { text });
+
+// --- the Popover's own size (ADR-0018) ------------------------------------
+/**
+ * Which edge or corner of the window a grip drags (ADR-0018).
+ *
+ * Spelled out here rather than imported: `@tauri-apps/api/window` declares the
+ * union but does not export it, and the member names are the plugin's wire
+ * values.
+ */
+export type ResizeDirection =
+  | "North"
+  | "NorthEast"
+  | "East"
+  | "SouthEast"
+  | "South"
+  | "SouthWest"
+  | "West"
+  | "NorthWest";
+
+/**
+ * Hand a press on one of the Popover's grips to the window manager, which owns
+ * the drag from there (ADR-0018). An undecorated window has no border for the OS
+ * to hit-test, so this is the only way one is resized by pointer.
+ */
+export const startResizeDragging = (direction: ResizeDirection) =>
+  getCurrentWindow().startResizeDragging(direction);
+
+/**
+ * Every resize of this window, in *physical* pixels — the user's drags and our
+ * own `set_size` alike. Rust tells the two apart; see `remember_popover_size`.
+ *
+ * Physical because that is what the event carries and converting costs an IPC
+ * round trip for the scale factor: this fires every frame of a drag and all but
+ * the last one is thrown away, so `setPopoverSize` converts instead.
+ */
+export const onWindowResized = (fn: (width: number, height: number) => void) => {
+  return getCurrentWindow().onResized(({ payload }) => fn(payload.width, payload.height));
+};
+
+/**
+ * Remember the size the window was dragged to (ADR-0018), given the physical
+ * size the resize event reported. Debounce it: a drag reports every pixel, and
+ * each report Rust keeps is a write to `config.toml`.
+ *
+ * The scale factor is read here, once per settled drag rather than once per
+ * frame, and read rather than cached: a window dragged onto a monitor with
+ * different scaling has to be measured against the new factor.
+ */
+export const setPopoverSize = async (physicalWidth: number, physicalHeight: number) => {
+  const window = getCurrentWindow();
+  const logical = new PhysicalSize(physicalWidth, physicalHeight).toLogical(
+    await window.scaleFactor(),
+  );
+  return invoke<void>("set_popover_size", { width: logical.width, height: logical.height });
+};
 
 // --- events ---------------------------------------------------------------
 

@@ -15,6 +15,7 @@
 // because prose has two dimensions now — platform *and* language — and a
 // constant can only hold one of them.
 import { IS_MAC } from "../platform";
+import { kb } from "./units";
 
 export const EN = {
   /** Words the product needs in more than one surface. */
@@ -60,6 +61,7 @@ export const EN = {
     empty: "The endpoint listed no models",
     config: "Beckon is not configured for this",
     "capture-too-large": "The screenshot is too big to send",
+    "capture-too-many": "There is no room for another screenshot",
     "capture-unreadable": "The screenshot could not be read",
     fallback: "Failed",
   } as Record<string, string>,
@@ -110,18 +112,31 @@ export const EN = {
     copy: "Copy",
     copied: "Copied",
 
-    /** The Capture (CONTEXT.md), which is a screenshot in prose — nobody calls
-     *  it a Capture out loud, and the term is for code and comments. */
-    capture: "Screenshot",
+    /** The Capture (CONTEXT.md) is a screenshot in prose — nobody calls it a
+     *  Capture out loud, and the term is for code and comments. */
     captureTooltip: (accelerator: string) => `Screenshot the screen (${accelerator})`,
     removeCapture: "Remove the screenshot",
     captureCancelled: "Nothing was captured.",
     captureRetry: (accelerator: string) => `Press ${accelerator} to try again.`,
-    captureNote: "Add a note about the screenshot…",
+    captureNote: "Add a note about the screenshots…",
     /** Beside the thumbnail: what was captured, and how big it is. Takes the
      *  raw byte count, so the two thumbnails cannot round it differently. */
     captureMeta: (width: number, height: number, bytes: number) =>
-      `${width}×${height} · PNG ${Math.round(bytes / 1024)} KB`,
+      `${width}×${height} · PNG ${kb(bytes)} KB`,
+    /** Under the rail: what is attached, as a set. The individual sizes are one
+     *  tap away in the preview, and four of them side by side read as noise. */
+    captureSet: (count: number, bytes: number) =>
+      `${count} screenshot${count === 1 ? "" : "s"} · ${kb(bytes)} KB total`,
+    viewCapture: "View this screenshot",
+    /** Said in words for a screen reader; the preview draws it as `2 / 3`. */
+    capturePosition: (index: number, total: number) => `Screenshot ${index} of ${total}`,
+    previousCapture: "Previous screenshot",
+    nextCapture: "Next screenshot",
+    closeCapture: "Close the screenshot",
+    /** On the image itself, because zoom has no visible control of its own —
+     *  the wheel and a click are the whole interface (ADR-0017). */
+    zoomHint: "Click to zoom, scroll to zoom in and out",
+    zoomOutHint: "Click to fit, drag to move",
   },
 
   settings: {

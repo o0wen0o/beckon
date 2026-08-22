@@ -21,29 +21,7 @@ pub use self::platform::*;
 pub use self::secrets::*;
 pub use self::windows::*;
 
-use serde::Serialize;
-
-use crate::llm::LlmError;
-
-/// An error the UI has to react to differently depending on cause, rather than
-/// just print.
-#[derive(Debug, Clone, Serialize)]
-pub struct Failure {
-    pub kind: String,
-    pub message: String,
-}
-
-impl Failure {
-    pub(super) fn new(kind: &str, message: impl Into<String>) -> Self {
-        Self {
-            kind: kind.to_string(),
-            message: message.into(),
-        }
-    }
-}
-
-impl From<LlmError> for Failure {
-    fn from(error: LlmError) -> Self {
-        Failure::new(error.kind(), error.to_string())
-    }
-}
+/// Re-exported so a command still returns `commands::Failure`: it lives at the
+/// crate root because `platform::capture` produces one too (ADR-0016), and one
+/// shape is what makes `describeFailure` a single reader.
+pub use crate::failure::Failure;

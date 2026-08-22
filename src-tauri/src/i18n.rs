@@ -206,6 +206,17 @@ pub fn capture_too_large(language: Language, bytes: usize, max: usize) -> String
     }
 }
 
+/// A screenshot taken with the tray already full (ADR-0017). Says the ceiling
+/// and what to do about it, because the bytes are being dropped either way.
+pub fn capture_too_many(language: Language, max: usize) -> String {
+    match language {
+        Language::En => {
+            format!("a turn carries at most {max} screenshots; remove one before taking another")
+        }
+        Language::Zh => format!("一次对话最多附带 {max} 张截图；请先移除一张再截图"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,6 +246,7 @@ mod tests {
             models_empty(Language::En).to_string(),
             test_needs_key(Language::En).to_string(),
             capture_too_large(Language::En, 1, 2),
+            capture_too_many(Language::En, 4),
         ];
         let zh = [
             tray_settings(Language::Zh).to_string(),
@@ -257,6 +269,7 @@ mod tests {
             models_empty(Language::Zh).to_string(),
             test_needs_key(Language::Zh).to_string(),
             capture_too_large(Language::Zh, 1, 2),
+            capture_too_many(Language::Zh, 4),
         ];
         for (english, chinese) in en.iter().zip(zh.iter()) {
             assert_ne!(english, chinese, "untranslated: {english}");

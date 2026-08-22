@@ -29,6 +29,24 @@ pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
 pub const DEFAULT_MODEL: &str = "deepseek-v4-flash";
 pub const DEFAULT_TEMPERATURE: f64 = 1.3;
 
+/// The Popover's size out of the box, in logical pixels (ADR-0018). Mirrored in
+/// `tauri.conf.json` so the very first paint is not at the wrong size.
+pub const DEFAULT_POPOVER_W: f64 = 620.0;
+pub const DEFAULT_POPOVER_H: f64 = 500.0;
+/// The floors, mirrored in `tauri.conf.json` as `minWidth`/`minHeight` so the
+/// window manager refuses a smaller drag rather than us undoing one afterwards.
+///
+/// The width floor is the composer's row — camera, box, Send — which wraps
+/// below it. The height floor is under `trigger::window::POPOVER_HINT_H`, and
+/// has to be: the hint window is the shortest Popover the product shows itself,
+/// and a floor above it is a floor `set_size` cannot meet.
+pub const MIN_POPOVER_W: f64 = 380.0;
+pub const MIN_POPOVER_H: f64 = 200.0;
+/// The ceilings exist only to keep a garbled value out of the file; a 4K panel
+/// is the largest thing a window can usefully be dragged to.
+pub const MAX_POPOVER_W: f64 = 3840.0;
+pub const MAX_POPOVER_H: f64 = 2160.0;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -40,6 +58,7 @@ pub struct Config {
     pub language: Language,
     pub api: ApiConfig,
     pub defaults: ModelDefaults,
+    pub popover: PopoverSize,
 }
 
 /// Which palette the three surfaces paint in.
@@ -89,6 +108,51 @@ pub struct ModelDefaults {
     pub temperature: f64,
 }
 
+/// The size the Popover is summoned at, in logical pixels (ADR-0018).
+///
+/// It is config rather than window state because the window is created hidden at
+/// startup and re-sized on every trigger (ADR-0007): a size that lived only in
+/// the window would be overwritten by the next summon, so remembering a drag at
+/// all means writing it to the file ADR-0003 makes authoritative.
+///
+/// Logical, not physical: the same file has to mean the same window on a 100%
+/// monitor and a 150% one, and it is what `set_size` takes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PopoverSize {
+    pub width: f64,
+    pub height: f64,
+}
+
+impl PopoverSize {
+    /// Clamped rather than refused: the value arrives from a drag, and a window
+    /// dragged to the edge of the plausible is not an error to report. A `NaN`
+    /// loses both comparisons, so it falls back to the default instead of
+    /// poisoning the placement arithmetic.
+    pub fn clamped(self) -> Self {
+        Self {
+            width: clamp_or_default(self.width, MIN_POPOVER_W, MAX_POPOVER_W, DEFAULT_POPOVER_W),
+            height: clamp_or_default(self.height, MIN_POPOVER_H, MAX_POPOVER_H, DEFAULT_POPOVER_H),
+        }
+    }
+}
+
+fn clamp_or_default(value: f64, min: f64, max: f64, fallback: f64) -> f64 {
+    if !value.is_finite() {
+        return fallback;
+    }
+    value.clamp(min, max)
+}
+
+impl Default for PopoverSize {
+    fn default() -> Self {
+        Self {
+            width: DEFAULT_POPOVER_W,
+            height: DEFAULT_POPOVER_H,
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -98,6 +162,7 @@ impl Default for Config {
             language: Language::default(),
             api: ApiConfig::default(),
             defaults: ModelDefaults::default(),
+            popover: PopoverSize::default(),
         }
     }
 }
@@ -132,10 +197,17 @@ pub struct Loaded {
 pub fn load_or_create(path: &Path) -> Loaded {
     match fs::read_to_string(path) {
         Ok(text) => match toml::from_str::<Config>(&text) {
-            Ok(config) => Loaded {
-                config,
-                error: None,
-            },
+            // The one field clamped on the way in rather than reported: it is
+            // written by a drag, not typed, so a value out of range is this
+            // program's own bug or a hand-edit — and either way the window has
+            // to be some size. The file is left as the user left it.
+            Ok(mut config) => {
+                config.popover = config.popover.clamped();
+                Loaded {
+                    config,
+                    error: None,
+                }
+            }
             Err(err) => Loaded {
                 config: Config::default(),
                 error: Some(format!("config.toml could not be parsed: {err}")),
@@ -260,6 +332,63 @@ mod tests {
     }
 
     #[test]
+    fn absent_popover_size_is_the_default() {
+        let parsed: Config = toml::from_str("").unwrap();
+        assert_eq!(parsed.popover.width, DEFAULT_POPOVER_W);
+        assert_eq!(parsed.popover.height, DEFAULT_POPOVER_H);
+    }
+
+    /// One dimension named is one dimension changed: the container-level
+    /// `serde(default)` fills the other from [`PopoverSize::default`], not from
+    /// `f64::default`, which would be a zero-width window.
+    #[test]
+    fn half_a_popover_size_keeps_the_other_default() {
+        let parsed: Config = toml::from_str("[popover]\nwidth = 900\n").unwrap();
+        assert_eq!(parsed.popover.width, 900.0);
+        assert_eq!(parsed.popover.height, DEFAULT_POPOVER_H);
+    }
+
+    #[test]
+    fn popover_size_survives_a_toml_round_trip() {
+        let config = Config {
+            popover: PopoverSize {
+                width: 900.0,
+                height: 700.0,
+            },
+            ..Config::default()
+        };
+        let text = toml::to_string_pretty(&config).unwrap();
+        assert_eq!(toml::from_str::<Config>(&text).unwrap(), config);
+    }
+
+    #[test]
+    fn an_out_of_range_popover_size_is_clamped_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "[popover]\nwidth = 12\nheight = 99999\n").unwrap();
+
+        let loaded = load_or_create(&path);
+        assert!(loaded.error.is_none());
+        assert_eq!(loaded.config.popover.width, MIN_POPOVER_W);
+        assert_eq!(loaded.config.popover.height, MAX_POPOVER_H);
+        // Clamping is ours, not a rewrite of the user's file (ADR-0003).
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "[popover]\nwidth = 12\nheight = 99999\n"
+        );
+    }
+
+    #[test]
+    fn a_nonsense_popover_size_falls_back_to_the_default() {
+        let clamped = PopoverSize {
+            width: f64::NAN,
+            height: f64::INFINITY,
+        }
+        .clamped();
+        assert_eq!(clamped, PopoverSize::default());
+    }
+
+    #[test]
     fn unknown_fields_are_tolerated() {
         let parsed: Config =
             toml::from_str("launcher_hotkey = \"Ctrl+Alt+K\"\nfuture_option = 3\n").unwrap();
@@ -285,6 +414,10 @@ base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
 thinking = false
 temperature = 1.3
+
+[popover]
+width = 620.0
+height = 500.0
 "#
         );
         let parsed: Config = toml::from_str(&text).unwrap();

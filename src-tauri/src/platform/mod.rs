@@ -94,9 +94,11 @@ mod tests {
         height: 1040,
     };
 
-    /// The Popover's real size (`trigger::POPOVER_W` × `POPOVER_H`). This
-    /// function is pure, so a stale number here would never fail a test — it
-    /// would just quietly stop describing the app.
+    /// The Popover's out-of-the-box size (`config::DEFAULT_POPOVER_W` ×
+    /// `DEFAULT_POPOVER_H`) — the user can drag it to any other (ADR-0018),
+    /// which is exactly why this function takes the size rather than reading it.
+    /// It is pure, so a stale number here would never fail a test; it would just
+    /// quietly stop describing the app.
     const POPOVER: (i32, i32) = (620, 500);
     /// The `empty-selection` Popover, which is deliberately shorter.
     const POPOVER_HINT: (i32, i32) = (620, 220);

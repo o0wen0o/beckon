@@ -4,6 +4,10 @@ status: accepted
 
 # A Capture is a screenshot from the OS snip tool, attached to a turn and sent as a data URL
 
+> Extended by [ADR-0017](./0017-a-turn-carries-several-captures-and-preview-is-a-layer.md): a turn
+> carries up to four Captures rather than one, and a thumbnail opens a preview over the window.
+> Everything below still holds — the arity is what changed.
+
 The Popover has a screenshot button. Pressing it hides Beckon's windows, runs the *platform's own*
 interactive snip tool — `ms-screenclip:` on Windows, `screencapture -i -c` on macOS — and comes back
 with whatever landed on the clipboard attached to the composer as a **Capture**. Send then goes to

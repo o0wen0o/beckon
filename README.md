@@ -15,7 +15,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - An Action can also be bound to a Direct Hotkey — press it and go straight to the result with zero interaction
 - The platform's copy shortcut is simulated to grab the Selection — Ctrl+C, or Cmd+C on macOS — with the clipboard restored afterwards
 - Popover near the cursor: takes focus, streams output, supports follow-up turns, closes on Esc
-- A screenshot button in the Popover: it runs the platform's own snip tool, attaches the result as a Capture, and sends it with whatever is typed beside it ([ADR-0016](./docs/adr/0016-captures-from-the-os-snip-tool-via-the-clipboard.md)). The image goes to whichever model the Action names; whether that model reads images is the endpoint's answer to give
+- A screenshot button in the Popover: it runs the platform's own snip tool, attaches the result as a Capture, and sends it with whatever is typed beside it ([ADR-0016](./docs/adr/0016-captures-from-the-os-snip-tool-via-the-clipboard.md)). Up to four Captures ride one turn, shown as a rail of thumbnails; clicking one opens it full size over the window ([ADR-0017](./docs/adr/0017-a-turn-carries-several-captures-and-preview-is-a-layer.md)). The images go to whichever model the Action names; whether that model reads images is the endpoint's answer to give
 - Full settings window: API key, global hotkey, theme, language, global model defaults, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
 - English and Simplified Chinese, switched in Settings ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md))
 - Actions stored as TOML files, with a file watcher that reloads them automatically on external changes
@@ -41,6 +41,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - The global hotkey defaults to `Ctrl+Shift+Space` on Windows and `Cmd+Shift+Space` on macOS: Space with two modifiers on both, and only the first differs, because the platform's own launcher does — Spotlight is `Cmd+Space`. Both avoid the IME chords (`Ctrl+Space` Chinese/English on Microsoft Pinyin and "previous input source" on macOS, `Shift+Space` full-width/half-width, `Win+Space` switch IME), `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools), and any `Ctrl+Alt` combination, which is `AltGr` on an ISO keyboard and so composes characters as well as the modifier state the grab must release before it can copy.
 - If the grab comes back empty, handle it according to the Action's `input_source` — this is **not an error**: `selection` shows a hint and sends no request, `auto` falls through to the input box.
 - The Popover always takes focus. Remember what was in front before showing it — the window on Windows, the application on macOS — and hand focus back on close.
+- The Popover is **620×500 to start with and resizable by dragging any edge or corner**, between 380×200 and 3840×2160. The size it is left at is remembered in `config.toml` and is what the next summon opens at ([ADR-0018](./docs/adr/0018-the-popover-is-resizable-and-remembers-its-size.md)). The Launcher is not resizable: its height is its match list.
 - On macOS the grab needs Accessibility permission, and the OS refuses it **silently**: the Selection just comes back empty. Settings reads the permission directly and says so, with a link to the pane; the hotkey itself still fires either way.
 
 **Failure and waiting**
@@ -50,7 +51,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - Request failed → show the error inline in the Popover with a retry button; no system notification.
 - Stream cut off midway → keep whatever was already output and mark it "interrupted" underneath.
 - Esc cancels the request at any time.
-- A Capture is attached, then sent — never captured-and-sent. A cancelled snip is **not an error**: nothing was captured, nothing was sent, and the Popover says so. A screenshot that cannot be sent — over Beckon's 8 MB ceiling, or bytes no decoder reads — is named as its own cause, distinct from a cancel.
+- A Capture is attached, then sent — never captured-and-sent. A cancelled snip is **not an error**: nothing was captured, nothing was sent, and the Popover says so. A screenshot that cannot be sent — over Beckon's 8 MB ceiling, past the four-per-turn ceiling, or bytes no decoder reads — is named as its own cause, distinct from a cancel, and leaves whatever is already attached alone.
 
 **Configuration**
 
@@ -67,7 +68,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 ```
 %APPDATA%\Beckon\                        # Windows
 ~/Library/Application Support/Beckon/    # macOS
-├── config.toml        # global hotkey, autostart, theme, language, base_url, global model defaults
+├── config.toml        # global hotkey, autostart, theme, language, base_url, model defaults, Popover size
 └── actions/
     ├── translate.toml
     └── ask.toml
@@ -94,6 +95,10 @@ base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
 thinking = false
 temperature = 1.3
+
+[popover]
+width = 620.0                   # written by dragging the window, not by hand
+height = 500.0
 ```
 
 ### actions/translate.toml

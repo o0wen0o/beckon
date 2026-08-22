@@ -12,7 +12,8 @@ import { describeFailure } from "@/lib/failures";
 import { useT } from "@/lib/i18n";
 import { showSettings } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
-import { exchange, isSettled, settlesInSettings, type Turn } from "./exchange";
+import { CaptureTile } from "./CaptureTile";
+import { exchange, isSettled, settlesInSettings, totalBytes, type Turn } from "./exchange";
 
 /** Long enough that the clamp is doing something, i.e. worth offering to undo. */
 const CLAMP_AT = 160;
@@ -35,7 +36,10 @@ const QUIET = "text-muted-quiet";
 
 export function TurnView({ turn, index }: { turn: Turn; index: number }) {
   const t = useT();
-  const capture = turn.capture;
+  const captures = turn.captures;
+  /** More than one is a grid of cropped tiles with one line of prose about the
+   *  set; exactly one is the image itself, described by its own dimensions. */
+  const many = captures.length > 1;
 
   /** The cause named first, then the provider's own words — the same sentence
    *  Settings builds, rather than a raw reqwest chain. */
@@ -49,25 +53,43 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {turn.question || capture ? (
+      {turn.question || captures.length > 0 ? (
         // The toggle sits under the card rather than inside it: `ghost` hovers
         // to `--accent`, which is the same grey the card is filled with.
         <div className="flex flex-col items-end gap-1">
-          {/* A Capture goes in the same card the words do, above them
-              (ADR-0016): what you sent is one object, and the image is the
+          {/* The Captures go in the same card the words do, above them
+              (ADR-0016): what you sent is one object, and the images are the
               larger half of it. `line-clamp` cannot be on the card once there
               is an image in it — it would clip the picture rather than the
               prose — so the clamp moves onto the text. */}
           <div className={cn(CARD, "flex flex-col gap-1.5")}>
-            {capture ? (
+            {captures.length > 0 ? (
               <>
-                <img
-                  src={capture.data_url}
-                  alt={t.popover.capture}
-                  className="max-h-40 rounded border object-contain"
-                />
+                {/* Two-up once there is more than one, and cropped to a common
+                    height: a column of whole images makes a two-screenshot
+                    question taller than the answer to it, which inverts which
+                    side of the turn reads as the subject. Whole is what the
+                    preview is for (ADR-0017). */}
+                <div className={many ? "grid grid-cols-2 gap-1.5" : "contents"}>
+                  {captures.map((capture, at) => (
+                    <CaptureTile
+                      key={at}
+                      capture={capture}
+                      onOpen={() => exchange.openPreview(index, at)}
+                      imageClassName={
+                        many ? "h-24 w-full object-cover" : "max-h-40 w-full object-contain"
+                      }
+                    />
+                  ))}
+                </div>
                 <span className={cn(QUIET, "text-meta")}>
-                  {t.popover.captureMeta(capture.width, capture.height, capture.bytes)}
+                  {many
+                    ? t.popover.captureSet(captures.length, totalBytes(captures))
+                    : t.popover.captureMeta(
+                        captures[0].width,
+                        captures[0].height,
+                        captures[0].bytes,
+                      )}
                 </span>
               </>
             ) : null}

@@ -16,7 +16,7 @@
    which is not a shadcn token and has exactly one consumer.
 
    The pay-off is that `--primary` and `--ring` go back to the values shadcn
-   generates. What is left is four deviations, each measured:
+   generates. What is left is the deviations below, each measured:
 
    - `--muted-foreground` is darkened to `0.475` in light mode. The generated
      `0.556` is 4.34:1 on `--muted`, and — more to the point — a field's
@@ -45,6 +45,19 @@
      `text-amber-700 dark:text-amber-400` written out at every use site, and a
      component naming its own colour is what this file exists to prevent.
      Light 6.11:1 and 5.67:1; dark 11.23:1 and 11.97:1.
+   - `--scrim` is added, and like `--brand` it has exactly one consumer: the
+     Capture preview's ground (ADR-0017). A screenshot is mostly pale and has no
+     border of its own, so on `--background` its edges are simply not there —
+     the ground under a picture has to be greyer than the picture. It is a grey
+     of its own rather than `--muted`, which is `--accent` to the pixel in both
+     modes and would leave the preview's arrows with an invisible hover. Light
+     `0.9`: `--muted-foreground` is 4.96:1 on it and `--foreground` 14.68:1,
+     and the ghost-button hover reads at 1.24:1 against it, stronger than the
+     1.09:1 that same hover has on the background everywhere else. Dark
+     `0.205`: 6.91:1, 17.16:1 and 1.19:1. The one number that gets *worse* is
+     the dark hover, 1.19 against 1.31 on the background — a step the pane
+     already spends elsewhere, and the alternative is a ground a screenshot
+     disappears into.
 
    `--destructive-foreground` is dropped rather than carried: nothing consumes
    it — shadcn's own destructive button says `text-white` — and the generated
@@ -76,6 +89,7 @@
   --color-warning: var(--warning);
   --color-success: var(--success);
   --color-brand: var(--brand);
+  --color-scrim: var(--scrim);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-border-strong: var(--border-strong);
@@ -214,6 +228,11 @@
   /* The one chromatic value on the surface, and it has one consumer:
      `BrandMark`. 5.76:1 on the background, 11.30:1 on the dark one. */
   --brand: oklch(0.508 0.128 245.8);
+  /* The ground under a picture, and it has one consumer: the Capture preview.
+     Same number as `--border`, a different thing — that is a line, this is a
+     surface, and a token that means "grey ground" is what keeps the preview
+     from naming a colour. */
+  --scrim: oklch(0.9 0 0);
   /* The navigation column is not a second surface — it is the same page with a
      rule down it. A tint plus a border draws one boundary twice. */
   --sidebar: oklch(1 0 0);
@@ -251,6 +270,10 @@
   --input: var(--border);
   --ring: oklch(0.922 0 0);
   --brand: oklch(0.809 0.115 216.6);
+  /* Lighter than the background here, not darker: the preview is a surface over
+     the window, and in the dark palette a *darker* ground would read as a hole
+     in it. */
+  --scrim: oklch(0.205 0 0);
   --sidebar: oklch(0.145 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.922 0 0);

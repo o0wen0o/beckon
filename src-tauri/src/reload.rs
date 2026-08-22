@@ -17,6 +17,31 @@ use crate::tray;
 pub const EVENT_ACTIONS_CHANGED: &str = "actions-changed";
 pub const EVENT_CONFIG_CHANGED: &str = "config-changed";
 
+/// The one write path for `config.toml` (ADR-0003).
+///
+/// Marked in `SelfWrites` before the write so the watcher swallows its own
+/// echo, then the one config-derived thing that is not markup is brought into
+/// line, then [`reload_config`] re-reads what was written and broadcasts it.
+/// Nothing downstream reads the `Config` handed in — the file is authoritative
+/// the moment it lands.
+///
+/// Every writer goes through here rather than repeating the sequence: a step
+/// added to it has to reach the resize path (ADR-0018) as well as Settings.
+pub fn write_config(app: &AppHandle, config: &config::Config) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let previous = state.config_snapshot();
+    let path = state.paths.config_file.clone();
+    state.self_writes.mark(&path);
+    config::save(&path, config)?;
+
+    if config.autostart != previous.autostart {
+        sync_autostart(app, config.autostart)?;
+    }
+
+    reload_config(app);
+    Ok(())
+}
+
 pub fn reload_config(app: &AppHandle) {
     let state = app.state::<AppState>();
     let loaded = config::load_or_create(&state.paths.config_file);
@@ -69,8 +94,9 @@ pub fn apply_hotkeys(app: &AppHandle) {
     }
 }
 
-/// Autostart is config-derived state, so it is applied from beside the config
-/// funnel rather than separately by each caller that changes the setting.
+/// Autostart is config-derived state, so it is applied from inside the config
+/// funnel rather than separately by each caller that changes the setting. Still
+/// `pub` for startup, which applies the stored setting without writing one.
 pub fn sync_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
     let manager = app.autolaunch();
     // An unreadable current state is no reason to refuse; just apply the wanted

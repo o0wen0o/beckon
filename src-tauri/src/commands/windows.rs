@@ -63,9 +63,18 @@ pub fn start_capture(app: AppHandle) {
     trigger::start_capture(&app);
 }
 
+/// One tile's remove button, by position in the attached list (ADR-0017).
 #[tauri::command]
-pub fn discard_capture(app: AppHandle) {
-    trigger::discard_capture(&app);
+pub fn discard_capture(app: AppHandle, index: usize) {
+    trigger::discard_capture(&app, index);
+}
+
+/// The Popover reporting its own size after a drag on one of its grips
+/// (ADR-0018). Logical pixels, debounced by the window: a drag reports every
+/// pixel and each report that is not ours is a write to `config.toml`.
+#[tauri::command]
+pub fn set_popover_size(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
+    trigger::window::remember_popover_size(&app, width, height)
 }
 
 #[tauri::command]

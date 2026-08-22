@@ -11,19 +11,20 @@
 
 use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow};
 
+use crate::config::PopoverSize;
 use crate::i18n;
 use crate::platform;
 use crate::state::AppState;
 
 use super::WINDOW_SETTINGS;
 
-/// The Popover's normal size. Mirrored in `tauri.conf.json` so the very first
-/// paint is not at the wrong size.
-pub(super) const POPOVER_W: f64 = 620.0;
-pub(super) const POPOVER_H: f64 = 500.0;
 /// `empty-selection` issues no request and offers no input, so it can never
 /// grow — which is what makes a smaller window safe here and nowhere else.
 /// A two-line hint does not need 500px of empty Popover.
+///
+/// A ceiling rather than the height: the remembered size (ADR-0018) may be
+/// shorter than this, and a hint is never a reason to make the window *bigger*
+/// than the user asked for.
 pub(super) const POPOVER_HINT_H: f64 = 220.0;
 
 pub(super) fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
@@ -69,6 +70,12 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
     let _ = window.set_size(size);
 
     let app = window.app_handle();
+    // Recorded before the placement can fail out: this is what tells the resize
+    // that follows apart from one the user dragged (ADR-0018).
+    *app.state::<AppState>()
+        .popover_asked_size
+        .lock()
+        .expect("popover size lock") = PopoverSize { width, height };
     let Some(cursor) = platform::cursor::cursor_position(app) else {
         return;
     };
@@ -81,6 +88,41 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
     let physical = size.to_physical::<i32>(scale);
     let (x, y) = platform::place_near_cursor(cursor, (physical.width, physical.height), area);
     let _ = window.set_position(PhysicalPosition::new(x, y));
+}
+
+/// A size the window reported, kept if the *user* is what produced it
+/// (ADR-0018).
+///
+/// The Popover is undecorated, so the grips that drag it are markup and the
+/// resize itself is the window manager's; this is the only place the result of
+/// one is written down. Every resize reports itself though — including the
+/// `set_size` above, and including the deliberately short `empty-selection`
+/// window — so a report matching what we last asked for is dropped rather than
+/// saved. Without that, one hint-sized Popover would shrink every later one.
+///
+/// Through the config funnel like every other write (ADR-0003):
+/// [`crate::reload::write_config`] marks it as our own so the watcher swallows
+/// the echo, then re-reads and broadcasts.
+pub fn remember_popover_size(app: &AppHandle, width: f64, height: f64) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let wanted = PopoverSize { width, height }.clamped();
+    {
+        let asked = state.popover_asked_size.lock().expect("popover size lock");
+        // Rounded to the pixel: the round trip through physical pixels on a
+        // fractional scale factor does not come back exact.
+        if asked.width.round() == wanted.width.round()
+            && asked.height.round() == wanted.height.round()
+        {
+            return Ok(());
+        }
+    }
+
+    let mut config = state.config_snapshot();
+    if config.popover == wanted {
+        return Ok(());
+    }
+    config.popover = wanted;
+    crate::reload::write_config(app, &config)
 }
 
 /// The Launcher is centred on the monitor the cursor is on: the README only

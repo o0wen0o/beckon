@@ -65,6 +65,9 @@ export interface Config {
   language: Language;
   api: { base_url: string };
   defaults: ModelParams;
+  /** The size the Popover is summoned at, in logical pixels (ADR-0018). Rust
+   *  clamps it, so this is always a size a window can actually be. */
+  popover: { width: number; height: number };
 }
 
 export type KeyStatus =
@@ -129,21 +132,29 @@ export interface PopoverView {
   phase: PopoverPhase;
   input: string | null;
   exchange_id: string | null;
-  /** Attached and not yet sent. */
-  capture: Capture | null;
-  /** The last snip produced nothing — cancelled, or the tool never answered. */
-  capture_cancelled: boolean;
-  /** A screenshot was taken and cannot be used: over the size ceiling, or bytes
-   *  no decoder recognised. Distinct from `capture_cancelled`, because the two
-   *  have different advice attached. */
-  capture_error: Failure | null;
+  /** Attached and not yet sent, oldest first (ADR-0017). */
+  captures: Capture[];
+  /** What the last snip had to say, if it had anything. */
+  capture_notice: CaptureNotice | null;
 }
+
+/**
+ * What one run of the snip tool left to say (ADR-0016).
+ *
+ * One value rather than a flag beside an error, because the two can never both
+ * stand: a run either attached a Capture, produced nothing, or produced bytes
+ * that cannot be sent. `cancelled` is not an error — nothing was captured, so
+ * nothing is being dropped — while `failed` carries the same `Failure` a
+ * refused command does, for the same `describeFailure` to read.
+ */
+export type CaptureNotice =
+  | { kind: "cancelled" }
+  | { kind: "failed"; failure: Failure };
 
 /** `popover:capture`: the fields of the view one snip can change. */
 export interface CapturePayload {
-  capture: Capture | null;
-  cancelled: boolean;
-  error: Failure | null;
+  captures: Capture[];
+  notice: CaptureNotice | null;
 }
 
 /** A command failure the UI reacts to by kind, not just by printing. */

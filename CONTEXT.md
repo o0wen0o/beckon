@@ -21,8 +21,9 @@ _Avoid_: highlighted text, selected region, text grab
 **Capture**:
 An image of part of the screen, taken with the platform's own snip tool from the Popover and read
 off the clipboard. A peer of the Selection, not a kind of it: the Selection is text the user had
-already highlighted, a Capture is made on request. In UI strings it is called a *screenshot* —
-"Capture" is the word for code, comments and commit messages.
+already highlighted, a Capture is made on request. A turn carries up to four of them, in the order
+they were taken (ADR-0017). In UI strings it is called a *screenshot* — "Capture" is the word for
+code, comments and commit messages.
 _Avoid_: snip, screen grab, attachment, image (all three are what it is made of, not what it is)
 
 ### Triggering

@@ -24,12 +24,11 @@ import {
   onPopoverCapture,
   onPopoverView,
   retryExchange,
-  startCapture,
   submitInput,
   Subscriptions,
 } from "../lib/ipc";
 import { Notifier } from "../lib/store";
-import type { Capture, CapturePayload, Failure, PopoverView } from "../lib/types";
+import type { Capture, CaptureNotice, CapturePayload, Failure, PopoverView } from "../lib/types";
 
 /**
  * Whether there is anything to send. A Capture is input on its own: the Action's
@@ -38,8 +37,14 @@ import type { Capture, CapturePayload, Failure, PopoverView } from "../lib/types
  * A free function rather than a getter, because the draft lives in the composer
  * and the guard lives in the store — one rule, read from both sides.
  */
-export const sendable = (text: string, capture: Capture | null) =>
-  text !== "" || capture !== null;
+export const sendable = (text: string, captures: Capture[]) =>
+  text !== "" || captures.length > 0;
+
+/** What a set of Captures weighs, for the one line of prose that describes it.
+ *  Here for the same reason as `sendable`: the rail and a sent turn's card both
+ *  say it, and they must not round it differently. */
+export const totalBytes = (captures: Capture[]) =>
+  captures.reduce((sum, capture) => sum + capture.bytes, 0);
 
 export type Status =
   | "waiting-first-token"
@@ -51,8 +56,9 @@ export type Status =
 
 export interface Turn {
   question: string;
-  /** The Capture that went with the question, if one did (ADR-0016). */
-  capture: Capture | null;
+  /** The Captures that went with the question, in the order they were taken
+   *  (ADR-0016, ADR-0017). Empty for a turn that carried only words. */
+  captures: Capture[];
   answer: string;
   reasoning: string;
   status: Status;
@@ -88,14 +94,13 @@ class ExchangeStore extends Notifier {
   view: PopoverView | null = null;
   turns: Turn[] = [];
   /**
-   * Attached and not yet sent. Rust owns it (ADR-0003) and hands it over on
-   * `popover:capture`; this is that value, not a second opinion about it.
+   * Attached and not yet sent, oldest first. Rust owns them (ADR-0003) and hands
+   * them over on `popover:capture`; this is that value, not a second opinion
+   * about it.
    */
-  capture: Capture | null = null;
-  /** The last snip came back with nothing. Cleared by the next one. */
-  captureCancelled = false;
-  /** A screenshot that was taken and cannot be sent, by cause. */
-  captureError: Failure | null = null;
+  captures: Capture[] = [];
+  /** What the last snip had to say, if it had anything. Cleared by the next. */
+  captureNotice: CaptureNotice | null = null;
   copiedTurn: number | null = null;
   /**
    * Bumped by every reveal. The window is reused (ADR-0007), so the composer
@@ -103,10 +108,32 @@ class ExchangeStore extends Notifier {
    * it on this remounts it, which clears both at once.
    */
   epoch = 0;
+  /**
+   * Bumped by every snip run that came back, landed or not. The window was
+   * hidden while the snip tool owned the screen, so focus comes back to the
+   * window rather than to the box inside it; this is the one signal that says
+   * "a run finished", which a count of what is attached is not — a refusal and
+   * a cancel both leave the count alone.
+   */
+  captureRun = 0;
 
   /** Zero unless a turn is waiting for its first token. */
   #waitingSince = 0;
   #waited = 0;
+
+  /**
+   * Which set is being looked at full size, and where in it — never the images
+   * themselves. `"composer"` is the pending tray, a number is that turn's own
+   * set; the two are different sets and the arrows must not cross between them
+   * (ADR-0017).
+   *
+   * Frontend-only, like `reasoningOpen`: nothing about looking at an image
+   * changes what would be sent, so Rust has no opinion about it. Naming the set
+   * rather than copying it is what keeps it from becoming a second opinion
+   * about what is attached (ADR-0003) — the tray shrinking under an open
+   * preview shortens it, and emptying closes it, with nothing to invalidate.
+   */
+  #preview: { source: "composer" | number; index: number } | null = null;
 
   get current(): Turn | null {
     return this.turns.length > 0 ? this.turns[this.turns.length - 1] : null;
@@ -160,6 +187,9 @@ class ExchangeStore extends Notifier {
       .add(
         onPopoverCapture((payload) => {
           this.#adoptCapture(payload);
+          // The run is over whatever it produced, which is what the composer
+          // needs to know to take focus back.
+          this.captureRun += 1;
           this.notify();
         }),
       )
@@ -236,10 +266,12 @@ class ExchangeStore extends Notifier {
     // starts with nothing attached — and Rust says so, rather than this
     // assuming it.
     this.#adoptCapture({
-      capture: this.view?.capture ?? null,
-      cancelled: this.view?.capture_cancelled ?? false,
-      error: this.view?.capture_error ?? null,
+      captures: this.view?.captures ?? [],
+      notice: this.view?.capture_notice ?? null,
     });
+    // A trigger is a new conversation; nothing from the last one is still
+    // being looked at.
+    this.#preview = null;
     if (!this.view) {
       this.turns = [];
       this.notify();
@@ -249,32 +281,67 @@ class ExchangeStore extends Notifier {
     this.notify();
   }
 
-  /**
-   * The screenshot button. The window hides while the OS snip tool owns the
-   * screen and comes back on `popover:capture` — so there is deliberately
-   * nothing to await here and no local "capturing" flag: the window is not on
-   * screen to show one.
-   */
-  capturing() {
-    void startCapture();
+  discardCapture(index: number) {
+    // Straight to Rust, which owns the list; the event is what shortens it here,
+    // so there is nothing local to notify about. An open preview follows it
+    // down, because `preview` is derived from the list rather than a copy of it.
+    void discardCapture(index);
   }
 
-  discardCapture() {
-    // Straight to Rust, which owns it; the event is what clears it here.
-    void discardCapture();
+  // --- the preview --------------------------------------------------------
+
+  /**
+   * What is on screen full size, resolved from the set it names. The index is
+   * clamped rather than trusted: the tray can shrink under an open preview, and
+   * an empty set is no preview at all — which is how sending closes it.
+   */
+  get preview(): { items: Capture[]; index: number } | null {
+    const at = this.#preview;
+    if (!at) return null;
+    const items =
+      at.source === "composer" ? this.captures : (this.turns[at.source]?.captures ?? []);
+    if (items.length === 0) return null;
+    return { items, index: Math.min(at.index, items.length - 1) };
+  }
+
+  /** Look at one Capture full size. `source` is the set it belongs to — the
+   *  pending tray, or the turn at that index — so the arrows walk that set and
+   *  nothing else (ADR-0017). */
+  openPreview(source: "composer" | number, index: number) {
+    this.#preview = { source, index };
+    this.notify();
+  }
+
+  closePreview() {
+    if (!this.#preview) return false;
+    this.#preview = null;
+    this.notify();
+    return true;
+  }
+
+  /** Wraps, because a set of two with a "next" that stops is a dead button. */
+  stepPreview(by: number) {
+    // The clamped view of `#preview`, so a set that shrank under it steps from
+    // where it is being drawn rather than from the index it was opened at.
+    const at = this.preview;
+    if (!at || !this.#preview) return;
+    this.#preview.index = (at.index + by + at.items.length) % at.items.length;
+    this.notify();
   }
 
   // --- the user's side ----------------------------------------------------
 
   async send(text: string) {
-    if (!sendable(text, this.capture) || this.busy) return;
-    // Taken now: Rust consumes it as the turn is started, and the turn keeps it
-    // for its own question card.
-    const capture = this.capture;
-    this.#adoptCapture({ capture: null, cancelled: false, error: null });
+    if (!sendable(text, this.captures) || this.busy) return;
+    // Taken now: Rust consumes them as the turn is started, and the turn keeps
+    // them for its own question card.
+    const captures = this.captures;
+    // Emptying the tray closes a preview of it on its own: the turn's own card
+    // is where those images live from here, and that is a different set.
+    this.#adoptCapture({ captures: [], notice: null });
 
     if (this.view && this.view.exchange_id && this.turns.length > 0) {
-      this.turns = [...this.turns, this.#newTurn(text, capture)];
+      this.turns = [...this.turns, this.#newTurn(text, captures)];
       this.notify();
       try {
         await followUp(this.view.exchange_id, text);
@@ -284,12 +351,12 @@ class ExchangeStore extends Notifier {
       return;
     }
 
-    this.turns = [this.#newTurn(text, capture)];
+    this.turns = [this.#newTurn(text, captures)];
     this.notify();
     try {
       const exchangeId = await submitInput(text);
       if (this.view) {
-        // The three capture fields are deliberately left as they were: they are
+        // The two capture fields are deliberately left as they were: they are
         // only ever read by `load`, which replaces the whole view with Rust's
         // own (ADR-0003), so nulling them here would be a write nothing reads.
         this.view = { ...this.view, phase: "running", exchange_id: exchangeId, input: text };
@@ -359,16 +426,15 @@ class ExchangeStore extends Notifier {
   /** Rust owns all three (ADR-0003); they arrive together and are adopted
    *  together, from the event and from a fresh view alike. */
   #adoptCapture(payload: CapturePayload) {
-    this.capture = payload.capture;
-    this.captureCancelled = payload.cancelled;
-    this.captureError = payload.error;
+    this.captures = payload.captures;
+    this.captureNotice = payload.notice;
   }
 
-  #newTurn(question: string, capture: Capture | null = null): Turn {
+  #newTurn(question: string, captures: Capture[] = []): Turn {
     this.#startWaiting();
     return {
       question,
-      capture,
+      captures,
       answer: "",
       reasoning: "",
       status: "waiting-first-token",

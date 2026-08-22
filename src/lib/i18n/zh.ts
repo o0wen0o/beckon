@@ -5,6 +5,7 @@
 // 名和产品里的专名），Selection 作“选中内容”，Launcher 作“启动器”，Popover 作
 // “浮窗”，Direct Hotkey 作“专属热键”，Input Source 作“输入来源”。
 import { IS_MAC } from "../platform";
+import { kb } from "./units";
 import type { Strings } from "./en";
 
 export const ZH: Strings = {
@@ -39,6 +40,7 @@ export const ZH: Strings = {
     empty: "端点没有列出任何模型",
     config: "Beckon 的配置不支持这样做",
     "capture-too-large": "截图太大，无法发送",
+    "capture-too-many": "已无法再附带更多截图",
     "capture-unreadable": "无法读取这张截图",
     fallback: "失败",
   },
@@ -86,14 +88,22 @@ export const ZH: Strings = {
     copy: "复制",
     copied: "已复制",
 
-    capture: "截图",
     captureTooltip: (accelerator: string) => `截取屏幕（${accelerator}）`,
     removeCapture: "移除截图",
     captureCancelled: "没有截到任何内容。",
     captureRetry: (accelerator: string) => `按 ${accelerator} 再试一次。`,
-    captureNote: "为这张截图写一句说明…",
+    captureNote: "为这些截图写一句说明…",
     captureMeta: (width: number, height: number, bytes: number) =>
-      `${width}×${height} · PNG ${Math.round(bytes / 1024)} KB`,
+      `${width}×${height} · PNG ${kb(bytes)} KB`,
+    captureSet: (count: number, bytes: number) =>
+      `${count} 张截图 · 共 ${kb(bytes)} KB`,
+    viewCapture: "查看这张截图",
+    capturePosition: (index: number, total: number) => `第 ${index} 张，共 ${total} 张截图`,
+    previousCapture: "上一张截图",
+    nextCapture: "下一张截图",
+    closeCapture: "关闭截图",
+    zoomHint: "点击放大，滚轮缩放",
+    zoomOutHint: "点击还原，拖动移动画面",
   },
 
   settings: {

@@ -3,20 +3,33 @@
 // left here is the shell, the scroller the store cannot reach, and the keys that
 // belong to the window rather than to a field.
 import * as React from "react";
-import { hidePopover, Subscriptions } from "@/lib/ipc";
+import {
+  hidePopover,
+  onWindowResized,
+  setPopoverSize,
+  startCapture,
+  Subscriptions,
+} from "@/lib/ipc";
 import { fill, useT } from "@/lib/i18n";
 import { hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { Callout } from "@/components/Callout";
 import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
+import { CapturePreview } from "./CapturePreview";
 import { Composer } from "./Composer";
 import { PopoverHeader } from "./PopoverHeader";
+import { ResizeGrips } from "./ResizeGrips";
 import { TurnView } from "./Turn";
 import { exchange } from "./exchange";
 
 /** How far off the bottom counts as "the user has scrolled up to re-read". */
 const STICK_WITHIN = 48;
+
+/** How long a resize has to stop for before it counts as the size the user
+ *  meant (ADR-0018). A drag reports every pixel, and each report Rust keeps is a
+ *  write to `config.toml`. */
+const SIZE_SETTLE = 400;
 
 export function Popover() {
   const t = useT();
@@ -38,6 +51,25 @@ export function Popover() {
     };
   }, []);
 
+  // The size the window is dragged to is remembered across summons (ADR-0018).
+  // Every resize reports itself, ours included; Rust drops the ones it caused,
+  // so this reports all of them and decides nothing. The report is physical
+  // pixels straight off the event — `setPopoverSize` converts, once per settled
+  // drag rather than once per frame.
+  React.useEffect(() => {
+    let settle: number | undefined;
+    const subscriptions = new Subscriptions().add(
+      onWindowResized((width, height) => {
+        window.clearTimeout(settle);
+        settle = window.setTimeout(() => void setPopoverSize(width, height), SIZE_SETTLE);
+      }),
+    );
+    return () => {
+      window.clearTimeout(settle);
+      void subscriptions.dispose();
+    };
+  }, []);
+
   const answer = store.current?.answer;
   React.useEffect(() => {
     if (!stick.current || !scroller.current) return;
@@ -55,22 +87,36 @@ export function Popover() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        // Esc closes the preview first (ADR-0017): it is the only layer over the
+        // window, so it is the nearest thing to back out of — and closing it
+        // must not also cancel the request underneath it.
+        if (exchange.closePreview()) return;
         // Esc cancels a live request first, so partial text stays readable;
         // a second Esc closes the window (README: both behaviours).
         if (!exchange.cancel()) void hidePopover();
         return;
       }
-      // Copy is the only export path, so it gets a shortcut that works while
-      // the composer has focus.
+      // The arrows walk the preview only while it is up. Unguarded they would
+      // be the caret's keys in the composer, which is the field below it.
+      if (exchange.preview && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+        event.preventDefault();
+        exchange.stepPreview(event.key === "ArrowRight" ? 1 : -1);
+        return;
+      }
+      /** Both window shortcuts are the same chord with one letter changed. */
+      const chord = (key: string) =>
+        event.key.toLowerCase() === key && hasCommandModifier(event) && event.shiftKey;
       // The screenshot shortcut, so a Popover summoned by a hotkey can grab one
       // without the mouse (ADR-0016). Window-scoped: it is not registered
       // globally and means nothing when the Popover is not up.
-      if (event.key.toLowerCase() === "s" && hasCommandModifier(event) && event.shiftKey) {
+      if (chord("s")) {
         event.preventDefault();
-        exchange.capturing();
+        void startCapture();
         return;
       }
-      if (event.key.toLowerCase() === "c" && hasCommandModifier(event) && event.shiftKey) {
+      // Copy is the only export path, so it gets a shortcut that works while
+      // the composer has focus.
+      if (chord("c")) {
         const current = exchange.current;
         if (!current?.answer) return;
         event.preventDefault();
@@ -86,8 +132,10 @@ export function Popover() {
 
   return (
     // The frameless card fills the window rect exactly, so the drop shadow
-    // under it is the compositor's rather than one painted here.
-    <div className="bg-background flex h-screen flex-col overflow-hidden rounded-lg border">
+    // under it is the compositor's rather than one painted here. `relative` is
+    // for the preview layer: it covers this card, not the viewport, so the
+    // rounded corners stay the window's own (ADR-0017).
+    <div className="bg-background relative flex h-screen flex-col overflow-hidden rounded-lg border">
       <PopoverHeader
         actionName={view?.action_name ?? "Beckon"}
         model={view?.model ?? null}
@@ -164,14 +212,32 @@ export function Popover() {
           // `popover:capture` precisely so the draft it belongs to survives.
           key={store.epoch}
           placeholder={empty ? t.popover.firstInput : t.popover.followUp}
-          capture={store.capture}
-          captureCancelled={store.captureCancelled}
-          captureError={store.captureError}
+          captures={store.captures}
+          captureNotice={store.captureNotice}
+          captureRun={store.captureRun}
           onSend={(text) => void exchange.send(text)}
-          onCapture={() => exchange.capturing()}
-          onDiscardCapture={() => exchange.discardCapture()}
+          onCapture={() => void startCapture()}
+          onOpenCapture={(index) => exchange.openPreview("composer", index)}
+          onDiscardCapture={(index) => exchange.discardCapture(index)}
         />
       ) : null}
+
+      {/* Last child and `absolute inset-0`, so it covers the title bar as well:
+          a preview under the drag region would leave the window's one grab
+          handle sitting on top of the picture (ADR-0017). */}
+      {store.preview ? (
+        <CapturePreview
+          items={store.preview.items}
+          index={store.preview.index}
+          onStep={(by) => exchange.stepPreview(by)}
+          onClose={() => exchange.closePreview()}
+        />
+      ) : null}
+
+      {/* After the preview, and above it: the window stays resizable while a
+          screenshot is being looked at, which is when its size matters most
+          (ADR-0018). */}
+      <ResizeGrips />
     </div>
   );
 }

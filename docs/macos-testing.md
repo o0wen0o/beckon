@@ -53,7 +53,22 @@ Ordered by how likely they are to be wrong.
 | 7b | Repeat, and press **Esc** in the snip overlay instead of dragging | The Popover comes back saying nothing was captured. Nothing is sent, and any previously attached screenshot is still attached |
 | 7c | Type a note beside an attached screenshot, then Send, with the Action's model set to `deepseek-v4-flash-vision-exp` | The image and the note go as one turn; the answer streams as usual |
 | 7d | Same, with the model left at `deepseek-v4-pro` | The request is sent anyway; the provider's own error is shown verbatim (Beckon gates nothing on the model, ADR-0016) |
-| 7e | Attach a screenshot, take a **second** one without sending the first | The second replaces the first; there is never more than one attached |
+| 7e | Attach a screenshot, take a **second** one without sending the first | Both are attached, oldest tile first, and the note being typed survives (ADR-0017) |
+| 7f | Take a **fifth** screenshot without sending | It is refused with "there is no room for another screenshot"; the four already attached stay attached |
+| 7g | Click a tile in the rail, then press ← / → , then Esc | The screenshot opens full size over the whole window on a grey ground, the arrows walk the set and wrap, Esc closes the preview only — the Exchange and the draft are still there |
+| 7g1 | With a preview open, click the grey space beside the image | It closes. A click on the image itself does not close it — that one zooms (ADR-0017) |
+| 7g2 | Preview a **full-screen** snip | The whole image is on screen, no edge cut off, both arrows still in their places (ADR-0017) |
+| 7g3 | In the preview, **scroll the wheel** up and down over the image | It zooms continuously, the title bar reads the percentage while zoomed, and scrolling back down stops at fit rather than shrinking past it. A trackpad's two-finger scroll is the same gesture |
+| 7g4 | **Click** the image, then drag it, then click again | The first click goes to the image's own pixels, dragging pans, the second click returns to fit — and the click that ends a drag does *not* toggle it |
+| 7g5 | Zoom in, then drag to each **corner** of the image | All four corners are reachable; nothing is stranded off the top or left edge (ADR-0017) |
+| 7g6 | Zoom in, then press ← or → | The next Capture opens fitted, not at the previous one's zoom |
+| 7g7 | Zoom in and look at the edges of the image area | No scrollbar appears on either axis, and the image does not jump smaller the moment it is zoomed (ADR-0017) |
+| 7g8 | Zoom in, then drag the image and **release with the pointer outside the image**, over the grey | It pans and stays open — the release does not close the preview (ADR-0017) |
+| 7h | Click a screenshot inside a *sent* turn's card | The same preview, walking that turn's images rather than the composer's |
+| 7i | Send two screenshots with a note, then ask a follow-up | The follow-up carries no image of its own, and the answer can still refer to both (the history is resent, ADR-0004) |
+| 7j | Drag each **edge and corner** of the Popover | It resizes from all eight, and cannot go below 380×200. An undecorated NSWindow has no border of its own, so this is `startResizeDragging` and nothing else (ADR-0018) |
+| 7k | Resize the Popover, close it, then trigger any Action again | It opens at the size you left it, still next to the cursor. `[popover]` in `config.toml` holds it |
+| 7l | Resize it, then trigger a `selection` Action with **nothing selected** | The short hint window appears — and the *next* full Popover is back at the size you chose, not 220px tall (ADR-0018) |
 | 8 | Open the Launcher hotkey while an app is fullscreen | The Launcher appears and takes focus |
 | 9 | In Settings, click into the API key field and press **Cmd+V** | It pastes. If not, Tauri's default menu is missing and every text field in the app is crippled |
 | 10 | With a Beckon window focused, press **Cmd+Q** | The app quits. From the menu bar's Quit item too |

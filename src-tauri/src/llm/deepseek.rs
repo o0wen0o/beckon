@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn an_image_sends_the_documented_parts_array() {
-        let content = Content::with_image("read this", "data:image/png;base64,AA");
+        let content = Content::with_images("read this", ["data:image/png;base64,AA"]);
         let body = build_body(
             &params("deepseek-v4-flash-vision-exp", false),
             &[Message::system("s"), Message::user(content)],
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn any_model_may_be_sent_an_image() {
         for model in ["deepseek-v4-pro", "llava:13b"] {
-            let content = Content::with_image("hi", "data:image/png;base64,AA");
+            let content = Content::with_images("hi", ["data:image/png;base64,AA"]);
             assert!(build_body(&params(model, false), &[Message::user(content)]).is_ok());
         }
     }

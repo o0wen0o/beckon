@@ -6,6 +6,7 @@ mod atomic;
 mod commands;
 mod config;
 mod exchange;
+mod failure;
 mod hotkey;
 mod i18n;
 mod llm;
@@ -90,6 +91,7 @@ fn main() {
             commands::retry_exchange,
             commands::start_capture,
             commands::discard_capture,
+            commands::set_popover_size,
             commands::hide_popover,
             commands::hide_launcher,
             commands::show_settings,

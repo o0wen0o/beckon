@@ -11,13 +11,14 @@
 // Capture is something you attach to what you are about to send, so it belongs
 // beside the box you are typing it in — and Send stays the one thing that sends.
 import * as React from "react";
-import { CameraIcon, SendIcon, TrashIcon } from "lucide-react";
+import { CameraIcon, SendIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { describeFailure } from "@/lib/failures";
 import { useT } from "@/lib/i18n";
 import { COMMAND_MODIFIER, formatAccelerator } from "@/lib/platform";
-import type { Capture, Failure } from "@/lib/types";
+import type { Capture, CaptureNotice } from "@/lib/types";
+import { CaptureRail } from "./CaptureRail";
 import { sendable } from "./exchange";
 
 /** The Popover-local shortcut for a screenshot, drawn once in the platform's
@@ -27,23 +28,26 @@ const CAPTURE_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+S`);
 
 interface ComposerProps {
   placeholder: string;
-  capture: Capture | null;
-  /** The last snip produced nothing. */
-  captureCancelled: boolean;
-  /** A screenshot was taken and cannot be sent, by cause. */
-  captureError: Failure | null;
+  /** Attached and not yet sent, oldest first (ADR-0017). */
+  captures: Capture[];
+  /** What the last snip had to say, if it had anything. */
+  captureNotice: CaptureNotice | null;
+  /** Bumped by every snip run that came back. */
+  captureRun: number;
   onSend: (text: string) => void;
   onCapture: () => void;
-  onDiscardCapture: () => void;
+  onOpenCapture: (index: number) => void;
+  onDiscardCapture: (index: number) => void;
 }
 
 export function Composer({
   placeholder,
-  capture,
-  captureCancelled,
-  captureError,
+  captures,
+  captureNotice,
+  captureRun,
   onSend,
   onCapture,
+  onOpenCapture,
   onDiscardCapture,
 }: ComposerProps) {
   const t = useT();
@@ -52,18 +56,19 @@ export function Composer({
 
   // The Popover is summoned by a hotkey; reaching for the mouse to click into
   // the one box on screen is the thing that would make it not worth summoning.
+  //
+  // And again after every snip run: the window was hidden while the snip tool
+  // had the screen, so focus comes back to the window rather than to the box
+  // inside it. Keyed on the run rather than on what is attached — a refusal and
+  // a cancel leave the count alone, and those are the two the user most needs
+  // to be able to type after.
   React.useEffect(() => {
     box.current?.focus();
-  }, []);
-
-  // The window was hidden while the snip tool had the screen, so focus comes
-  // back to the window rather than to the box inside it.
-  React.useEffect(() => {
-    if (capture) box.current?.focus();
-  }, [capture]);
+  }, [captureRun]);
 
   const text = draft.trim();
-  const canSend = sendable(text, capture);
+  const canSend = sendable(text, captures);
+  const attached = captures.length > 0;
 
   const send = () => {
     if (!canSend) return;
@@ -77,36 +82,20 @@ export function Composer({
           than at the top of the scroller: the scroller holds the conversation
           and the standing notice for a Popover with nothing in it yet, and by
           the time a screenshot is taken the user is reading the bottom of it. */}
-      {captureError ? (
+      {captureNotice?.kind === "failed" ? (
         // A screenshot that cannot be sent is worth the marker the product
         // gives an alarm: something *was* captured and is being dropped.
-        <p className="text-warning text-note">{describeFailure(captureError, t)}</p>
-      ) : captureCancelled ? (
+        <p className="text-warning text-note">{describeFailure(captureNotice.failure, t)}</p>
+      ) : captureNotice?.kind === "cancelled" ? (
         // Not an alarm: nothing was captured, so nothing was sent.
         <p className="text-muted-quiet text-note">
           {t.popover.captureCancelled} {t.popover.captureRetry(CAPTURE_ACCELERATOR)}
         </p>
       ) : null}
 
-      {/* The pending Capture sits above the box, not inside it: a thumbnail in
+      {/* The pending Captures sit above the box, not inside it: a thumbnail in
           the field would move the caret, and the field stays a text field. */}
-      {capture ? (
-        <div className="bg-muted flex items-center gap-2 self-start rounded-md border py-1 pr-1 pl-2">
-          <img src={capture.data_url} alt="" className="h-8 w-12 rounded border object-cover" />
-          <span className="text-muted-foreground text-quiet">
-            {t.popover.captureMeta(capture.width, capture.height, capture.bytes)}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={t.popover.removeCapture}
-            title={t.popover.removeCapture}
-            onClick={onDiscardCapture}
-          >
-            <TrashIcon className="size-3.5" />
-          </Button>
-        </div>
-      ) : null}
+      <CaptureRail captures={captures} onOpen={onOpenCapture} onRemove={onDiscardCapture} />
 
       <div className="flex items-end gap-2">
         {/* Outlined, not filled: Send is the one filled control in the window,
@@ -125,8 +114,8 @@ export function Composer({
           ref={box}
           rows={1}
           value={draft}
-          placeholder={capture ? t.popover.captureNote : placeholder}
-          aria-label={capture ? t.popover.captureNote : placeholder}
+          placeholder={attached ? t.popover.captureNote : placeholder}
+          aria-label={attached ? t.popover.captureNote : placeholder}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {

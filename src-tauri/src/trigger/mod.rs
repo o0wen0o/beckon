@@ -21,12 +21,11 @@ use crate::action::InputSource;
 use crate::exchange;
 use crate::llm::Content;
 use crate::platform;
-use crate::platform::capture::{Capture, CaptureError};
-use crate::state::{AppState, PopoverPhase, PopoverView};
+use crate::platform::capture::Capture;
+use crate::state::{AppState, CaptureNotice, PopoverPhase, PopoverView};
 
 use self::foreground::{remember_foreground, restore_foreground_if_idle};
 use self::window::{center_on_active_monitor, reveal, size_and_place_at_cursor, POPOVER_HINT_H};
-use self::window::{POPOVER_H, POPOVER_W};
 
 pub const WINDOW_LAUNCHER: &str = "launcher";
 pub const WINDOW_POPOVER: &str = "popover";
@@ -34,7 +33,7 @@ pub const WINDOW_SETTINGS: &str = "settings";
 
 /// The Popover's view changed: re-read it with `get_popover_view`.
 pub const EVENT_POPOVER_VIEW: &str = "popover:view";
-/// The attached Capture changed, and *only* that (ADR-0016). Its own event
+/// The attached Captures changed, and *only* that (ADR-0016). Its own event
 /// rather than `popover:view`, because re-reading the view is how a new trigger
 /// is handled: it resets the conversation and remounts the composer, which is
 /// exactly wrong for a screenshot attached in the middle of typing.
@@ -137,9 +136,8 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
         phase,
         input: input.clone(),
         exchange_id: None,
-        capture: None,
-        capture_cancelled: false,
-        capture_error: None,
+        captures: Vec::new(),
+        capture_notice: None,
     };
 
     if phase == PopoverPhase::Running {
@@ -162,25 +160,29 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_VIEW, ());
 
     if let Some(window) = app.get_webview_window(WINDOW_POPOVER) {
+        // Whatever size the user last left the window at (ADR-0018). The hint
+        // is a ceiling on top of that, never a floor: a Popover already shorter
+        // than the hint stays that short.
+        let size = state.config_snapshot().popover;
         let height = if phase == PopoverPhase::EmptySelection {
-            POPOVER_HINT_H
+            size.height.min(POPOVER_HINT_H)
         } else {
-            POPOVER_H
+            size.height
         };
-        size_and_place_at_cursor(&window, POPOVER_W, height);
+        size_and_place_at_cursor(&window, size.width, height);
         reveal(&window);
     }
 }
 
 /// Start a turn for a Popover that was waiting for typed input.
 ///
-/// An attached Capture is taken here: a Capture belongs to the turn it was
-/// attached to, so sending consumes it (ADR-0016).
+/// Attached Captures are taken here: a Capture belongs to the turn it was
+/// attached to, so sending consumes them (ADR-0016, ADR-0017).
 pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
     let state = app.state::<AppState>();
     // Only the identity is read from the view here. Cloning the whole thing
-    // would copy the attached Capture's base64 — megabytes — to reach one
-    // `String`, and the Capture itself is moved out below.
+    // would copy the attached Captures' base64 — megabytes — to reach one
+    // `String`, and the Captures themselves are moved out below.
     let action_id = state
         .popover_view
         .lock()
@@ -206,8 +208,11 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
         let mut slot = state.popover_view.lock().expect("popover view lock");
         // Consumed by the turn: it is in the history now, and leaving it
         // attached would send it a second time with the next follow-up.
-        let capture = slot.as_mut().and_then(PopoverView::take_capture);
-        user_content(&action.render_user(text), capture)
+        let captures = slot
+            .as_mut()
+            .map(PopoverView::take_captures)
+            .unwrap_or_default();
+        user_content(&action.render_user(text), captures)
     };
     let plan = state
         .exchanges
@@ -230,10 +235,10 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
 
 /// A follow-up turn inside the same Exchange (ADR-0004: full history resent).
 ///
-/// A Capture attached after the first answer belongs to this turn, exactly as
-/// one attached before the first did.
+/// Captures attached after the first answer belong to this turn, exactly as
+/// ones attached before the first did.
 pub fn follow_up(app: &AppHandle, exchange_id: &str, text: &str) -> Result<(), String> {
-    let capture = app
+    let captures = app
         .state::<AppState>()
         .popover_view
         .lock()
@@ -241,14 +246,15 @@ pub fn follow_up(app: &AppHandle, exchange_id: &str, text: &str) -> Result<(), S
         .as_mut()
         // No view is not a state a follow-up can reach; nothing attached is the
         // answer that cannot be wrong if it ever does.
-        .and_then(PopoverView::take_capture);
+        .map(PopoverView::take_captures)
+        .unwrap_or_default();
     // Straight into `retry`, which is exactly "begin this content and spawn the
     // turn" — the only difference between the two is where the content is from.
-    retry(app, exchange_id, user_content(text, capture))
+    retry(app, exchange_id, user_content(text, captures))
 }
 
 /// Resend a turn verbatim. A retry repeats the message that failed — the same
-/// words and the same Capture — so it does not go through the attach path.
+/// words and the same Captures — so it does not go through the attach path.
 pub fn retry(app: &AppHandle, exchange_id: &str, content: Content) -> Result<(), String> {
     let state = app.state::<AppState>();
     let plan = state
@@ -259,18 +265,15 @@ pub fn retry(app: &AppHandle, exchange_id: &str, content: Content) -> Result<(),
     Ok(())
 }
 
-/// One turn worth of content: the rendered text, plus the attached Capture when
-/// there is one. The only place the two are joined, so "the image goes with the
-/// words typed beside it" is a single rule (ADR-0016).
+/// One turn worth of content: the rendered text, plus whatever Captures were
+/// attached to it. The only place the two are joined, so "the images go with the
+/// words typed beside them" is a single rule (ADR-0016, ADR-0017).
 ///
-/// The Capture arrives by value because every caller has just taken it out of
-/// the view: its base64 is megabytes, and it is moved onto the wire rather than
-/// copied there.
-fn user_content(text: &str, capture: Option<Capture>) -> Content {
-    match capture {
-        Some(capture) => Content::with_image(text, capture.data_url),
-        None => Content::from(text),
-    }
+/// The Captures arrive by value because every caller has just taken them out of
+/// the view: their base64 is megabytes, and it is moved onto the wire rather
+/// than copied there.
+fn user_content(text: &str, captures: Vec<Capture>) -> Content {
+    Content::with_images(text, captures.into_iter().map(|capture| capture.data_url))
 }
 
 /// The Popover screenshot button: hide our windows, run the OS snip tool, then
@@ -299,9 +302,9 @@ pub fn start_capture(app: &AppHandle) {
         match slot.as_mut() {
             // A second attempt clears what the first one said, so the window
             // cannot come back saying "nothing was captured" over a fresh
-            // Capture. Only the notices: the Capture already attached stays
+            // Capture. Only the notice: the Captures already attached stay
             // until this snip lands.
-            Some(view) => view.clear_capture_notices(),
+            Some(view) => view.capture_notice = None,
             // Nothing to capture *for*: no Action is loaded. The flag has to go
             // back down on the way out, or the button is dead for good.
             None => {
@@ -347,32 +350,36 @@ pub fn start_capture(app: &AppHandle) {
     });
 }
 
-/// The Popover remove-the-screenshot button.
-pub fn discard_capture(app: &AppHandle) {
+/// One tile's remove button (ADR-0017).
+///
+/// By index, because a Capture has no identity of its own — it is bytes, and two
+/// snips of the same region are equal. The list only ever grows at the end and
+/// only this window shrinks it, so the index the window names is the one it
+/// rendered; out of range is a no-op in [`PopoverView::remove_capture`].
+pub fn discard_capture(app: &AppHandle, index: usize) {
     {
         let state = app.state::<AppState>();
         let mut slot = state.popover_view.lock().expect("popover view lock");
         let Some(view) = slot.as_mut() else { return };
-        view.clear_capture();
+        view.remove_capture(index);
     }
     emit_capture(app);
 }
 
-/// The three fields of the view a Capture can change, as one payload.
+/// The two fields of the view a Capture can change, as one payload.
 ///
 /// Borrowed from the view rather than cloned into a `serde_json::Value`: the
 /// base64 is megabytes and Tauri serialises the payload anyway, so a `Value` in
-/// between would be one whole copy of the image for nothing. `Clone` is what
-/// `emit_to` asks for, and cloning this copies two references rather than the
-/// megabytes behind them.
+/// between would be one whole copy of every image for nothing. `Clone` is what
+/// `emit_to` asks for, and cloning this copies a slice reference rather than the
+/// megabytes behind it.
 #[derive(Serialize, Clone, Default)]
 struct CapturePayload<'a> {
-    capture: Option<&'a Capture>,
-    cancelled: bool,
-    error: Option<&'a CaptureError>,
+    captures: &'a [Capture],
+    notice: Option<&'a CaptureNotice>,
 }
 
-/// Tell the window what the three fields now are, rather than telling it to go
+/// Tell the window what the two fields now are, rather than telling it to go
 /// and look: looking means `get_popover_view`, which is the new-trigger path.
 ///
 /// The guard is held across the emit, which is allowed — this is a plain `std`
@@ -382,9 +389,8 @@ fn emit_capture(app: &AppHandle) {
     let slot = state.popover_view.lock().expect("popover view lock");
     let payload = match slot.as_ref() {
         Some(view) => CapturePayload {
-            capture: view.capture.as_ref(),
-            cancelled: view.capture_cancelled,
-            error: view.capture_error.as_ref(),
+            captures: &view.captures,
+            notice: view.capture_notice.as_ref(),
         },
         None => CapturePayload::default(),
     };

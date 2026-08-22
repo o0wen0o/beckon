@@ -39,12 +39,14 @@
         "url": "popover.html",
         "width": 620,
         "height": 500,
+        "minWidth": 380,
+        "minHeight": 200,
         "visible": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "resizable": false,
+        "resizable": true,
         "maximizable": false,
         "shadow": true
       }

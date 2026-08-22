@@ -70,26 +70,6 @@ pub enum Fault {
     Unreadable(String),
 }
 
-/// The kind-plus-message pair a [`Fault`] becomes on its way to the Popover.
-///
-/// Shaped like `commands::Failure` on purpose, because it reaches the Popover
-/// through the same path and is read by the same `describeFailure`: the cause is
-/// named in the reader's language and the detail is quoted verbatim.
-#[derive(Debug, Clone, Serialize)]
-pub struct CaptureError {
-    pub kind: String,
-    pub message: String,
-}
-
-impl CaptureError {
-    pub(crate) fn new(kind: &str, message: String) -> Self {
-        Self {
-            kind: kind.to_string(),
-            message,
-        }
-    }
-}
-
 /// What one run of the snip tool produced.
 ///
 /// Three arms, not `Option`: "the user pressed Esc" and "that screenshot is
@@ -129,10 +109,12 @@ impl Outcome {
 /// A PNG in is still decoded and re-encoded. It costs a few tens of
 /// milliseconds on a snip-sized image, and it buys the dimensions, one code
 /// path, and a guarantee that what we send is a PNG we produced.
-pub fn from_clipboard_bytes(bytes: &[u8]) -> Result<Capture, Fault> {
+fn from_clipboard_bytes(bytes: &[u8]) -> Result<Capture, Fault> {
     let image = image::load_from_memory(bytes).map_err(|e| Fault::Unreadable(e.to_string()))?;
 
-    let mut png = Cursor::new(Vec::new());
+    // Pre-sized off what the clipboard held: a snip-sized encode into an empty
+    // `Vec` is twenty reallocations, each copying megabytes.
+    let mut png = Cursor::new(Vec::with_capacity(bytes.len()));
     image
         .write_to(&mut png, ImageFormat::Png)
         .map_err(|e| Fault::Unreadable(e.to_string()))?;

@@ -17,24 +17,15 @@ pub fn get_config(state: State<AppState>) -> Config {
 
 /// Persist config. A Launcher hotkey that cannot be registered is **refused**,
 /// not saved (README).
+///
+/// Validate and delegate, like every command: the probe is the refusal, and
+/// `reload::write_config` is the one funnel — mark, write, re-read, broadcast.
 #[tauri::command]
 pub fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result<(), String> {
-    let previous = state.config_snapshot();
-    if config.launcher_hotkey != previous.launcher_hotkey {
+    if config.launcher_hotkey != state.config_snapshot().launcher_hotkey {
         hotkey::probe(&app, &config.launcher_hotkey)?;
     }
-
-    let path = state.paths.config_file.clone();
-    state.self_writes.mark(&path);
-    crate::config::save(&path, &config)?;
-
-    if config.autostart != previous.autostart {
-        reload::sync_autostart(&app, config.autostart)?;
-    }
-
-    // The one funnel: re-read what we just wrote, re-derive hotkeys, broadcast.
-    reload::reload_config(&app);
-    Ok(())
+    reload::write_config(&app, &config)
 }
 
 #[tauri::command]

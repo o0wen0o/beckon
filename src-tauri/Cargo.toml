@@ -33,7 +33,10 @@ image = { version = "0.25", default-features = false, features = [
     "tiff",
 ] }
 
-serde = { version = "1", features = ["derive"] }
+# `rc`: a Capture's data URL lives behind an `Arc<str>` so resending the
+# untruncated history (ADR-0004) is a refcount bump rather than megabytes of
+# `memcpy` per turn.
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 toml = "0.8"
 thiserror = "2"

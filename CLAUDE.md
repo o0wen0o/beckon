@@ -14,7 +14,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Input Source, Selection, Capture, Launcher,
   Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one Chinese
   form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 16 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 18 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -76,10 +76,17 @@ load-bearing:
 3. Emit the view event **before** revealing the window. Windows are created hidden at startup and
    reused (ADR-0007), so revealing first paints the previous Exchange for a few frames.
 
-A Capture (ADR-0016) rides the same flow sideways: `start_capture` hides the Popover *window* —
+A Capture (ADR-0016, ADR-0017) rides the same flow sideways: `start_capture` hides the Popover *window* —
 never `hide_popover`, which would discard the Exchange — runs the OS snip tool on a thread, and
 emits `popover:capture` rather than `popover:view`, because re-reading the view is the new-trigger
 path and would remount the composer over the note the screenshot was taken for.
+
+The size that step 3 reveals at is the user's (ADR-0018): `config.popover`, with the
+`empty-selection` hint height as a *ceiling* on it rather than a fixed height. The Popover is
+undecorated, so the eight grips that resize it are markup (`ResizeGrips`) handing the drag to
+`startResizeDragging`, and the window reports the result back debounced. Rust drops any report
+matching `popover_asked_size` — the size it last asked for — because every `set_size` reports itself
+and the 220px hint would otherwise become the remembered size.
 
 Spawn a thread for the grab: it blocks up to ~300ms polling the clipboard and must stay off the
 event-loop thread. `show_settings` spawns too — `WebviewWindowBuilder::build` deadlocks on the main
@@ -136,7 +143,10 @@ never translated in either direction.
   invalidates.
 - **Contradicting an ADR requires a new ADR**, numbered next, naming what it supersedes; edit the
   superseded one to point forward rather than deleting it (0008 → 0012, 0009 → 0010/0014,
-  0001/0002/0005 → 0013). ADR-0016 does not supersede 0002 — it explains why the clipboard restore
+  0001/0002/0005 → 0013). ADR-0017 extends 0016 rather than superseding it — the arity of a turn's
+  Captures changed, not where they come from. ADR-0018 makes the Popover's 620×500 a *default* rather
+  than contradicting the layout arguments made against it (0010, 0014, 0017): those still describe
+  the window a user has never dragged. ADR-0016 does not supersede 0002 — it explains why the clipboard restore
   0002 mandates deliberately does not apply to a snip the user ran themselves.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
@@ -147,7 +157,7 @@ never translated in either direction.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (1806 symbols, 4426 relationships, 149 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (1863 symbols, 4601 relationships, 154 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

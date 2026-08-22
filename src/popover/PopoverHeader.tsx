@@ -10,7 +10,13 @@ import { BrandMark } from "@/components/BrandMark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { ModelParams } from "@/lib/types";
+
+/** The title bar's box, shared with the preview layer that covers it
+ *  (ADR-0017): the preview's close button only lands on top of the one
+ *  underneath it while the two bars are the same height and padding. */
+export const TITLE_BAR = "flex h-8.5 flex-none items-center gap-2 border-b pr-1 pl-3";
 
 interface PopoverHeaderProps {
   actionName: string;
@@ -24,7 +30,7 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
   return (
     <header
       data-tauri-drag-region
-      className="flex h-8.5 flex-none cursor-default items-center gap-2 border-b pr-1 pl-3 select-none"
+      className={cn(TITLE_BAR, "cursor-default select-none")}
     >
       <BrandMark className="text-brand size-3.5 flex-none" />
       {/* An Action's name, at the weight every other list gives it. The

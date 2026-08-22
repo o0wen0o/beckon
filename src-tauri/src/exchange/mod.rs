@@ -181,14 +181,14 @@ mod tests {
         let id = manager.create("s", params());
         manager.begin_turn(
             &id,
-            Content::with_image("what is this?", "data:image/png;base64,AA"),
+            Content::with_images("what is this?", ["data:image/png;base64,AA"]),
         );
         manager.commit_assistant(&id, "a dialog");
 
         let second = manager.begin_turn(&id, "and the button?").unwrap();
         assert_eq!(
             second.messages[1].content,
-            Content::with_image("what is this?", "data:image/png;base64,AA")
+            Content::with_images("what is this?", ["data:image/png;base64,AA"])
         );
         // The retry path resends this one verbatim, so it is the follow-up and
         // carries no image of its own.
