@@ -11,10 +11,10 @@ as a TOML file), and streams a DeepSeek response into a popover near the cursor.
 Read before non-trivial work:
 
 - [README.md](./README.md) — the spec: scope, decided behaviour, config-file layout.
-- [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Input Source, Selection, Launcher, Direct
-  Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one Chinese form.
-  Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 15 accepted ADRs. Comments cite them by number; a comment saying
+- [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Input Source, Selection, Capture, Launcher,
+  Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one Chinese
+  form. Use those words in code, comments, UI strings and commit messages.
+- [docs/adr/](./docs/adr/) — 16 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -76,6 +76,11 @@ load-bearing:
 3. Emit the view event **before** revealing the window. Windows are created hidden at startup and
    reused (ADR-0007), so revealing first paints the previous Exchange for a few frames.
 
+A Capture (ADR-0016) rides the same flow sideways: `start_capture` hides the Popover *window* —
+never `hide_popover`, which would discard the Exchange — runs the OS snip tool on a thread, and
+emits `popover:capture` rather than `popover:view`, because re-reading the view is the new-trigger
+path and would remount the composer over the note the screenshot was taken for.
+
 Spawn a thread for the grab: it blocks up to ~300ms polling the clipboard and must stay off the
 event-loop thread. `show_settings` spawns too — `WebviewWindowBuilder::build` deadlocks on the main
 thread on Windows.
@@ -88,7 +93,7 @@ thread on Windows.
 | `action/` | The `Action` model, the `Registry` loaded from `actions/`, the debounced watcher. |
 | `exchange/` | In-memory Exchanges (ADR-0004: no storage layer anywhere), `spawn_turn`, streaming events to the Popover. |
 | `llm/` | OpenAI-compatible client: `sse` a pure frame parser, `wire` the shapes, `deepseek` the only home for provider quirks, `models` the catalog. Knows nothing about windows or Actions. |
-| `platform/` | The facade: Win32 under `windows/`, AppKit/CoreGraphics under `macos/`, stubs in `fallback.rs`. Put every new platform divergence here so business logic stays `#[cfg]`-free. Pure geometry (`place_near_cursor`) lives here as the unit-testable part. |
+| `platform/` | The facade: Win32 under `windows/`, AppKit/CoreGraphics under `macos/`, stubs in `fallback.rs`. Put every new platform divergence here so business logic stays `#[cfg]`-free. Pure geometry (`place_near_cursor`) and Capture normalisation (`capture.rs`) live here as the unit-testable parts; `snip` is the per-platform half of ADR-0016. |
 | `hotkey.rs` | Parsing (`Ctrl`/`Alt`/`Shift`/`Cmd` parse on both platforms) and registration; failures surface in `ApplyReport`, never silently. |
 | `secrets.rs` | The API key via `keyring`, never plaintext on disk (ADR-0005). "First run" means "no key readable", never a file check. |
 | `i18n.rs` | Only what Rust writes: the tray menu, the balloon, derived diagnostics. |
@@ -131,7 +136,8 @@ never translated in either direction.
   invalidates.
 - **Contradicting an ADR requires a new ADR**, numbered next, naming what it supersedes; edit the
   superseded one to point forward rather than deleting it (0008 → 0012, 0009 → 0010/0014,
-  0001/0002/0005 → 0013).
+  0001/0002/0005 → 0013). ADR-0016 does not supersede 0002 — it explains why the clipboard restore
+  0002 mandates deliberately does not apply to a snip the user ran themselves.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each
@@ -141,7 +147,7 @@ never translated in either direction.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (1612 symbols, 3986 relationships, 133 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (1734 symbols, 4245 relationships, 143 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

@@ -4,3 +4,4 @@
 pub mod focus;
 pub mod permission;
 pub mod selection;
+pub mod snip;

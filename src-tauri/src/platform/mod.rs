@@ -5,28 +5,30 @@
 //! adding a third platform means adding a sibling directory, not chasing
 //! `#[cfg]` through business logic.
 //!
-//! Two things are deliberately *not* per-platform: `cursor`, which Tauri
-//! already normalises for us, and the geometry below, which is the part of this
-//! layer that can be unit-tested.
+//! Three things are deliberately *not* per-platform: `cursor`, which Tauri
+//! already normalises for us, `capture`, which is what to do with the bytes a
+//! snip produced rather than how to produce them, and the geometry below. Those
+//! are the parts of this layer that can be unit-tested.
 
 use serde::Serialize;
 
+pub mod capture;
 pub mod cursor;
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-pub use self::windows::{focus, permission, selection};
+pub use self::windows::{focus, permission, selection, snip};
 
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub use self::macos::{focus, permission, selection};
+pub use self::macos::{focus, permission, selection, snip};
 
 #[cfg(not(any(windows, target_os = "macos")))]
 mod fallback;
 #[cfg(not(any(windows, target_os = "macos")))]
-pub use self::fallback::{focus, permission, selection};
+pub use self::fallback::{focus, permission, selection, snip};
 
 /// Whether the OS will let Beckon synthesise the copy keystroke ADR-0002 is
 /// built on.

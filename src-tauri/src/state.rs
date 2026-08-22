@@ -16,6 +16,7 @@ use crate::action::ModelParams;
 use crate::config::Config;
 use crate::exchange::ExchangeManager;
 use crate::hotkey::HotkeyState;
+use crate::platform::capture::{Capture, CaptureError};
 
 /// The Beckon directory and the two paths inside it (README): `%APPDATA%\Beckon\`
 /// on Windows, `~/Library/Application Support/Beckon/` on macOS.
@@ -88,6 +89,20 @@ pub struct PopoverView {
     /// The input that was sent, for display above the answer.
     pub input: Option<String>,
     pub exchange_id: Option<String>,
+    /// A Capture the user has attached and not yet sent (ADR-0016).
+    ///
+    /// The view is where it lives, not a second slot beside it: the request is
+    /// built in Rust from these bytes and the window draws its thumbnail from
+    /// the same ones, so one owner means the two can never disagree about what
+    /// is attached (ADR-0003).
+    pub capture: Option<Capture>,
+    /// The last snip produced nothing — Esc, or a tool that never answered.
+    /// Cleared by the next capture, or by anything being sent.
+    pub capture_cancelled: bool,
+    /// A screenshot *was* taken and cannot be used: over the size ceiling, or
+    /// bytes no decoder recognised. Distinct from `capture_cancelled`, because
+    /// the two have different advice attached.
+    pub capture_error: Option<CaptureError>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -119,6 +134,10 @@ pub struct AppState {
 
     /// Kept alive for the process lifetime; dropping it stops the watcher.
     pub watcher: Mutex<Option<WatcherGuard>>,
+    /// A snip is running (ADR-0016). One at a time: the button and its shortcut
+    /// can both land before the window is even hidden, and two snip tools
+    /// fighting over one clipboard is not a state worth defining.
+    pub capturing: AtomicBool,
     /// The startup hotkey-failure balloon fires once only (README).
     pub balloon_shown: AtomicBool,
     /// Errors that put the tray icon into its error state.
@@ -139,6 +158,7 @@ impl AppState {
             previous_foreground: Mutex::new(None),
             popover_view: Mutex::new(None),
             watcher: Mutex::new(None),
+            capturing: AtomicBool::new(false),
             balloon_shown: AtomicBool::new(false),
             startup_errors: Mutex::new(Vec::new()),
         }

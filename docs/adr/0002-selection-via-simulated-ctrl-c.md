@@ -24,4 +24,8 @@ Windows has no clean, universal API for "read the text the user currently has se
 - There is a race between sending Ctrl+C and reading the clipboard. Poll for a change in the clipboard sequence number rather than sleeping for a fixed interval.
 - Grabbing text inside a UAC-elevated window fails silently. When the grab comes back empty, handle it according to the Action's Input Source; it is not an error.
 - The backed-up clipboard content is **discarded from memory immediately** once restoration completes; it does not linger in the process. A user's clipboard history should not gain an extra retained copy just because they use Beckon.
+- The backup-and-restore rule is about *synthesised* input, and applies only to it. A Capture
+  ([ADR-0016](./0016-captures-from-the-os-snip-tool-via-the-clipboard.md)) reaches the clipboard
+  because the user ran a screenshot tool, so it is left alone: restoring over it would be Beckon
+  undoing something the user did.
 - The Popover offers **no "replace the original text"**. Automatic write-back means putting the result on the clipboard and simulating Ctrl+V, but there is no reliable signal for "paste finished," so the moment to restore can only be guessed. Grabbing text is an operation the user cannot see and therefore must be undone; write-back, by contrast, is not worth introducing that undebuggable race for a sliver of convenience. The only way a user takes the result away is by clicking "Copy" — that write was requested by the user, so it is not undone.

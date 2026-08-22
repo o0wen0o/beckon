@@ -17,6 +17,12 @@
 //!   and `deepseek-v4-pro` in its example response
 //!   (<https://api-docs.deepseek.com/api/list-models>); the pricing page lists
 //!   the same two, both 1M context, thinking on by default.
+//! - `deepseek-v4-flash-vision-exp` arrived 2026-08-21
+//!   (<https://api-docs.deepseek.com/news/news260821/>) and is DeepSeek's
+//!   image-reading model. It is experimental, and the docs say nothing about
+//!   whether it takes the `thinking` object — hence [`Thinking::Never`] for it,
+//!   which refuses `thinking = true` out loud instead of guessing. This table
+//!   records no image column: nothing is gated on one (ADR-0016).
 //! - The changelog (<https://api-docs.deepseek.com/updates>) records V4-Pro and
 //!   V4-Flash arriving 2026-04-24, and the legacy names `deepseek-chat` /
 //!   `deepseek-reasoner` being **discontinued on 2026-07-24**. Those two stay in
@@ -83,6 +89,17 @@ pub const CATALOG: &[CatalogEntry] = &[
         description: "The stronger V4, 1M context. Thinking can be switched off.",
         description_zh: "更强的 V4，100 万上下文。思考模式可关闭。",
         thinking: Thinking::Switchable,
+        retired: false,
+    },
+    CatalogEntry {
+        id: "deepseek-v4-flash-vision-exp",
+        label: "DeepSeek V4 Flash Vision (experimental)",
+        description: "DeepSeek's image-reading model. Experimental; no thinking mode.",
+        description_zh: "DeepSeek 的图片阅读模型。实验性质，没有思考模式。",
+        // Undocumented for this model, and a `thinking` object it does not
+        // understand is a 400 on every request — so `true` is refused rather
+        // than sent hopefully.
+        thinking: Thinking::Never,
         retired: false,
     },
     CatalogEntry {
@@ -239,6 +256,15 @@ fn rank(id: &str) -> usize {
 mod tests {
     use super::*;
 
+    /// What the dropdown offers with no live list: every non-retired row of the
+    /// catalog, in catalog order. Named once, because four tests are about what
+    /// happens *around* it rather than about the list itself.
+    const DOCUMENTED: [&str; 3] = [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash-vision-exp",
+    ];
+
     fn ids(options: &[ModelOption]) -> Vec<&str> {
         options.iter().map(|option| option.id.as_str()).collect()
     }
@@ -293,7 +319,7 @@ mod tests {
     #[test]
     fn without_a_live_list_the_documented_models_are_offered() {
         let options = options(None, &[]);
-        assert_eq!(ids(&options), vec!["deepseek-v4-flash", "deepseek-v4-pro"]);
+        assert_eq!(ids(&options), DOCUMENTED.to_vec());
         assert!(options.iter().all(|o| o.origin == Origin::Documented));
         assert_eq!(options[0].thinking, Some(Thinking::Switchable));
     }
@@ -360,11 +386,7 @@ mod tests {
         let options = options(None, &strings(&["deepseek-v9-quantum"]));
         assert_eq!(
             ids(&options),
-            vec![
-                "deepseek-v4-flash",
-                "deepseek-v4-pro",
-                "deepseek-v9-quantum"
-            ]
+            [DOCUMENTED.as_slice(), &["deepseek-v9-quantum"]].concat()
         );
         let extra = options.last().unwrap();
         assert_eq!(extra.origin, Origin::Configured);
@@ -386,7 +408,7 @@ mod tests {
     #[test]
     fn a_configured_model_that_is_already_offered_is_not_duplicated() {
         let options = options(None, &strings(&["DeepSeek-V4-Flash", "deepseek-v4-pro"]));
-        assert_eq!(ids(&options), vec!["deepseek-v4-flash", "deepseek-v4-pro"]);
+        assert_eq!(ids(&options), DOCUMENTED.to_vec());
         assert!(options.iter().all(|o| o.origin == Origin::Documented));
     }
 
@@ -394,7 +416,7 @@ mod tests {
     fn blank_configured_values_are_not_options() {
         // An Action with no override contributes nothing.
         let options = options(None, &strings(&["", "   "]));
-        assert_eq!(ids(&options), vec!["deepseek-v4-flash", "deepseek-v4-pro"]);
+        assert_eq!(ids(&options), DOCUMENTED.to_vec());
     }
 
     #[test]

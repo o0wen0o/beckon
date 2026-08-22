@@ -18,7 +18,7 @@ use std::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::action::ModelParams;
-use crate::llm::Message;
+use crate::llm::{Content, Message};
 
 pub use self::turn::spawn_turn;
 
@@ -71,10 +71,13 @@ impl ExchangeManager {
     /// Append a user turn and hand back what the runner needs. A fresh
     /// cancellation token is installed: a cancelled token stays cancelled, so
     /// the previous turn's token cannot be reused.
-    pub fn begin_turn(&self, id: &str, user_text: &str) -> Option<TurnPlan> {
+    ///
+    /// `content` rather than `&str` because a turn may carry a Capture
+    /// (ADR-0016); the image travels with the history like any other message.
+    pub fn begin_turn(&self, id: &str, content: impl Into<Content>) -> Option<TurnPlan> {
         let mut map = self.inner.lock().expect("exchange lock");
         let entry = map.get_mut(id)?;
-        entry.exchange.messages.push(Message::user(user_text));
+        entry.exchange.messages.push(Message::user(content.into()));
         entry.cancel = CancellationToken::new();
         Some(TurnPlan {
             exchange_id: id.to_string(),
@@ -114,9 +117,10 @@ impl ExchangeManager {
         map.clear();
     }
 
-    /// The last thing the user sent. A retry resends exactly that — the turn
-    /// that failed is the one worth repeating.
-    pub fn last_user_message(&self, id: &str) -> Option<String> {
+    /// The last thing the user sent, Capture included. A retry resends exactly
+    /// that — the turn that failed is the one worth repeating, and repeating it
+    /// without its image would answer a different question.
+    pub fn last_user_message(&self, id: &str) -> Option<Content> {
         let map = self.inner.lock().expect("exchange lock");
         map.get(id)?
             .exchange
@@ -151,9 +155,9 @@ mod tests {
 
         let second = manager.begin_turn(&id, "again, politely").unwrap();
         assert_eq!(second.messages.len(), 4);
-        assert_eq!(second.messages[1].content, "hello");
-        assert_eq!(second.messages[2].content, "你好");
-        assert_eq!(second.messages[3].content, "again, politely");
+        assert_eq!(second.messages[1].content, Content::from("hello"));
+        assert_eq!(second.messages[2].content, Content::from("你好"));
+        assert_eq!(second.messages[3].content, Content::from("again, politely"));
     }
 
     #[test]
@@ -167,6 +171,31 @@ mod tests {
 
         let second = manager.begin_turn(&id, "two").unwrap();
         assert!(!second.cancel.is_cancelled());
+    }
+
+    /// A Capture rides in the history like any other content, so a follow-up
+    /// still has the image the first answer was about (ADR-0004: untruncated).
+    #[test]
+    fn a_capture_stays_in_the_history_for_the_next_turn() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        manager.begin_turn(
+            &id,
+            Content::with_image("what is this?", "data:image/png;base64,AA"),
+        );
+        manager.commit_assistant(&id, "a dialog");
+
+        let second = manager.begin_turn(&id, "and the button?").unwrap();
+        assert_eq!(
+            second.messages[1].content,
+            Content::with_image("what is this?", "data:image/png;base64,AA")
+        );
+        // The retry path resends this one verbatim, so it is the follow-up and
+        // carries no image of its own.
+        assert_eq!(
+            manager.last_user_message(&id),
+            Some(Content::from("and the button?"))
+        );
     }
 
     #[test]
@@ -199,6 +228,6 @@ mod tests {
         manager.begin_turn(&id, "one").unwrap();
         manager.commit_assistant(&id, "answer");
         manager.begin_turn(&id, "two").unwrap();
-        assert_eq!(manager.last_user_message(&id).as_deref(), Some("two"));
+        assert_eq!(manager.last_user_message(&id), Some(Content::from("two")));
     }
 }

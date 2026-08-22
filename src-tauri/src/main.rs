@@ -88,6 +88,8 @@ fn main() {
             commands::follow_up,
             commands::cancel_exchange,
             commands::retry_exchange,
+            commands::start_capture,
+            commands::discard_capture,
             commands::hide_popover,
             commands::hide_launcher,
             commands::show_settings,

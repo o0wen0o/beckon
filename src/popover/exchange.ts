@@ -12,6 +12,7 @@
 import {
   cancelExchange,
   copyToClipboard,
+  discardCapture,
   describeError,
   followUp,
   getPopoverView,
@@ -20,13 +21,15 @@ import {
   onExchangeError,
   onFirstToken,
   onInterrupted,
+  onPopoverCapture,
   onPopoverView,
   retryExchange,
+  startCapture,
   submitInput,
   Subscriptions,
 } from "../lib/ipc";
 import { Notifier } from "../lib/store";
-import type { Failure, PopoverView } from "../lib/types";
+import type { Capture, Failure, PopoverView } from "../lib/types";
 
 export type Status =
   | "waiting-first-token"
@@ -38,6 +41,8 @@ export type Status =
 
 export interface Turn {
   question: string;
+  /** The Capture that went with the question, if one did (ADR-0016). */
+  capture: Capture | null;
   answer: string;
   reasoning: string;
   status: Status;
@@ -72,6 +77,15 @@ export type Notice = "none" | "no-view" | "empty-selection" | "awaiting-input";
 class ExchangeStore extends Notifier {
   view: PopoverView | null = null;
   turns: Turn[] = [];
+  /**
+   * Attached and not yet sent. Rust owns it (ADR-0003) and hands it over on
+   * `popover:capture`; this is that value, not a second opinion about it.
+   */
+  capture: Capture | null = null;
+  /** The last snip came back with nothing. Cleared by the next one. */
+  captureCancelled = false;
+  /** A screenshot that was taken and cannot be sent, by cause. */
+  captureError: Failure | null = null;
   copiedTurn: number | null = null;
   /**
    * Bumped by every reveal. The window is reused (ADR-0007), so the composer
@@ -109,6 +123,12 @@ class ExchangeStore extends Notifier {
     return this.view !== null && (this.view.phase === "needs-input" || this.canFollowUp);
   }
 
+  /** Whether there is anything to send. A Capture is input on its own: the
+   *  Action's own prompt is the question being asked about it (ADR-0016). */
+  get sendable() {
+    return this.capture !== null;
+  }
+
   /** `PopoverPhase` is resolved in Rust so the rule lives in one place; picking
    *  the notice here keeps the second half of it out of markup. */
   get notice(): Notice {
@@ -133,6 +153,14 @@ class ExchangeStore extends Notifier {
   listen(subscriptions: Subscriptions) {
     subscriptions
       .add(onPopoverView(() => void this.load()))
+      .add(
+        onPopoverCapture((payload) => {
+          this.capture = payload.capture;
+          this.captureCancelled = payload.cancelled;
+          this.captureError = payload.error;
+          this.notify();
+        }),
+      )
       .add(
         onFirstToken((payload) =>
           this.#forCurrent(payload.exchange_id, (turn) => this.#markStreaming(turn)),
@@ -202,6 +230,12 @@ class ExchangeStore extends Notifier {
     this.view = await getPopoverView();
     this.copiedTurn = null;
     this.epoch += 1;
+    // A Capture belongs to the Popover that was showing, so a fresh trigger
+    // starts with nothing attached — and Rust says so, rather than this
+    // assuming it.
+    this.capture = this.view?.capture ?? null;
+    this.captureCancelled = this.view?.capture_cancelled ?? false;
+    this.captureError = this.view?.capture_error ?? null;
     if (!this.view) {
       this.turns = [];
       this.notify();
@@ -211,13 +245,34 @@ class ExchangeStore extends Notifier {
     this.notify();
   }
 
+  /**
+   * The screenshot button. The window hides while the OS snip tool owns the
+   * screen and comes back on `popover:capture` — so there is deliberately
+   * nothing to await here and no local "capturing" flag: the window is not on
+   * screen to show one.
+   */
+  capturing() {
+    void startCapture();
+  }
+
+  discardCapture() {
+    // Straight to Rust, which owns it; the event is what clears it here.
+    void discardCapture();
+  }
+
   // --- the user's side ----------------------------------------------------
 
   async send(text: string) {
-    if (text === "" || this.busy) return;
+    if ((text === "" && !this.sendable) || this.busy) return;
+    // Taken now: Rust consumes it as the turn is started, and the turn keeps it
+    // for its own question card.
+    const capture = this.capture;
+    this.capture = null;
+    this.captureCancelled = false;
+    this.captureError = null;
 
     if (this.view && this.view.exchange_id && this.turns.length > 0) {
-      this.turns = [...this.turns, this.#newTurn(text)];
+      this.turns = [...this.turns, this.#newTurn(text, capture)];
       this.notify();
       try {
         await followUp(this.view.exchange_id, text);
@@ -227,12 +282,20 @@ class ExchangeStore extends Notifier {
       return;
     }
 
-    this.turns = [this.#newTurn(text)];
+    this.turns = [this.#newTurn(text, capture)];
     this.notify();
     try {
       const exchangeId = await submitInput(text);
       if (this.view) {
-        this.view = { ...this.view, phase: "running", exchange_id: exchangeId, input: text };
+        this.view = {
+          ...this.view,
+          phase: "running",
+          exchange_id: exchangeId,
+          input: text,
+          capture: null,
+          capture_cancelled: false,
+          capture_error: null,
+        };
         this.notify();
       }
     } catch (error) {
@@ -296,10 +359,11 @@ class ExchangeStore extends Notifier {
 
   // --- internals ----------------------------------------------------------
 
-  #newTurn(question: string): Turn {
+  #newTurn(question: string, capture: Capture | null = null): Turn {
     this.#startWaiting();
     return {
       question,
+      capture,
       answer: "",
       reasoning: "",
       status: "waiting-first-token",

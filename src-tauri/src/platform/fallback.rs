@@ -25,6 +25,14 @@ pub mod selection {
     }
 }
 
+pub mod snip {
+    use crate::platform::capture::Outcome;
+
+    pub fn grab_capture() -> Outcome {
+        Outcome::Nothing
+    }
+}
+
 pub mod permission {
     use crate::platform::InputPermission;
 

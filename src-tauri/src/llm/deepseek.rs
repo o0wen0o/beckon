@@ -12,6 +12,13 @@
 //! DeepSeek model would leave thinking on and quietly add seconds of latency to
 //! every translation — the exact failure the README wants gone.
 //!
+//! ## Images
+//!
+//! A Capture goes on the wire as an OpenAI-style content part and is never
+//! gated on the model: Beckon cannot keep a per-model image table true across
+//! every provider a custom `base_url` may point at, so the endpoint's own error
+//! is the only authority on what it reads (ADR-0016).
+//!
 //! Per-model behaviour is not written down here: it lives in
 //! [`super::models::CATALOG`], which is also what the Settings dropdown is built
 //! from. Keeping one table means the set of models we offer and the set we know
@@ -112,6 +119,7 @@ fn thinking_wire(model: &str, thinking: bool) -> Result<ThinkingWire, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::llm::Content;
 
     fn params(model: &str, thinking: bool) -> ModelParams {
         ModelParams {
@@ -234,6 +242,35 @@ mod tests {
             ThinkingWire::Omit
         );
         assert!(thinking_wire("gpt-4o-mini", true).is_err());
+    }
+
+    #[test]
+    fn an_image_sends_the_documented_parts_array() {
+        let content = Content::with_image("read this", "data:image/png;base64,AA");
+        let body = build_body(
+            &params("deepseek-v4-flash-vision-exp", false),
+            &[Message::system("s"), Message::user(content)],
+        )
+        .unwrap();
+        assert_eq!(
+            body["messages"][1]["content"],
+            json!([
+                { "type": "text", "text": "read this" },
+                { "type": "image_url", "image_url": { "url": "data:image/png;base64,AA" } }
+            ])
+        );
+        // Thinking is undocumented for it, so nothing is sent.
+        assert!(body.get("thinking").is_none());
+    }
+
+    /// No model is gated on images, catalogued or not: whether the endpoint
+    /// reads one is the endpoint's answer to give (ADR-0016).
+    #[test]
+    fn any_model_may_be_sent_an_image() {
+        for model in ["deepseek-v4-pro", "llava:13b"] {
+            let content = Content::with_image("hi", "data:image/png;base64,AA");
+            assert!(build_body(&params(model, false), &[Message::user(content)]).is_ok());
+        }
     }
 
     #[test]

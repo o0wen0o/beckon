@@ -62,6 +62,14 @@ export function Popover() {
       }
       // Copy is the only export path, so it gets a shortcut that works while
       // the composer has focus.
+      // The screenshot shortcut, so a Popover summoned by a hotkey can grab one
+      // without the mouse (ADR-0016). Window-scoped: it is not registered
+      // globally and means nothing when the Popover is not up.
+      if (event.key.toLowerCase() === "s" && hasCommandModifier(event) && event.shiftKey) {
+        event.preventDefault();
+        exchange.capturing();
+        return;
+      }
       if (event.key.toLowerCase() === "c" && hasCommandModifier(event) && event.shiftKey) {
         const current = exchange.current;
         if (!current?.answer) return;
@@ -152,9 +160,16 @@ export function Popover() {
         <Composer
           // A fresh element per trigger: the draft and the grown height are the
           // browser's, and remounting is what clears both (ADR-0007).
+          // A Capture arriving is *not* a new trigger — it lands on
+          // `popover:capture` precisely so the draft it belongs to survives.
           key={store.epoch}
           placeholder={empty ? t.popover.firstInput : t.popover.followUp}
+          capture={store.capture}
+          captureCancelled={store.captureCancelled}
+          captureError={store.captureError}
           onSend={(text) => void exchange.send(text)}
+          onCapture={() => exchange.capturing()}
+          onDiscardCapture={() => exchange.discardCapture()}
         />
       ) : null}
     </div>

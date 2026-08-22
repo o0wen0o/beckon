@@ -50,7 +50,22 @@ pub fn retry_exchange(app: AppHandle, exchange_id: String) -> Result<(), String>
         .exchanges
         .last_user_message(&exchange_id)
         .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
-    trigger::follow_up(&app, &exchange_id, &last_user)
+    // Straight to the Exchange rather than through `follow_up`: the message is
+    // already built, Capture included, and re-rendering it would attach
+    // whatever happens to be on the Popover *now* (ADR-0016).
+    trigger::retry(&app, &exchange_id, last_user)
+}
+
+/// The Popover screenshot button (ADR-0016). Returns immediately: the snip runs
+/// on its own thread and the window re-appears with the result attached.
+#[tauri::command]
+pub fn start_capture(app: AppHandle) {
+    trigger::start_capture(&app);
+}
+
+#[tauri::command]
+pub fn discard_capture(app: AppHandle) {
+    trigger::discard_capture(&app);
 }
 
 #[tauri::command]

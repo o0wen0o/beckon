@@ -38,6 +38,8 @@ export const ZH: Strings = {
     interrupted: "回答提前中断",
     empty: "端点没有列出任何模型",
     config: "Beckon 的配置不支持这样做",
+    "capture-too-large": "截图太大，无法发送",
+    "capture-unreadable": "无法读取这张截图",
     fallback: "失败",
   },
 
@@ -83,6 +85,15 @@ export const ZH: Strings = {
     openSettings: "打开设置",
     copy: "复制",
     copied: "已复制",
+
+    capture: "截图",
+    captureTooltip: (accelerator: string) => `截取屏幕（${accelerator}）`,
+    removeCapture: "移除截图",
+    captureCancelled: "没有截到任何内容。",
+    captureRetry: (accelerator: string) => `按 ${accelerator} 再试一次。`,
+    captureNote: "为这张截图写一句说明…",
+    captureMeta: (width: number, height: number, kilobytes: number) =>
+      `${width}×${height} · PNG ${kilobytes} KB`,
   },
 
   settings: {

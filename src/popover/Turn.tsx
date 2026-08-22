@@ -35,6 +35,7 @@ const QUIET = "text-muted-quiet";
 
 export function TurnView({ turn, index }: { turn: Turn; index: number }) {
   const t = useT();
+  const capture = turn.capture;
 
   /** The cause named first, then the provider's own words — the same sentence
    *  Settings builds, rather than a raw reqwest chain. */
@@ -48,14 +49,37 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {turn.question ? (
+      {turn.question || capture ? (
         // The toggle sits under the card rather than inside it: `ghost` hovers
         // to `--accent`, which is the same grey the card is filled with.
         <div className="flex flex-col items-end gap-1">
-          {/* Clamped, not scrollable: a scroller inside the body's scroller is
-              a trap. */}
-          <div className={cn(CARD, turn.questionExpanded ? null : "line-clamp-2")}>
-            {turn.question}
+          {/* A Capture goes in the same card the words do, above them
+              (ADR-0016): what you sent is one object, and the image is the
+              larger half of it. `line-clamp` cannot be on the card once there
+              is an image in it — it would clip the picture rather than the
+              prose — so the clamp moves onto the text. */}
+          <div className={cn(CARD, "flex flex-col gap-1.5")}>
+            {capture ? (
+              <>
+                <img
+                  src={capture.data_url}
+                  alt={t.popover.capture}
+                  className="max-h-40 rounded border object-contain"
+                />
+                <span className={cn(QUIET, "text-meta")}>
+                  {t.popover.captureMeta(
+                    capture.width,
+                    capture.height,
+                    Math.round(capture.bytes / 1024),
+                  )}
+                </span>
+              </>
+            ) : null}
+            {turn.question ? (
+              <span className={turn.questionExpanded ? undefined : "line-clamp-2"}>
+                {turn.question}
+              </span>
+            ) : null}
           </div>
           {turn.question.length > CLAMP_AT ? (
             <Button

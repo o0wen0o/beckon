@@ -59,6 +59,8 @@ export const EN = {
     interrupted: "The answer stopped early",
     empty: "The endpoint listed no models",
     config: "Beckon is not configured for this",
+    "capture-too-large": "The screenshot is too big to send",
+    "capture-unreadable": "The screenshot could not be read",
     fallback: "Failed",
   } as Record<string, string>,
 
@@ -107,6 +109,18 @@ export const EN = {
     openSettings: "Open Settings",
     copy: "Copy",
     copied: "Copied",
+
+    /** The Capture (CONTEXT.md), which is a screenshot in prose — nobody calls
+     *  it a Capture out loud, and the term is for code and comments. */
+    capture: "Screenshot",
+    captureTooltip: (accelerator: string) => `Screenshot the screen (${accelerator})`,
+    removeCapture: "Remove the screenshot",
+    captureCancelled: "Nothing was captured.",
+    captureRetry: (accelerator: string) => `Press ${accelerator} to try again.`,
+    captureNote: "Add a note about the screenshot…",
+    /** Beside the thumbnail: what was captured, and how big it is. */
+    captureMeta: (width: number, height: number, kilobytes: number) =>
+      `${width}×${height} · PNG ${kilobytes} KB`,
   },
 
   settings: {

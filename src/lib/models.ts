@@ -19,7 +19,13 @@ export function modelOptions(current: string, catalog: ModelCatalog | null): Mod
   const options = catalog?.options ?? [];
   if (current === "" || options.some((option) => option.id === current)) return options;
   return [
-    { id: current, label: current, description: "", thinking: null, origin: "configured" },
+    {
+      id: current,
+      label: current,
+      description: "",
+      thinking: null,
+      origin: "configured",
+    },
     ...options,
   ];
 }

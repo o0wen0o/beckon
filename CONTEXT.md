@@ -18,6 +18,13 @@ _Avoid_: input mode, mode
 The text the user has highlighted in a program outside Beckon, obtained by simulating Ctrl+C.
 _Avoid_: highlighted text, selected region, text grab
 
+**Capture**:
+An image of part of the screen, taken with the platform's own snip tool from the Popover and read
+off the clipboard. A peer of the Selection, not a kind of it: the Selection is text the user had
+already highlighted, a Capture is made on request. In UI strings it is called a *screenshot* —
+"Capture" is the word for code, comments and commit messages.
+_Avoid_: snip, screen grab, attachment, image (all three are what it is made of, not what it is)
+
 ### Triggering
 
 **Launcher**:
@@ -49,6 +56,7 @@ the same failure as a synonym in English.
 | Action | Action | Untranslated on purpose: it is also the file in `actions/`, and the filename is the identity |
 | Input Source | 输入来源 | Its three values are 选中内容 / 手动输入 / 自动 — the *values* stay `selection` / `prompt` / `auto` on disk |
 | Selection | 选中内容 | _Avoid_: 选区, 选中文本 |
+| Capture | 截图 | _Avoid_: 屏幕截图, 抓图, 图片 |
 | Launcher | 启动器 | |
 | Direct Hotkey | 专属热键 | _Avoid_: 快捷键 alone, which is any hotkey |
 | Popover | 浮窗 | _Avoid_: 弹窗, which is a dialog |

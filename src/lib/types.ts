@@ -109,6 +109,19 @@ export interface ModelCatalog {
 
 export type PopoverPhase = "needs-input" | "empty-selection" | "running";
 
+/**
+ * A screenshot the user grabbed with the OS snip tool, normalised to PNG in Rust
+ * (ADR-0016). `data_url` is both the `<img src>` and the value that goes on the
+ * wire — one copy, so the thumbnail cannot differ from what was sent.
+ */
+export interface Capture {
+  data_url: string;
+  width: number;
+  height: number;
+  /** Encoded PNG length, before base64. */
+  bytes: number;
+}
+
 export interface PopoverView {
   action_id: string;
   action_name: string;
@@ -116,6 +129,21 @@ export interface PopoverView {
   phase: PopoverPhase;
   input: string | null;
   exchange_id: string | null;
+  /** Attached and not yet sent. */
+  capture: Capture | null;
+  /** The last snip produced nothing — cancelled, or the tool never answered. */
+  capture_cancelled: boolean;
+  /** A screenshot was taken and cannot be used: over the size ceiling, or bytes
+   *  no decoder recognised. Distinct from `capture_cancelled`, because the two
+   *  have different advice attached. */
+  capture_error: Failure | null;
+}
+
+/** `popover:capture`: the fields of the view one snip can change. */
+export interface CapturePayload {
+  capture: Capture | null;
+  cancelled: boolean;
+  error: Failure | null;
 }
 
 /** A command failure the UI reacts to by kind, not just by printing. */

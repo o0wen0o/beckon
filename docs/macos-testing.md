@@ -49,6 +49,11 @@ Ordered by how likely they are to be wrong.
 | 5 | Same on a **second display**, especially one above or left of the main one (negative coordinates) | Still on screen, on the display the cursor is on |
 | 6 | Same on a **Retina display** | Correct size, not half or double |
 | 7 | Press Esc to close the Popover | Focus returns to the app you were reading — the *app*, not just some window of it |
+| 7a | In the Popover, press the screenshot button (or Cmd+Shift+S), drag a region | Beckon's windows vanish while the snip runs — the Popover must not be in the shot — then the Popover comes back with a thumbnail above the box and the caret still in it. This is `screencapture -i -c` plus the pasteboard read (ADR-0016) |
+| 7b | Repeat, and press **Esc** in the snip overlay instead of dragging | The Popover comes back saying nothing was captured. Nothing is sent, and any previously attached screenshot is still attached |
+| 7c | Type a note beside an attached screenshot, then Send, with the Action's model set to `deepseek-v4-flash-vision-exp` | The image and the note go as one turn; the answer streams as usual |
+| 7d | Same, with the model left at `deepseek-v4-pro` | The request is sent anyway; the provider's own error is shown verbatim (Beckon gates nothing on the model, ADR-0016) |
+| 7e | Attach a screenshot, take a **second** one without sending the first | The second replaces the first; there is never more than one attached |
 | 8 | Open the Launcher hotkey while an app is fullscreen | The Launcher appears and takes focus |
 | 9 | In Settings, click into the API key field and press **Cmd+V** | It pastes. If not, Tauri's default menu is missing and every text field in the app is crippled |
 | 10 | With a Beckon window focused, press **Cmd+Q** | The app quits. From the menu bar's Quit item too |

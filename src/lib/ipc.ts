@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   ActionFile,
+  CapturePayload,
   Config,
   DeltaPayload,
   ErrorPayload,
@@ -75,6 +76,9 @@ export const followUp = (exchangeId: string, text: string) =>
 export const cancelExchange = (exchangeId: string) =>
   invoke<void>("cancel_exchange", { exchangeId });
 export const retryExchange = (exchangeId: string) => invoke<void>("retry_exchange", { exchangeId });
+/** Runs the OS snip tool; the result arrives as `popover:capture` (ADR-0016). */
+export const startCapture = () => invoke<void>("start_capture");
+export const discardCapture = () => invoke<void>("discard_capture");
 export const hidePopover = () => invoke<void>("hide_popover");
 export const hideLauncher = () => invoke<void>("hide_launcher");
 export const showSettings = () => invoke<void>("show_settings");
@@ -87,6 +91,8 @@ export const onActionsChanged = (fn: (snapshot: RegistrySnapshot) => void) =>
 export const onConfigChanged = (fn: (config: Config) => void) =>
   listen<Config>("config-changed", (event) => fn(event.payload));
 export const onPopoverView = (fn: () => void) => listen("popover:view", () => fn());
+export const onPopoverCapture = (fn: (payload: CapturePayload) => void) =>
+  listen<CapturePayload>("popover:capture", (event) => fn(event.payload));
 export const onSettingsOpened = (fn: () => void) => listen("settings:opened", () => fn());
 export const onLauncherOpened = (fn: (selectionChars: number) => void) =>
   listen<{ selection_chars: number }>("launcher:opened", (event) =>
