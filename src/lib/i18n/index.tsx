@@ -29,7 +29,7 @@ class I18nStore extends Notifier {
 
   apply(language: Language) {
     // `config-changed` fires for every setting; re-rendering every window
-    // because the temperature moved is exactly what this guard is for.
+    // because the Popover was dragged is exactly what this guard is for.
     if (language === this.language) return;
     this.language = language;
     this.strings = CATALOGS[language] ?? EN;

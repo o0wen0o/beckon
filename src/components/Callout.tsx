@@ -8,9 +8,6 @@ import { cn } from "@/lib/utils";
 
 interface CalloutProps {
   tone?: "info" | "warn" | "danger";
-  /** For the one caller that is not a pane: the Popover's scroller spaces its
-   *  children with a `gap`, where `mb-6.5` lands as a hole in the column. */
-  className?: string;
   children: React.ReactNode;
 }
 
@@ -20,7 +17,7 @@ const RULE: Record<NonNullable<CalloutProps["tone"]>, string> = {
   danger: "border-l-destructive",
 };
 
-export function Callout({ tone = "info", className, children }: CalloutProps) {
+export function Callout({ tone = "info", children }: CalloutProps) {
   return (
     <div
       role={tone === "danger" ? "alert" : undefined}
@@ -29,7 +26,6 @@ export function Callout({ tone = "info", className, children }: CalloutProps) {
         "[&_strong]:text-foreground [&_strong]:font-bold",
         "[&_ul]:list-disc [&_ul]:pl-5",
         RULE[tone],
-        className,
       )}
     >
       {children}

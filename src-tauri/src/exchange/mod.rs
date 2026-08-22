@@ -140,7 +140,6 @@ mod tests {
         ModelParams {
             model: "deepseek-v4-flash".into(),
             thinking: false,
-            temperature: 1.3,
         }
     }
 

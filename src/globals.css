@@ -151,9 +151,9 @@
      cursor in one corner, so a card holds its control to a measure — and a
      control that caps *itself* at a number written into its own class string is
      a second place deciding the same thing. `Field` names the measure for the
-     card; `ModelSelect` and `Temperature` name it because they are dropped into
-     cards that do not. The wide one is for a control sharing its line with
-     buttons, and for the stacked cards that hold typed text. */
+     card; `ModelSelect` names it itself because it is dropped into cards that do
+     not. The wide one is for a control sharing its line with buttons, and for
+     the stacked cards that hold typed text. */
   --container-control: 21.25rem;
   --container-control-wide: 26.25rem;
 

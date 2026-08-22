@@ -18,15 +18,6 @@ use crate::state::AppState;
 
 use super::WINDOW_SETTINGS;
 
-/// `empty-selection` issues no request and offers no input, so it can never
-/// grow — which is what makes a smaller window safe here and nowhere else.
-/// A two-line hint does not need 500px of empty Popover.
-///
-/// A ceiling rather than the height: the remembered size (ADR-0018) may be
-/// shorter than this, and a hint is never a reason to make the window *bigger*
-/// than the user asked for.
-pub(super) const POPOVER_HINT_H: f64 = 220.0;
-
 pub(super) fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let language = app.state::<AppState>().config_snapshot().language;
     tauri::WebviewWindowBuilder::new(
@@ -64,7 +55,8 @@ pub(super) fn reveal(window: &WebviewWindow) {
 /// The physical size is derived from the logical one rather than read back with
 /// `outer_size()`. This runs on the hotkey thread, so `set_size` is dispatched
 /// to the event loop and an immediate read can still return the old rect —
-/// which would place a hint-sized window using the full-sized bounds.
+/// which would place a window the user has dragged short using the previous
+/// rect's bounds (ADR-0020).
 pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, height: f64) {
     let size = LogicalSize::new(width, height);
     let _ = window.set_size(size);
@@ -96,9 +88,9 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
 /// The Popover is undecorated, so the grips that drag it are markup and the
 /// resize itself is the window manager's; this is the only place the result of
 /// one is written down. Every resize reports itself though — including the
-/// `set_size` above, and including the deliberately short `empty-selection`
-/// window — so a report matching what we last asked for is dropped rather than
-/// saved. Without that, one hint-sized Popover would shrink every later one.
+/// `set_size` above — so a report matching what we last asked for is dropped
+/// rather than saved. Without that, a clamped or rounded echo of our own summon
+/// would be persisted as if the user had dragged to it.
 ///
 /// Through the config funnel like every other write (ADR-0003):
 /// [`crate::reload::write_config`] marks it as our own so the watcher swallows

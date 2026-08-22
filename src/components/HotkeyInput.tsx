@@ -51,13 +51,17 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 text-note">
         {/* The value is a chip and the affordance is a button beside it, rather
             than one bordered control doing both. A box holding a combination
             reads as a value someone typed into a field, and the thing that says
             how to change it should be the thing you press — which is also what
             keeps this row the same weight as the hotkey chips in the Actions
-            list, instead of the widest control on the pane. */}
+            list, instead of the widest control on the pane.
+
+            `text-note` on the row rather than on each part: `Kbd` sizes itself
+            at 0.92em of whatever it sits in, so the chip follows the labels down
+            instead of having to be told twice. */}
         {value ? (
           <Kbd
             className={
@@ -69,9 +73,12 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
         ) : null}
         <Button
           variant="ghost"
-          size="sm"
+          size="xs"
           className={[
-            "min-w-24 flex-none justify-start",
+            // `font-medium` over `ghost`'s own 400: at 14px the light weight was
+            // what kept a borderless button under the row label beside it, and
+            // at 12px the size does that on its own.
+            "min-w-20 flex-none justify-start font-medium",
             recording ? "text-primary" : "",
             error !== null && !recording ? "text-destructive" : "",
           ].join(" ")}
@@ -79,22 +86,22 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
           onKeyDown={onKeyDown}
           onBlur={() => setRecording(false)}
         >
-          <KeyboardIcon className="size-3.5" />
+          <KeyboardIcon />
           {recording ? t.controls.hotkey.recording : value ? t.controls.hotkey.change : t.controls.hotkey.record}
         </Button>
 
         {clearable && value && !recording ? (
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
             aria-label={t.controls.hotkey.clear}
-            className="flex-none"
+            className="flex-none font-medium"
             onClick={() => {
               setError(null);
               onChange(null);
             }}
           >
-            <XIcon className="size-3.5" /> Clear
+            <XIcon /> {t.controls.hotkey.clearShort}
           </Button>
         ) : null}
       </div>

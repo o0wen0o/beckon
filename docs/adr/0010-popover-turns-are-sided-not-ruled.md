@@ -9,6 +9,13 @@ ledger to all three windows, the Popover included: a fixed label column holding 
 model's name, `Thinking` and `Failed`, against a content column, one hairline per row. That part
 of it is replaced. Everything else in ADR-0009 stands.
 
+**Narrowed by [ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md):**
+the notice slot below is described as holding three notices, one an alarm. It holds two, and neither
+is an alarm: the empty-Selection block and the `Callout` that drew it went with the phase behind
+them, so the Popover renders no `Callout` at all, and the `className` escape hatch its one caller
+needed is gone too. The sided-not-ruled argument is untouched — what is history is the third notice,
+the alarm among them, and the margin exception.
+
 ## Why the ledger was the wrong fit here, specifically
 
 The ledger's label column earns its space by naming a **value** — a setting, an Action's Input

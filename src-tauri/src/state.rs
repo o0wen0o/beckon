@@ -207,10 +207,10 @@ fn describe_fault(language: Language, fault: Fault) -> Failure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PopoverPhase {
-    /// `prompt`, or `auto` with an empty grab: ask for typed input.
+    /// `prompt`, or `auto` with an empty grab: ask for typed input. An empty
+    /// grab is a phase, never an error (ADR-0002) — and since ADR-0020 removed
+    /// the `selection` Input Source, it is always *this* phase.
     NeedsInput,
-    /// `selection` with an empty grab: a hint, and no request (README).
-    EmptySelection,
     /// A request is in flight; the streaming states come from events.
     Running,
 }
@@ -242,10 +242,11 @@ pub struct AppState {
     /// The size the Popover window was last *told* to be (ADR-0018).
     ///
     /// Every resize reports itself, ours included, and the two have to be told
-    /// apart: an `empty-selection` Popover is deliberately 220px tall, and
-    /// persisting that would make the next full one 220px too. This is the one
-    /// value that distinguishes them, and it is window state rather than config
-    /// — nothing outside the trigger flow has an opinion about it.
+    /// apart: the `set_size` at the start of each trigger would otherwise be
+    /// written back as if the user had dragged there, and a clamp or a rounding
+    /// difference would then walk the remembered size a pixel at a time. This is
+    /// the one value that distinguishes them, and it is window state rather than
+    /// config — nothing outside the trigger flow has an opinion about it.
     pub popover_asked_size: Mutex<PopoverSize>,
     /// Errors that put the tray icon into its error state.
     pub startup_errors: Mutex<Vec<String>>,
@@ -307,7 +308,6 @@ mod tests {
             model: ModelParams {
                 model: "m".into(),
                 thinking: false,
-                temperature: 0.0,
             },
             phase: PopoverPhase::NeedsInput,
             input: None,

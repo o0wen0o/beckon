@@ -10,6 +10,8 @@
 //! snip produced rather than how to produce them, and the geometry below. Those
 //! are the parts of this layer that can be unit-tested.
 
+use std::path::{Path, PathBuf};
+
 use serde::Serialize;
 
 pub mod capture;
@@ -39,13 +41,47 @@ pub use self::fallback::{focus, permission, selection, snip};
 /// which is why this is surfaced instead of inferred from an empty grab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-// The other two variants are unreachable where nothing has to be granted, but
-// they are part of the shape the frontend switches on either way.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+// Every target constructs a proper subset: Windows and the fallback only ever
+// answer `NotRequired`, macOS only ever `Granted` or `Denied`. The variants the
+// current target cannot reach are still part of the shape the frontend switches
+// on, and `NotRequired`'s only macOS construction is in `mod tests`, which the
+// bin target's dead-code pass does not see — so the exemption is unconditional
+// rather than one target's leftovers.
+#[allow(dead_code)]
 pub enum InputPermission {
     NotRequired,
     Granted,
     Denied,
+}
+
+/// Rewrite a path into the form the OS watcher will report it in (ADR-0003).
+///
+/// macOS FSEvents resolves symlinks before it reports, so a config directory
+/// reached through one — `$TMPDIR`'s `/var` → `/private/var`, a symlinked home —
+/// arrives under a path that never equals the one we asked to watch, and every
+/// edit is silently classified as belonging to neither `config.toml` nor
+/// `actions/`. Windows is deliberately left alone: `canonicalize` there returns
+/// a `\\?\` verbatim path, which is *not* what `ReadDirectoryChangesW` — and so
+/// `notify` — reports, so resolving would break the match it fixes on macOS.
+#[cfg(target_os = "macos")]
+pub fn watch_path(path: &Path) -> PathBuf {
+    // Resolve the parent rather than the path: `mark` runs before the write, and
+    // a rename's "from" path is already gone, so the file itself often does not
+    // exist. The directory holding it always does.
+    match (path.parent(), path.file_name()) {
+        (Some(parent), Some(name)) => match parent.canonicalize() {
+            Ok(dir) => dir.join(name),
+            // An unresolvable parent leaves both sides unresolved, which still
+            // agree with each other.
+            Err(_) => path.to_path_buf(),
+        },
+        _ => path.canonicalize().unwrap_or_else(|_| path.to_path_buf()),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn watch_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 /// A monitor's usable area in physical pixels (taskbar, Dock and menu bar
@@ -100,8 +136,10 @@ mod tests {
     /// It is pure, so a stale number here would never fail a test; it would just
     /// quietly stop describing the app.
     const POPOVER: (i32, i32) = (620, 500);
-    /// The `empty-selection` Popover, which is deliberately shorter.
-    const POPOVER_HINT: (i32, i32) = (620, 220);
+    /// A Popover dragged short. No phase produces one on its own any more
+    /// (ADR-0020), but the user can, and the placement has to follow the height
+    /// it is given rather than the one it started at.
+    const POPOVER_SHORT: (i32, i32) = (620, 220);
 
     #[test]
     fn sits_below_right_of_the_cursor_when_it_fits() {
@@ -114,12 +152,13 @@ mod tests {
         assert_eq!((x, y), (1900 - 12 - 620, 1030 - 12 - 500));
     }
 
-    /// The shorter hint window still fits below a cursor where the full one
-    /// would have had to flip.
+    /// A short Popover still fits below a cursor where the full one would have
+    /// had to flip — the height it is placed with is the height it is, which is
+    /// the whole reason this function takes a size.
     #[test]
-    fn the_hint_sized_popover_fits_where_the_full_one_would_flip() {
+    fn a_short_popover_fits_where_the_full_one_would_flip() {
         let (_, tall) = place_near_cursor((100, 600), POPOVER, SCREEN);
-        let (_, short) = place_near_cursor((100, 600), POPOVER_HINT, SCREEN);
+        let (_, short) = place_near_cursor((100, 600), POPOVER_SHORT, SCREEN);
         assert_eq!(tall, 600 - 12 - 500);
         assert_eq!(short, 612);
     }

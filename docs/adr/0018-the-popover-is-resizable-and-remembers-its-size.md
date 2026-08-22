@@ -20,7 +20,7 @@ box, and a full-screen snip fitted into it is a third of its real size. Reading 
 opening the file somewhere else, which is the workflow the Capture existed to avoid. Nothing about a
 fixed window makes that better; only a bigger one does.
 
-The second case is prose. A `selection` Action pointed at a long paragraph produces an answer taller
+The second case is prose. An Action pointed at a long paragraph produces an answer taller
 than the window twice over, and a user who wants to read it beside the source has a scroll wheel and
 nothing else.
 
@@ -42,23 +42,27 @@ only honest label is "the size you last left the Popover".
 
 ## Telling our own resize from the user's
 
-Every resize reports itself, including the `set_size` at the start of each trigger — and including
-the deliberately short `empty-selection` window, which is 220px tall on purpose. Persisting reports
-indiscriminately would mean one hint-sized Popover shrinking every later one.
+Every resize reports itself, including the `set_size` at the start of each trigger. Persisting
+reports indiscriminately would write our own summon back as if the user had dragged to it, so a
+clamp or a rounding difference would walk the remembered size a pixel at a time. (When this was
+written there was a louder version of the same bug: the `empty-selection` window was 220px on
+purpose, and one of those would have shrunk every later Popover. That phase is gone under
+[ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md); the mechanism below is unchanged
+and still necessary.)
 
 So `AppState::popover_asked_size` records the size the window was last *told* to be, and
 `remember_popover_size` drops any report that matches it (to the pixel: the round trip through
 physical pixels at a fractional scale factor does not come back exact). What is left is a size the
 user produced.
 
-Two consequences worth naming:
+One consequence worth naming:
 
-- `MIN_POPOVER_H` is **200**, under the 220px hint height, not the 240 the composer would like. A
-  floor above the shortest window the product shows itself is a floor `set_size` cannot meet, and the
-  window manager clamping our own call would look exactly like a drag.
-- the hint height is now a *ceiling* rather than a height: `min(remembered, 220)`. A Popover the user
-  has already made shorter than the hint stays that short, because a hint is not a reason to make a
-  window bigger than it was asked to be.
+- `MIN_POPOVER_H` is **200**, not the 240 the composer would like. When this was written the reason
+  was the 220px hint: a floor above the shortest window the product shows itself is a floor
+  `set_size` cannot meet, and the window manager clamping our own call would look exactly like a
+  drag. [ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md) removed that window, and
+  with it the second consequence recorded here — the hint height as a *ceiling* on the remembered
+  size, `min(remembered, 220)`. 200 stays on its own merits: a composer plus one line of answer.
 
 ## Grips, because an undecorated window has no border
 

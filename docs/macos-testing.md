@@ -68,7 +68,7 @@ Ordered by how likely they are to be wrong.
 | 7i | Send two screenshots with a note, then ask a follow-up | The follow-up carries no image of its own, and the answer can still refer to both (the history is resent, ADR-0004) |
 | 7j | Drag each **edge and corner** of the Popover | It resizes from all eight, and cannot go below 380×200. An undecorated NSWindow has no border of its own, so this is `startResizeDragging` and nothing else (ADR-0018) |
 | 7k | Resize the Popover, close it, then trigger any Action again | It opens at the size you left it, still next to the cursor. `[popover]` in `config.toml` holds it |
-| 7l | Resize it, then trigger a `selection` Action with **nothing selected** | The short hint window appears — and the *next* full Popover is back at the size you chose, not 220px tall (ADR-0018) |
+| 7l | Resize the Popover to an odd size on a **scaled** display, then trigger an Action several times over | `[popover]` in `config.toml` still reads what you dragged to: our own `set_size` is not written back as though it were a drag, so the remembered size never walks a pixel at a time (ADR-0018) |
 | 8 | Open the Launcher hotkey while an app is fullscreen | The Launcher appears and takes focus |
 | 9 | In Settings, click into the API key field and press **Cmd+V** | It pastes. If not, Tauri's default menu is missing and every text field in the app is crippled |
 | 10 | With a Beckon window focused, press **Cmd+Q** | The app quits. From the menu bar's Quit item too |

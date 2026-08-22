@@ -27,7 +27,6 @@ pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Cmd+Shift+Space";
 
 pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
 pub const DEFAULT_MODEL: &str = "deepseek-v4-flash";
-pub const DEFAULT_TEMPERATURE: f64 = 1.3;
 
 /// The Popover's size out of the box, in logical pixels (ADR-0018). Mirrored in
 /// `tauri.conf.json` so the very first paint is not at the wrong size.
@@ -37,9 +36,9 @@ pub const DEFAULT_POPOVER_H: f64 = 500.0;
 /// window manager refuses a smaller drag rather than us undoing one afterwards.
 ///
 /// The width floor is the composer's row — camera, box, Send — which wraps
-/// below it. The height floor is under `trigger::window::POPOVER_HINT_H`, and
-/// has to be: the hint window is the shortest Popover the product shows itself,
-/// and a floor above it is a floor `set_size` cannot meet.
+/// below it. The height floor is a composer plus one line of answer: with the
+/// hint window gone (ADR-0020) the product no longer sizes the Popover itself,
+/// so the floor only has to keep a hand-drag readable.
 pub const MIN_POPOVER_W: f64 = 380.0;
 pub const MIN_POPOVER_H: f64 = 200.0;
 /// The ceilings exist only to keep a garbled value out of the file; a 4K panel
@@ -105,7 +104,6 @@ pub struct ModelDefaults {
     /// DeepSeek has thinking mode *on* by default, which is pure latency for
     /// translation-shaped Actions. Hence the default of `false` here.
     pub thinking: bool,
-    pub temperature: f64,
 }
 
 /// The size the Popover is summoned at, in logical pixels (ADR-0018).
@@ -180,7 +178,6 @@ impl Default for ModelDefaults {
         Self {
             model: DEFAULT_MODEL.to_string(),
             thinking: false,
-            temperature: DEFAULT_TEMPERATURE,
         }
     }
 }
@@ -413,7 +410,6 @@ base_url = "https://api.deepseek.com"
 [defaults]
 model = "deepseek-v4-flash"
 thinking = false
-temperature = 1.3
 
 [popover]
 width = 620.0

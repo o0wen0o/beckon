@@ -6,7 +6,6 @@ import { FieldGroup } from "@/components/FieldGroup";
 import { ModelSelect } from "@/components/ModelSelect";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
-import { Temperature } from "@/components/Temperature";
 import { describeFailure } from "@/lib/failures";
 import { fill, useT } from "@/lib/i18n";
 import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
@@ -21,9 +20,11 @@ export function ModelDefaults() {
   const catalog = store.models;
   const model = config?.defaults.model ?? null;
 
-  // One option list, derived from once. Four separate calls built it
-  // independently and three of them then scanned it for the same id — on every
-  // render, which on this pane is every step of the temperature slider.
+  // Memoised for identity, not for the list-building: `modelOptions` allocates a
+  // fresh array for a configured-but-unknown model, and `ModelSelect` memoises
+  // its own filtering on `[options]`, so a new identity here re-filters there.
+  // The two hint helpers below still rebuild the list internally — cheap enough
+  // to leave alone, and passing it in would be a signature change in lib/models.
   const options = React.useMemo(() => modelOptions(model ?? "", catalog), [model, catalog]);
   const modelHint = unknownModelHint(model, catalog, t);
   const modelInfo = options.find((option) => option.id === model)?.description ?? "";
@@ -90,22 +91,6 @@ export function ModelDefaults() {
                 />
               )}
             </Field>
-
-            <Field
-              label={t.settings.defaults.temperature}
-              hint={t.settings.defaults.temperatureHint}
-            >
-              {({ id, describedBy }) => (
-                <Temperature
-                  id={id}
-                  describedBy={describedBy}
-                  value={config.defaults.temperature}
-                  onChange={(value) =>
-                    store.editConfig((draft) => (draft.defaults.temperature = value))
-                  }
-                />
-              )}
-            </Field>
           </FieldGroup>
 
           <FieldGroup title={t.settings.defaults.catalog}>
@@ -117,6 +102,7 @@ export function ModelDefaults() {
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
+                    size="sm-note"
                     onClick={() => void store.refreshModels()}
                     disabled={store.modelsLoading}
                   >

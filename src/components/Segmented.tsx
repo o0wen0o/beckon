@@ -33,13 +33,19 @@ export function Segmented<T extends string>({
       // again. There is no "no Input Source", so an empty value is dropped
       // rather than written.
       onValueChange={(next) => next && onChange(next as T)}
-      size="sm"
       // A track holding separate segments, not one welded row: the group is an
       // edge and nothing else — no ground, since a fill is the pane's "selected"
       // and the selected segment already carries it — and the choices inside it
       // are rounded and set apart by a gap. A non-zero `spacing` is also what turns off shadcn's
       // welded-row rules (rounded-none plus a shared left border).
       spacing={1}
+      // `--radius` (8px, `rounded-lg`) minus the 4px pad leaves 4px — `rounded-sm`
+      // — for the segments, so the two curves are concentric rather than merely
+      // both round. The pad and the 26px segment below also put the whole control
+      // at 36px, the height of the `Input` and `Select` it shares a Field column
+      // with. No `size` prop: the item's class string below is the whole spec,
+      // and `ToggleGroupItem` overrides the rest of any scale arm anyway, so a
+      // prop here would only be a second answer to a question already settled.
       className="self-start rounded-lg border p-1"
     >
       {options.map((option) => (
@@ -50,11 +56,17 @@ export function Segmented<T extends string>({
           // so hover is a `--muted` ground under the label. Stock gives selected
           // and hovered the same `bg-accent`; here the two fills stay a register
           // apart, hover quiet and selected the pane's inversion.
-          className="text-muted-foreground rounded-md data-[state=off]:hover:bg-muted data-[state=off]:hover:text-foreground data-[state=on]:bg-primary data-[state=on]:font-medium data-[state=on]:text-primary-foreground px-3 transition-colors duration-150 ease-out motion-reduce:transition-none"
+          //
+          // 26px and px-2.5 rather than the scale's 32px and px-3: the label is
+          // one or two words with nothing to wrap, so the extra box was air.
+          // `text-note` (12px, our scale — not Tailwind's `text-xs`) rather than
+          // the 14px of the `Input` beside it: these are the choices *inside* a
+          // control, and one register down is what says so.
+          className="text-muted-foreground h-6.5 gap-1.5 rounded-sm data-[state=off]:hover:bg-muted data-[state=off]:hover:text-foreground data-[state=on]:bg-primary data-[state=on]:font-medium data-[state=on]:text-primary-foreground px-2.5 text-note transition-colors duration-150 ease-out motion-reduce:transition-none"
         >
-          {/* 14px, not the toggle base's 16: the glyph rides beside a 14px
+          {/* 12px, not the toggle base's 16: the glyph rides beside a 12px
               label and matching it keeps the pair one word. */}
-          {option.icon ? <option.icon aria-hidden className="size-3.5" /> : null}
+          {option.icon ? <option.icon aria-hidden className="size-3" /> : null}
           {option.label}
         </ToggleGroupItem>
       ))}
