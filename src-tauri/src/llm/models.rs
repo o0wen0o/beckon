@@ -3,11 +3,11 @@
 //! ## One table, two consumers
 //!
 //! [`CATALOG`] is the single source of truth for both the Settings dropdown and
-//! [`thinking_wire`](super::deepseek). That is deliberate. An unknown model is a
-//! *hard error* in `deepseek` — omitting the field would silently leave DeepSeek
-//! thinking on — so a dropdown built from a second, hand-kept list would be a
-//! dropdown that offers models the request layer then refuses. Both read this
-//! table, so the two cannot drift.
+//! `thinking_wire` in [`super::request`]. That is deliberate. A DeepSeek model
+//! that always thinks, asked to stop, is a *hard error* there — omitting the
+//! field would silently leave thinking on — so a dropdown built from a second,
+//! hand-kept list would be a dropdown that offers models the request layer then
+//! refuses. Both read this table, so the two cannot drift.
 //!
 //! ## Where the ids come from
 //!
@@ -32,19 +32,25 @@
 //!
 //! ## The live list versus this one
 //!
-//! [`options`] prefers the ids the endpoint actually serves, because `base_url`
-//! is configurable — pointed at a local or non-DeepSeek endpoint, this table
-//! describes nothing that exists there. The documented list is what we fall back
-//! to when there is no credential, the fetch fails, or the machine is offline.
-//! It is a *fallback*, never an empty dropdown: two ids that are almost
-//! certainly right beat nothing to pick.
+//! [`options`] prefers the ids the endpoint actually serves, because there is
+//! one `base_url` per provider row — pointed at a local or non-DeepSeek
+//! endpoint, this table describes nothing that exists there. The documented list
+//! is what we fall back to when there is no credential, the fetch fails, or the
+//! machine is offline. It is a *fallback*, never an empty dropdown: two ids that
+//! are almost certainly right beat nothing to pick.
+//!
+//! Since ADR-0021 that fallback is offered **only for DeepSeek's own host**
+//! ([`Provider::is_deepseek_host`](crate::config::Provider::is_deepseek_host)).
+//! Offering `deepseek-v4-flash` as the documented list for somebody's Ollama
+//! would be a dropdown of ids that endpoint has never served — worse than the
+//! one entry the row already names.
 
 use serde::Serialize;
 
 use crate::config::Language;
 
-/// What a model does with thinking mode — the property `deepseek` needs in
-/// order to put the right `thinking` object on the wire.
+/// What a model does with thinking mode — the property [`super::request`] needs
+/// in order to put the right `thinking` object on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Thinking {
@@ -140,7 +146,7 @@ pub fn find(id: &str) -> Option<&'static CatalogEntry> {
 
 /// The id suggested in an error message when the user's model cannot do what
 /// they asked of it. Derived, so retiring a model cannot leave stale advice
-/// behind in `deepseek`.
+/// behind in [`super::request`].
 pub fn switchable_suggestion() -> &'static str {
     CATALOG
         .iter()
@@ -181,11 +187,15 @@ pub struct ModelOption {
 /// Build the dropdown.
 ///
 /// `live` is the endpoint's own list when we managed to fetch one, `None`
-/// otherwise. `selected` is every model id the configuration currently names —
-/// the global default plus each Action's override — so that a value we cannot
-/// vouch for still appears rather than being rewritten out from under the user.
+/// otherwise. `documented` says whether [`CATALOG`] describes *this* endpoint —
+/// it is DeepSeek's own list, so it is a fallback only for DeepSeek's own host
+/// (ADR-0021). `selected` is every model id the configuration currently names
+/// for this provider — the row's own model plus each Action's override — so that
+/// a value we cannot vouch for still appears rather than being rewritten out
+/// from under the user.
 pub fn options(
     live: Option<&[String]>,
+    documented: bool,
     selected: &[String],
     language: Language,
 ) -> Vec<ModelOption> {
@@ -203,11 +213,15 @@ pub fn options(
             // recognise, which trail the ones we do.
             out.sort_by_key(|option| rank(&option.id));
         }
-        None => {
+        // No live list. The documented one stands in where it describes the
+        // endpoint, and nowhere else — leaving only `selected`, which is at
+        // minimum the model the row already names.
+        None if documented => {
             for entry in CATALOG.iter().filter(|entry| !entry.retired) {
                 out.push(describe(entry.id, Origin::Documented, language));
             }
         }
+        None => {}
     }
 
     for id in selected {
@@ -275,8 +289,11 @@ mod tests {
 
     /// The option *set* is what these tests are about, and it is the same in
     /// both languages; `describes_a_model_in_both_languages` covers the rest.
+    /// `documented` is `true` here — these tests are about the DeepSeek row, and
+    /// `an_endpoint_the_catalog_does_not_describe_gets_no_documented_list`
+    /// covers the other side.
     fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption> {
-        super::options(live, selected, Language::En)
+        super::options(live, true, selected, Language::En)
     }
 
     #[test]
@@ -286,7 +303,7 @@ mod tests {
             entry.description(Language::En),
             entry.description(Language::Zh)
         );
-        let zh = super::options(None, &[], Language::Zh);
+        let zh = super::options(None, true, &[], Language::Zh);
         let flash = zh
             .iter()
             .find(|o| o.id == crate::config::DEFAULT_MODEL)
@@ -330,6 +347,20 @@ mod tests {
         let offered = ids(&options);
         assert!(!offered.contains(&"deepseek-chat"));
         assert!(!offered.contains(&"deepseek-reasoner"));
+    }
+
+    /// The list is DeepSeek's own, so it stands in only for DeepSeek's own host
+    /// (ADR-0021). Everywhere else the row's own model is the whole offer —
+    /// which is still not an empty dropdown.
+    #[test]
+    fn an_endpoint_the_catalog_does_not_describe_gets_no_documented_list() {
+        let offered = super::options(None, false, &strings(&["qwen3:8b"]), Language::En);
+        assert_eq!(ids(&offered), vec!["qwen3:8b"]);
+        assert_eq!(offered[0].origin, Origin::Configured);
+        // A live list is the endpoint's own word and needs no vouching either way.
+        let live = strings(&["llama3.1:8b"]);
+        let offered = super::options(Some(&live), false, &[], Language::En);
+        assert_eq!(ids(&offered), vec!["llama3.1:8b"]);
     }
 
     #[test]

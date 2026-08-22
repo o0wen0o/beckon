@@ -1,5 +1,5 @@
-// The Popover's title bar: which Action is loaded, which model it goes to, and
-// the way out. It is also the drag region, so nothing in it may take focus
+// The Popover's title bar: which Action is loaded, where it goes, and the way
+// out. It is also the drag region, so nothing in it may take focus
 // except the button.
 //
 // What is *happening* is deliberately not here — a running turn reports itself
@@ -39,8 +39,17 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
           say about the one line naming what the window is for. */}
       <span className="truncate font-medium">{actionName}</span>
       <span className="flex-1" />
+      {/* The endpoint as well as the model, always (ADR-0021). Since a provider
+          is an Action-level override, two Actions on the same hotkey away from
+          each other can go to different hosts — so "where did this go" is no
+          longer answerable from a settings pane, and a line that only sometimes
+          appeared would be a line nobody learns to read. The id rather than the
+          label: it is what the Action file names, it is short, and this bar has
+          one line. */}
       {model ? (
-        <span className="text-muted-quiet font-mono text-meta">{model.model}</span>
+        <span className="text-muted-quiet truncate font-mono text-meta">
+          {model.provider} · {model.model}
+        </span>
       ) : null}
       {/* Thinking being on is a capability in use, not a condition to act on,
           so it is an outlined chip rather than a warning colour. */}

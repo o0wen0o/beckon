@@ -1,6 +1,6 @@
 # Beckon
 
-Beckon is a tool that lives in the background on Windows: press a hotkey to summon it, send a preset prompt plus your current input to DeepSeek, and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
+Beckon is a tool that lives in the background on Windows: press a hotkey to summon it, send a preset prompt plus your current input to an OpenAI-compatible endpoint — DeepSeek by default — and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
 
 ## Language
 
@@ -13,6 +13,15 @@ _Avoid_: Skill, Command, Preset, feature
 **Input Source**:
 A property of an Action declaring where its input comes from — `auto` (use the Selection if there is one, otherwise ask for typed input) or `prompt` (typed input only; the Selection is ignored). Two values, not three: `selection` was retired by ADR-0020 and still loads as `auto`.
 _Avoid_: input mode, mode
+
+**Provider**:
+One endpoint requests can go to: a row of `[[api.providers]]` holding a `base_url`, a model, how that
+endpoint is told not to think, and the id its stored key is filed under. Every Action names one or
+inherits `[defaults] provider`, so several can be in use at once — which is why there is no "active"
+provider and no global switch to describe (ADR-0021). A row is always the user's own file: never a
+Rust enum of vendors, and never an aggregator standing in for one.
+_Avoid_: active provider, current provider, backend, vendor, API (the API is the protocol, a Provider
+is one host that speaks it), model (a Provider serves models; it is not one)
 
 **Selection**:
 The text the user has highlighted in a program outside Beckon, obtained by simulating Ctrl+C.
@@ -62,3 +71,4 @@ the same failure as a synonym in English.
 | Direct Hotkey | 专属热键 | _Avoid_: 快捷键 alone, which is any hotkey |
 | Popover | 浮窗 | _Avoid_: 弹窗, which is a dialog |
 | Exchange | 对话 | Only ever the one a Popover holds |
+| Provider | 端点 | The row, and what Settings calls the section. _Avoid_: 服务商 (a company, not a row — two rows can point at one company), 后端, 供应商 |

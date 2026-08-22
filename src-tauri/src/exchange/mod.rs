@@ -138,6 +138,7 @@ mod tests {
 
     fn params() -> ModelParams {
         ModelParams {
+            provider: "deepseek".into(),
             model: "deepseek-v4-flash".into(),
             thinking: false,
         }

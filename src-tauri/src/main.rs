@@ -67,7 +67,7 @@ fn main() {
             commands::get_config,
             commands::save_config,
             commands::reveal_config_dir,
-            commands::open_api_key_page,
+            commands::get_provider_presets,
             commands::get_startup_errors,
             commands::get_actions,
             commands::save_action,
@@ -75,7 +75,9 @@ fn main() {
             commands::delete_action,
             commands::read_action_raw,
             commands::write_action_raw,
+            commands::get_key_statuses,
             commands::get_key_status,
+            commands::open_key_page,
             commands::set_api_key,
             commands::delete_api_key,
             commands::test_connection,
@@ -215,9 +217,27 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
         log::warn!("could not apply the autostart setting: {err}");
     }
 
+    // The pre-provider credential moves onto the default row before anything
+    // asks whether there is one, or an existing install would come back
+    // reporting no key and yanking the user to Settings (ADR-0021).
+    // One snapshot for both questions: a `Config` clone carries the whole
+    // provider table, and the row asked about is the same row either time.
+    let config = handle.state::<AppState>().config_snapshot();
+    let default_provider = config.defaults.provider.clone();
+    if secrets::migrate_legacy(&default_provider) {
+        log::info!("moved the stored API key onto the \"{default_provider}\" endpoint");
+    }
+
     // First run is "no key readable", never a file check (ADR-0005). A read
-    // error also lands here — the user has to be guided through it.
-    if !matches!(secrets::status(), KeyStatus::Present { .. }) {
+    // error also lands here — the user has to be guided through it. Asked of the
+    // *default* row only: an endpoint no Action has been pointed at yet is not
+    // what makes this a first run, and a local one wants no key at all.
+    let needs_key = match config.provider(None) {
+        Some(row) if row.is_local() => false,
+        Some(row) => !matches!(secrets::status(&row.id), KeyStatus::Present { .. }),
+        None => true,
+    };
+    if needs_key {
         trigger::show_settings(&handle);
     }
 

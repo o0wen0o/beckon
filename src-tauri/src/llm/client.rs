@@ -38,6 +38,19 @@ pub fn models_url(base_url: &str) -> String {
     api_url(base_url, "models")
 }
 
+/// Attach the credential, or deliberately none.
+///
+/// `None` is a real answer, not a missing one: a local endpoint wants no
+/// `Authorization` header at all, and sending `Bearer ` with nothing after it is
+/// a 401 from anything that reads the header (ADR-0021). Every request goes
+/// through here so "no key means no header" is one rule.
+fn signed(request: reqwest::RequestBuilder, api_key: Option<&str>) -> reqwest::RequestBuilder {
+    match api_key {
+        Some(key) => request.bearer_auth(key),
+        None => request,
+    }
+}
+
 pub fn build_http_client() -> reqwest::Client {
     // No `.timeout(..)` on purpose — see the module docs.
     reqwest::Client::builder()
@@ -51,14 +64,12 @@ pub fn build_http_client() -> reqwest::Client {
 pub async fn stream_chat(
     http: &reqwest::Client,
     base_url: &str,
-    api_key: &str,
+    api_key: Option<&str>,
     body: &Value,
     cancel: &CancellationToken,
     mut on_event: impl FnMut(StreamEvent),
 ) -> Result<(), LlmError> {
-    let request = http
-        .post(chat_url(base_url))
-        .bearer_auth(api_key)
+    let request = signed(http.post(chat_url(base_url)), api_key)
         .header("accept", "text/event-stream")
         .json(body);
 
@@ -135,13 +146,11 @@ pub async fn stream_chat(
 pub async fn test_connection(
     http: &reqwest::Client,
     base_url: &str,
-    api_key: &str,
+    api_key: Option<&str>,
     model: &str,
 ) -> Result<(), LlmError> {
-    let response = http
-        .post(chat_url(base_url))
-        .bearer_auth(api_key)
-        .json(&super::deepseek::build_probe_body(model))
+    let response = signed(http.post(chat_url(base_url)), api_key)
+        .json(&super::request::build_probe_body(model))
         .send()
         .await
         .map_err(|e| LlmError::Network(e.to_string()))?;
@@ -164,11 +173,9 @@ pub async fn test_connection(
 pub async fn list_models(
     http: &reqwest::Client,
     base_url: &str,
-    api_key: &str,
+    api_key: Option<&str>,
 ) -> Result<Vec<String>, LlmError> {
-    let response = http
-        .get(models_url(base_url))
-        .bearer_auth(api_key)
+    let response = signed(http.get(models_url(base_url)), api_key)
         .send()
         .await
         .map_err(|e| LlmError::Network(e.to_string()))?;

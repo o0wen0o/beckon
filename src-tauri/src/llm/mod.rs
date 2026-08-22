@@ -1,15 +1,15 @@
 //! The OpenAI-compatible LLM layer.
 //!
 //! `sse` is a pure frame parser, `wire` the response shapes and the pure
-//! functions over them, `error` the one error type, `deepseek` the one place
-//! provider quirks live, `models` the catalog both `deepseek` and the Settings
-//! dropdown read, and `client` does the request. Nothing here knows about
-//! windows or Actions.
+//! functions over them, `error` the one error type, `request` the one place a
+//! divergence between endpoints lives, `models` the catalog both `request` and
+//! the Settings dropdown read, and `client` does the request. Nothing here knows
+//! about windows.
 
 pub mod client;
-pub mod deepseek;
 mod error;
 pub mod models;
+pub mod request;
 pub mod sse;
 mod wire;
 

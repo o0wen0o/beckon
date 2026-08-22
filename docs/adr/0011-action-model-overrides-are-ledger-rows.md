@@ -85,3 +85,8 @@ dropped: a value nobody is departing from is not news, and three rows do not nee
 - The temperature readout is 28px rather than an input's full height: it is a caption on the
   slider, and at 36px it stood taller than the track it annotates.
 - `--spacing-ledger-label` and `--spacing-ledger-gap` now have exactly one consumer, `Field`. (Both are deleted under ADR-0012, which has no label column.)
+
+> **A third row joined the group.** [ADR-0021](./0021-any-openai-compatible-endpoint-chosen-per-action.md) made `provider` an Action override beside `model`
+> and `thinking`. It needed nothing new: the gutter dot and the revert control named here already draw
+> exactly this shape, and the only thing the new row adds is that overriding it moves what the two
+> below it inherit.

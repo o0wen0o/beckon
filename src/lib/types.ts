@@ -3,12 +3,41 @@
 
 export type InputSource = "prompt" | "auto";
 
+/**
+ * How an endpoint is told **not** to think (ADR-0021).
+ *
+ * A property of the endpoint, never of the model — `deepseek-ai/DeepSeek-V3`
+ * served by SiliconFlow speaks the plain OpenAI dialect — so it cannot be
+ * derived from a model id. `none` is every endpoint with no such control, which
+ * is most of them.
+ */
+export type Reasoning = "deepseek" | "qwen" | "none";
+
+/** One endpoint the user keeps. Mirrors `config::Provider`. */
+export interface Provider {
+  /** Identity, and the credential account (`provider:{id}`). */
+  id: string;
+  /** Display only, like an Action's `name`. */
+  label: string;
+  base_url: string;
+  model: string;
+  thinking: boolean;
+  reasoning: Reasoning;
+  /** Absent means send none and let the endpoint decide. */
+  temperature?: number | null;
+  key_page?: string | null;
+}
+
+/** What a turn carries. `provider` is a `Provider.id`, not a label. */
 export interface ModelParams {
+  provider: string;
   model: string;
   thinking: boolean;
 }
 
+/** An Action's `[model]` table; `null` everywhere means "inherit". */
 export interface ModelOverrides {
+  provider: string | null;
   model: string | null;
   thinking: boolean | null;
 }
@@ -61,8 +90,9 @@ export interface Config {
   autostart: boolean;
   theme: Theme;
   language: Language;
-  api: { base_url: string };
-  defaults: ModelParams;
+  /** What an Action that names no provider gets. Not "active": nothing is. */
+  defaults: { provider: string };
+  api: { providers: Provider[] };
   /** The size the Popover is summoned at, in logical pixels (ADR-0018). Rust
    *  clamps it, so this is always a size a window can actually be. */
   popover: { width: number; height: number };

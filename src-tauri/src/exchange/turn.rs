@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use tauri::{AppHandle, Manager};
 
-use crate::llm::{client, deepseek, LlmError, StreamEvent};
+use crate::llm::{client, request, LlmError, StreamEvent};
 use crate::state::AppState;
 
 use super::events::{
@@ -26,34 +26,43 @@ pub fn spawn_turn(app: AppHandle, plan: TurnPlan) {
 async fn run_turn(app: AppHandle, plan: TurnPlan) {
     let state = app.state::<AppState>();
 
-    let base_url = {
+    // The row is read here rather than carried in the plan (ADR-0021): a
+    // `base_url` corrected in Settings while a Popover is open has to reach the
+    // next follow-up, and the Exchange only ever held the id.
+    let (provider, language) = {
         let config = state.config.read().expect("config lock");
-        config.api.base_url.clone()
+        (
+            config.provider(Some(&plan.params.provider)).cloned(),
+            config.language,
+        )
+    };
+    let Some(provider) = provider else {
+        emit_error(
+            &app,
+            &plan.exchange_id,
+            "config",
+            &crate::i18n::provider_missing(language, &plan.params.provider),
+        );
+        return;
     };
 
-    let api_key = match crate::secrets::read() {
-        Ok(Some(key)) => key,
-        Ok(None) => {
-            emit_error(
-                &app,
-                &plan.exchange_id,
-                "no-credential",
-                "No API key is stored. Open Settings to add one.",
-            );
-            return;
-        }
-        Err(message) => {
-            emit_error(
-                &app,
-                &plan.exchange_id,
-                "read-error",
-                &format!("The API key could not be read from the Credential Manager: {message}"),
-            );
+    // The credential split lives in `commands::require_api_key` once (ADR-0005,
+    // ADR-0021): four outcomes, one of them "a local row wants no header". A
+    // `Failure` is `{kind, message}`, which is exactly what `emit_error` takes,
+    // so the Popover and Settings cannot come to disagree about the same row.
+    let api_key = match crate::commands::require_api_key(
+        &provider,
+        &crate::i18n::turn_needs_key(language, &provider.label),
+        language,
+    ) {
+        Ok(key) => key,
+        Err(failure) => {
+            emit_error(&app, &plan.exchange_id, &failure.kind, &failure.message);
             return;
         }
     };
 
-    let body = match deepseek::build_body(&plan.params, &plan.messages) {
+    let body = match request::build_body(&provider, &plan.params, &plan.messages) {
         Ok(body) => body,
         Err(message) => {
             emit_error(&app, &plan.exchange_id, "config", &message);
@@ -64,8 +73,8 @@ async fn run_turn(app: AppHandle, plan: TurnPlan) {
     let mut sink = DeltaSink::new(app.clone(), plan.exchange_id.clone());
     let result = client::stream_chat(
         &state.http,
-        &base_url,
-        &api_key,
+        &provider.base_url,
+        api_key.as_deref(),
         &body,
         &plan.cancel,
         |event| sink.push(event),

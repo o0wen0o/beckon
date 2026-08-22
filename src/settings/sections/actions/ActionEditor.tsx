@@ -2,11 +2,25 @@
 // (ADR-0003): every field commits to disk, debounced, and the `actions-changed`
 // echo re-renders the list behind it.
 //
-// The defaults an override inherits from and the model catalog come from the
-// window's other store — this window already loads both for Model defaults, and
-// a second copy could only drift from it.
+// The endpoint an override inherits from, and that endpoint's model catalog,
+// come from the window's other store — the Connection pane already loads both,
+// and a second copy could only drift from it.
+//
+// The `Overrides` group is where ADR-0021's design question landed. Three rows,
+// each either inheriting or overriding, and changing the first changes what the
+// other two inherit: `provider` resolves to a row, and that row is what `model`
+// and `thinking` fall back to. Nothing new was built for it — `Field`'s own
+// `override` prop already draws exactly this, and `provider` is a third row in a
+// group made for it.
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Callout } from "@/components/Callout";
 import { Field } from "@/components/Field";
 import { FieldGroup } from "@/components/FieldGroup";
@@ -18,6 +32,7 @@ import { Segmented } from "@/components/Segmented";
 import { useT } from "@/lib/i18n";
 import { SOURCES as SOURCE_ORDER, sourceLabel } from "@/lib/inputSource";
 import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
+import { chatUrl, isLocal, keyProblem, strandedModel } from "@/lib/providers";
 import type { Action } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../../actions";
@@ -40,8 +55,13 @@ export function ActionEditor({ action }: ActionEditorProps) {
   const sources = SOURCE_ORDER.map((value) => ({ value, label: sourceLabel(value, t) }));
 
   const draft = store.draft;
-  const defaults = config?.defaults;
   const hotkeyConflict = store.snapshot.hotkey_errors[action.id];
+
+  /** The row this Action's request would go to, and the row it would go to if
+   *  the `provider` override were reverted. The second is what the revert
+   *  control names, so both are needed even when they are the same. */
+  const fallback = settings.defaultProvider;
+  const provider = settings.provider(draft?.model.provider);
 
   // Above the guard, because hooks have to be, and memoized because every
   // keystroke in Name, Description or either prompt field re-renders this form:
@@ -51,8 +71,11 @@ export function ActionEditor({ action }: ActionEditorProps) {
   // shows what a request would carry, so while the key is absent the select
   // holds the inherited value — and a select whose value is missing from its own
   // options silently rewrites it.
-  const effectiveModel = draft?.model.model ?? config?.defaults.model ?? "";
-  const catalog = settings.models;
+  const effectiveModel = draft?.model.model ?? provider?.model ?? "";
+  // This endpoint's catalog, not "the" catalog: there is one list per row
+  // (ADR-0021). It is keyed on the resolved provider, so overriding the row
+  // above re-reads the list here.
+  const catalog = provider ? (settings.models[provider.id] ?? null) : null;
   const modelOverrideOptions = React.useMemo(
     () => modelOptions(effectiveModel, catalog),
     [effectiveModel, catalog],
@@ -62,7 +85,16 @@ export function ActionEditor({ action }: ActionEditorProps) {
     [effectiveModel, catalog, t],
   );
 
-  if (!draft || !defaults) return null;
+  // The endpoint this Action would post to is the one whose list is about to be
+  // read, so its live fetch is paid for here: a reveal only primes every row's
+  // offline answer (`settings.refreshAll`). Keyed on the resolved id, so
+  // overriding the row above fetches the new one's list.
+  const resolvedProvider = provider?.id;
+  React.useEffect(() => {
+    if (resolvedProvider !== undefined) void settings.refreshModels(resolvedProvider);
+  }, [resolvedProvider]);
+
+  if (!draft || !config) return null;
 
   // The Definition screen's own warnings, carried onto the card that opens it:
   // one at a time, because that screen shows every one of them in full. A
@@ -78,8 +110,21 @@ export function ActionEditor({ action }: ActionEditorProps) {
   // values, since those are what a request would carry.
   const modelInfo =
     modelOverrideOptions.find((option) => option.id === effectiveModel)?.description ?? "";
-  const effectiveThinking = draft.model.thinking ?? defaults.thinking;
-  const thinkingHint = thinkingWarning(effectiveModel, effectiveThinking, catalog, t);
+  const effectiveThinking = draft.model.thinking ?? provider?.thinking ?? false;
+  const thinkingHint = thinkingWarning(provider, effectiveModel, effectiveThinking, catalog, t);
+  /**
+   * A model this Action pinned that its own endpoint does not serve — the case
+   * that appears the moment you override the row above while a model is pinned.
+   *
+   * It is *kept*, never rewritten, so this says so out loud with the revert
+   * control right beside it. Only claimed once the endpoint has answered:
+   * `strandedModel` is `null` while the list is empty, because nothing is known
+   * before it arrives.
+   */
+  const stranded =
+    draft.model.model === null ? null : strandedModel(effectiveModel, catalog?.options);
+  const keyMissing =
+    provider !== undefined && keyProblem(provider, settings.keyStatuses[provider.id]) !== null;
 
   return (
     <>
@@ -159,14 +204,68 @@ export function ActionEditor({ action }: ActionEditorProps) {
           on an overridden row only, with the head's note covering the rest. This
           was three bordered boxes indented into the value column, and the only
           thing on the pane that was not a row of its own (ADR-0011). */}
-      <FieldGroup title={t.settings.actions.overrides} note={t.settings.actions.overridesNote}>
+      {keyMissing && provider ? (
+        // The per-Action version of "no credential". It belongs here rather than
+        // only on the Connection pane: with an endpoint per Action, one Action
+        // can be broken while every other one works (ADR-0021).
+        <Callout tone="warn">
+          <p>{t.settings.actions.needsKey(provider.label)}</p>
+        </Callout>
+      ) : null}
+
+      <FieldGroup
+        title={t.settings.actions.overrides}
+        note={t.settings.actions.overridesNote(
+          fallback?.label ?? config.defaults.provider,
+        )}
+      >
         <Field
-          label={t.settings.defaults.model}
-          hint={modelHint ? undefined : modelInfo}
-          error={modelHint}
+          label={t.settings.actions.provider}
+          hint={t.settings.actions.providerHint}
+          override={{
+            overridden: draft.model.provider !== null,
+            defaultReading: fallback?.label ?? config.defaults.provider,
+            onRevert: () => store.editDraft((next) => (next.model.provider = null), true),
+          }}
+        >
+          {({ id, describedBy }) => (
+            // The effective value, like every other row here: the control shows
+            // what a request would carry, and touching it *is* the override.
+            <Select
+              value={provider?.id ?? ""}
+              onValueChange={(next) =>
+                store.editDraft((draft) => (draft.model.provider = next), true)
+              }
+            >
+              <SelectTrigger id={id} aria-describedby={describedBy} className="w-fit min-w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {config.api.providers.map((one) => (
+                  <SelectItem key={one.id} value={one.id}>
+                    {isLocal(one) ? t.settings.actions.providerLocal(one.label) : one.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+
+        <Field
+          label={t.controls.model.label}
+          hint={modelHint || stranded ? undefined : modelInfo}
+          error={
+            stranded
+              ? t.settings.actions.strandedModel(
+                  stranded,
+                  provider?.label ?? "",
+                  provider?.model ?? "",
+                )
+              : modelHint
+          }
           override={{
             overridden: draft.model.model !== null,
-            defaultReading: defaults.model,
+            defaultReading: provider?.model ?? "",
             onRevert: () => store.editDraft((next) => (next.model.model = null), true),
           }}
         >
@@ -185,12 +284,12 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Field>
 
         <Field
-          label={t.settings.defaults.thinking}
+          label={t.controls.model.thinking}
           warning={thinkingHint}
           hint={t.settings.actions.thinkingHint}
           override={{
             overridden: draft.model.thinking !== null,
-            defaultReading: defaults.thinking ? t.controls.field.on : t.controls.field.off,
+            defaultReading: provider?.thinking ? t.controls.field.on : t.controls.field.off,
             onRevert: () => store.editDraft((next) => (next.model.thinking = null), true),
           }}
         >
@@ -198,13 +297,27 @@ export function ActionEditor({ action }: ActionEditorProps) {
             <OnOffSwitch
               id={id}
               describedBy={describedBy}
-              label={t.settings.defaults.thinking}
+              label={t.controls.model.thinking}
               checked={effectiveThinking}
               onChange={(value) => store.editDraft((next) => (next.model.thinking = value), true)}
             />
           )}
         </Field>
       </FieldGroup>
+
+      {/* What a turn would actually carry, in one place. With an endpoint per
+          Action, "where did this go" is no longer answerable from one global
+          setting, so it is answered here (ADR-0021). */}
+      {provider ? (
+        <FieldGroup title={t.settings.actions.sends}>
+          <div className="text-muted-foreground grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 font-mono text-meta">
+            <span>POST</span>
+            <span className="text-foreground [overflow-wrap:anywhere]">{chatUrl(provider)}</span>
+            <span>model</span>
+            <span className="text-foreground">{effectiveModel || "—"}</span>
+          </div>
+        </FieldGroup>
+      ) : null}
 
       {/* A card like every other, under a head of its own: with no hairlines
           left on the pane there is no divider to sit above, and a group head is

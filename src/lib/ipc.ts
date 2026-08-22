@@ -17,6 +17,7 @@ import type {
   KeyStatus,
   ModelCatalog,
   PopoverView,
+  Provider,
   RegistrySnapshot,
 } from "./types";
 
@@ -25,8 +26,8 @@ import type {
 export const getConfig = () => invoke<Config>("get_config");
 export const saveConfig = (config: Config) => invoke<void>("save_config", { config });
 export const revealConfigDir = () => invoke<void>("reveal_config_dir");
-/** Opens a constant URL — the page a DeepSeek key comes from. */
-export const openApiKeyPage = () => invoke<void>("open_api_key_page");
+/** The filled-in rows "Add from preset" offers (ADR-0021). */
+export const getProviderPresets = () => invoke<Provider[]>("get_provider_presets");
 export const getStartupErrors = () => invoke<string[]>("get_startup_errors");
 
 // --- actions --------------------------------------------------------------
@@ -42,10 +43,23 @@ export const writeActionRaw = (fileName: string, text: string) =>
 
 // --- secrets --------------------------------------------------------------
 
-export const getKeyStatus = () => invoke<KeyStatus>("get_key_status");
-export const setApiKey = (key: string) => invoke<KeyStatus>("set_api_key", { key });
-export const deleteApiKey = () => invoke<KeyStatus>("delete_api_key");
-export const testConnection = () => invoke<void>("test_connection");
+/**
+ * Every configured row's credential status, in one read — the Connection pane
+ * draws the whole inventory at once (ADR-0021).
+ */
+export const getKeyStatuses = () => invoke<Record<string, KeyStatus>>("get_key_statuses");
+/** One row's status, for the operations that change exactly one of them. */
+export const getKeyStatus = (providerId: string) =>
+  invoke<KeyStatus>("get_key_status", { providerId });
+export const setApiKey = (providerId: string, key: string) =>
+  invoke<KeyStatus>("set_api_key", { providerId, key });
+export const deleteApiKey = (providerId: string) =>
+  invoke<KeyStatus>("delete_api_key", { providerId });
+export const testConnection = (providerId: string) =>
+  invoke<void>("test_connection", { providerId });
+/** Opens the row's own `key_page`; Rust refuses anything but `https`. */
+export const openKeyPage = (providerId: string) =>
+  invoke<void>("open_key_page", { providerId });
 
 // --- models ---------------------------------------------------------------
 
@@ -53,7 +67,8 @@ export const testConnection = () => invoke<void>("test_connection");
  * `live = false` is the documented catalog, answered without touching the
  * network; `true` asks the endpoint and falls back to the same catalog.
  */
-export const getModels = (live: boolean) => invoke<ModelCatalog>("get_models", { live });
+export const getModels = (providerId: string, live: boolean) =>
+  invoke<ModelCatalog>("get_models", { providerId, live });
 
 // --- hotkeys --------------------------------------------------------------
 

@@ -16,10 +16,10 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - The platform's copy shortcut is simulated to grab the Selection — Ctrl+C, or Cmd+C on macOS — with the clipboard restored afterwards
 - Popover near the cursor: takes focus, streams output, supports follow-up turns, closes on Esc
 - A screenshot button in the Popover: it runs the platform's own snip tool, attaches the result as a Capture, and sends it with whatever is typed beside it ([ADR-0016](./docs/adr/0016-captures-from-the-os-snip-tool-via-the-clipboard.md)). Up to four Captures ride one turn, shown as a rail of thumbnails; clicking one opens it full size over the window ([ADR-0017](./docs/adr/0017-a-turn-carries-several-captures-and-preview-is-a-layer.md)). The images go to whichever model the Action names; whether that model reads images is the endpoint's answer to give
-- Full settings window: API key, global hotkey, theme, language, global model defaults, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
+- Full settings window: the endpoints you keep with a key each, global hotkey, theme, language, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
 - English and Simplified Chinese, switched in Settings ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md))
 - Actions stored as TOML files, with a file watcher that reloads them automatically on external changes
-- OpenAI-compatible API, with a configurable `base_url`
+- **Any OpenAI-compatible endpoint**, kept as a table and chosen **per Action** — DeepSeek by default, and every preset points at the vendor's own host, never an aggregator ([ADR-0021](./docs/adr/0021-any-openai-compatible-endpoint-chosen-per-action.md))
 
 **Explicitly out of scope**
 
@@ -57,8 +57,9 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 
 - When recording a hotkey in the settings window, **attempt to register it immediately**; if it is taken, flag it red on the spot and refuse to save a hotkey that cannot be registered.
 - A hotkey registration failure at startup is never silent: the tray icon switches to an error state plus a one-time balloon notification that opens settings when clicked.
-- The model is **chosen from a list, not typed**. The list is the endpoint's own `/v1/models` response when a key is stored and the request succeeds, and the officially documented DeepSeek models otherwise — no credential, a rejected key or a dead network downgrades the list and says why, but never empties it. A model already named in `config.toml` or in an Action stays selectable even when nothing vouches for it, flagged rather than rewritten.
-- On first run (no key readable from the credential store), open the settings window directly, including a "Test connection" button — it sends a minimal request to verify the key and `base_url` on the spot.
+- The model is **chosen from a list, not typed**, and there is one list **per endpoint**. It is that endpoint's own `/v1/models` response when the request succeeds, and otherwise what the configuration already names — plus the documented DeepSeek models, for DeepSeek's own host only. No credential, a rejected key or a dead network downgrades the list and says why, but never empties it. A model already named in `config.toml` or in an Action stays selectable even when nothing vouches for it, flagged rather than rewritten — including a model an Action pinned before its endpoint changed.
+- An Action names an endpoint or inherits `[defaults] provider`. Two endpoints can therefore be live at once: Translate on a fast hosted model and Summarise on one that never leaves the machine are the same hotkey away from each other, not a settings trip apart.
+- On first run (no key readable for the default endpoint), open the settings window directly. Each endpoint has its own "Test connection" — it sends a minimal request with that endpoint's own key. A **local** endpoint needs no key at all, and its absence is not reported as a fault.
 - On first run, if `actions/` does not exist, write two example Actions — one `auto` and one `prompt` — covering both Input Sources. Once deleted, they are not regenerated.
 - The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose OS appearance is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
 - The language is `en` or `zh`, and it applies to all three surfaces *and* the tray menu at once. **The default is `en`**, on a Chinese machine too, and there is no `system` arm: an OS locale is a guess about a reader rather than a setting, and a wrong guess replaces every word in the product — including the words explaining how to change it back ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)). Your Actions are never translated in either direction: they are your words, in your files.
@@ -68,13 +69,13 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 ```
 %APPDATA%\Beckon\                        # Windows
 ~/Library/Application Support/Beckon/    # macOS
-├── config.toml        # global hotkey, autostart, theme, language, base_url, model defaults, Popover size
+├── config.toml        # global hotkey, autostart, theme, language, the endpoint table, Popover size
 └── actions/
     ├── translate.toml
     └── ask.toml
 ```
 
-The API key is **not here** — it lives in the OS credential store (the Windows Credential Manager, or the login Keychain on macOS) under the service name `Beckon` ([ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md)). There is no plaintext secret file anywhere on disk.
+The API keys are **not here** — they live in the OS credential store (the Windows Credential Manager, or the login Keychain on macOS) under the service name `Beckon`, one account per endpoint (`provider:{id}`) ([ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md), [ADR-0021](./docs/adr/0021-any-openai-compatible-endpoint-chosen-per-action.md)). There is no plaintext secret file anywhere on disk.
 
 A config directory copies between the two platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super` all parse on both. Only the *defaults* differ, and only where a stock machine would refuse to register them.
 
@@ -88,17 +89,39 @@ autostart = true
 theme = "light"                 # light | dark | system
 language = "en"                 # en | zh
 
-[api]
-base_url = "https://api.deepseek.com"
-
 [defaults]
-model = "deepseek-v4-flash"
-thinking = false
+provider = "deepseek"           # what an Action that names no provider gets
 
 [popover]
 width = 620.0                   # written by dragging the window, not by hand
 height = 500.0
+
+# One table per endpoint. Written last: an array of tables swallows any header
+# after it. `id` is both what an Action names and the credential account.
+[[api.providers]]
+id = "deepseek"
+label = "DeepSeek"              # display only
+base_url = "https://api.deepseek.com"
+model = "deepseek-v4-flash"
+thinking = false
+reasoning = "deepseek"          # deepseek | qwen | none — how this endpoint is
+                                # told *not* to think. A property of the endpoint,
+                                # not of the model; prefilled by its preset.
+temperature = 1.3               # optional; omitted means let the endpoint decide
+key_page = "https://platform.deepseek.com/api_keys"
+
+[[api.providers]]
+id = "ollama"
+label = "Ollama (local)"
+base_url = "http://localhost:11434/v1"
+model = "qwen3:8b"
+thinking = false
+reasoning = "qwen"
+# No key_page, and no key needed: a local endpoint gets no Authorization header.
 ```
+
+A pre-provider file — `[api] base_url` with `[defaults] model` and `thinking` — keeps working: it folds
+into one row on load and the old keys leave the file the next time it is written.
 
 ### actions/translate.toml
 
@@ -115,8 +138,12 @@ Output only the translation — no explanation, no quotes, no prefix or suffix o
 """
 # user may be omitted; it defaults to "{{input}}"
 
-# [model] may be omitted entirely; `model` and `thinking` fall back to the
-# defaults in config.toml. There is no per-Action temperature (ADR-0019).
+# [model] may be omitted entirely. Each key absent means "inherit":
+#   provider  the [defaults] provider row
+#   model     that row's model
+#   thinking  that row's thinking
+# Overriding `provider` therefore moves what the other two inherit. There is no
+# per-Action temperature (ADR-0019, ADR-0021).
 ```
 
 ### actions/ask.toml
@@ -129,6 +156,7 @@ input_source = "prompt"
 system = "Answer concisely. Unless asked, do not enumerate bullet points and do not preamble at length."
 
 [model]
+provider = "ollama"             # optional; absent means [defaults] provider
 thinking = true
 ```
 

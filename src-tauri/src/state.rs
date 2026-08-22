@@ -306,6 +306,7 @@ mod tests {
             action_id: "a".into(),
             action_name: "A".into(),
             model: ModelParams {
+                provider: "p".into(),
                 model: "m".into(),
                 thinking: false,
             },

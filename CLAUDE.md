@@ -6,15 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A background-resident LLM shortcut for Windows and macOS on Tauri v2 (Rust backend + React
 webviews). A global hotkey grabs the current Selection, resolves an Action (a preset prompt stored
-as a TOML file), and streams a DeepSeek response into a popover near the cursor.
+as a TOML file), and streams the response into a popover near the cursor. The endpoint is any
+OpenAI-compatible one — DeepSeek by default — kept as a table and chosen **per Action**
+(ADR-0021), always at the vendor's own host and never through an aggregator.
 
 Read before non-trivial work:
 
 - [README.md](./README.md) — the spec: scope, decided behaviour, config-file layout.
-- [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Input Source, Selection, Capture, Launcher,
-  Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one Chinese
-  form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 20 accepted ADRs. Comments cite them by number; a comment saying
+- [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
+  Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
+  Chinese form. Use those words in code, comments, UI strings and commit messages.
+- [docs/adr/](./docs/adr/) — 21 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -73,7 +75,10 @@ load-bearing:
    (ADR-0006, ADR-0002).
 2. Resolve `input_source` against the grab in Rust, producing a `PopoverView` + `PopoverPhase`. An
    empty grab is a phase, never an error — and since ADR-0020 there are two arms (`auto`, `prompt`)
-   and two phases (`NeedsInput`, `Running`), so an empty grab always lands in the composer.
+   and two phases (`NeedsInput`, `Running`), so an empty grab always lands in the composer. The
+   Action's `[model]` table is merged over the Provider row it resolves to in the same step
+   (`model_params`), so `ModelParams` carries a provider **id** onward — the row itself is re-read at
+   request time (ADR-0021).
 3. Emit the view event **before** revealing the window. Windows are created hidden at startup and
    reused (ADR-0007), so revealing first paints the previous Exchange for a few frames.
 
@@ -100,10 +105,10 @@ thread on Windows.
 | `commands/` | The IPC surface, one file per thing commanded, re-exported flat. Thin: validate, delegate, let `reload` broadcast. |
 | `action/` | The `Action` model, the `Registry` loaded from `actions/`, the debounced watcher. |
 | `exchange/` | In-memory Exchanges (ADR-0004: no storage layer anywhere), `spawn_turn`, streaming events to the Popover. |
-| `llm/` | OpenAI-compatible client: `sse` a pure frame parser, `wire` the shapes, `deepseek` the only home for provider quirks, `models` the catalog. Knows nothing about windows or Actions. |
+| `llm/` | OpenAI-compatible client: `sse` a pure frame parser, `wire` the shapes, `request` the only home for a divergence between endpoints, `models` the DeepSeek catalog. Knows nothing about windows. |
 | `platform/` | The facade: Win32 under `windows/`, AppKit/CoreGraphics under `macos/`, stubs in `fallback.rs`. Put every new platform divergence here so business logic stays `#[cfg]`-free. Pure geometry (`place_near_cursor`) and Capture normalisation (`capture.rs`) live here as the unit-testable parts; `snip` is the per-platform half of ADR-0016. |
 | `hotkey.rs` | Parsing (`Ctrl`/`Alt`/`Shift`/`Cmd` parse on both platforms) and registration; failures surface in `ApplyReport`, never silently. |
-| `secrets.rs` | The API key via `keyring`, never plaintext on disk (ADR-0005). "First run" means "no key readable", never a file check. |
+| `secrets.rs` | One API key **per Provider** via `keyring`, account `provider:{id}`, never plaintext on disk (ADR-0005, ADR-0021). "First run" means "no key readable" for the default row, never a file check — and never for a local row, which wants no header at all. |
 | `i18n.rs` | Only what Rust writes: the tray menu, the balloon, derived diagnostics. |
 
 Read under a lock, drop the guard, then `await` — plain `std` locks, never held across a suspension
@@ -128,6 +133,35 @@ before the first paint.
   ([src/lib/pane.tsx](src/lib/pane.tsx)) — from the body, opening a dropdown reads as "the user left
   the form" to the save protocol.
 
+### The Provider table (ADR-0021)
+
+`config.api.providers` is the list of endpoints; `config.defaults.provider` names the one an Action
+that says nothing inherits. There is no "active" row — several are in use at once, one per Action —
+so nothing in the codebase may reintroduce a global switch.
+
+Three rules the whole layer leans on:
+
+- **`Config::fold_legacy` owns the invariants**: the table is never empty, every id is distinct, and
+  `defaults.provider` always names a row that exists. It runs on the load path, inside
+  `Config::default`, and at the IPC boundary in `save_config` — so what a fresh install has cannot
+  drift from what a pre-provider file becomes, and a table arriving from a window cannot be the one
+  thing on disk that breaks them. No pane re-checks any of it. `ApiConfig::default` is therefore
+  **empty** — an empty table means "the file said nothing", which is the signal to migrate.
+- **The wire dialect is a property of the endpoint, never of the model.** `Reasoning` says how an
+  endpoint is told *not* to think, and `Reasoning::guess` is the only host guess in the codebase — it
+  runs once, on a file written before the table existed. Anywhere else, the row states it and
+  `llm/request.rs` sends nothing it was not told to: an unknown field is a `400`, not a courtesy.
+- **A configured model is surfaced, never rewritten**, and `get_models` gathers `configured` *per
+  provider* so a model an Action pinned before its endpoint changed still appears in that endpoint's
+  dropdown. Overriding an Action's provider strands its pinned model; the editor says so in red with
+  the revert control beside it.
+
+`src/lib/providers.ts` mirrors five small rules from Rust — `isLocal`, `chatUrl`, the Action count,
+the stranded model, and `keyProblem` (the four-outcome credential split `commands::require_api_key`
+owns) — because they answer what a pane *says* while drawing a list, not what goes on the wire. Add a
+rule there only if it can be stated twice without drifting; otherwise it belongs in Rust and reaches
+the window as a field. What is *not* there is any invariant: those are `fold_legacy`'s.
+
 ### i18n (ADR-0015)
 
 One `language` field in `config.toml` (`en` | `zh`, default `en`, no `system` arm) drives all three
@@ -151,7 +185,12 @@ never translated in either direction.
   0002 mandates deliberately does not apply to a snip the user ran themselves. ADR-0019 and ADR-0020
   each *narrow* what an Action file may say without contradicting why: 0011 and 0012 still describe
   the override rows that remain, and 0020 keeps 0002's "an empty grab is a phase, never an error" —
-  it just leaves one phase where there were two.
+  it just leaves one phase where there were two. ADR-0021 supersedes nothing and *extends* three:
+  0005's three credential outcomes all survive, with one new reading (nothing stored for a local
+  endpoint is a working setup, not a fault); 0011's override machinery gained a third row and needed
+  no new mechanism for it; and 0019's decision — no temperature *control* — stands, while the 1.3 it
+  pinned moved onto the DeepSeek row, which is the argument 0019 itself made about where a DeepSeek
+  quirk belongs.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each
@@ -161,7 +200,7 @@ never translated in either direction.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (1873 symbols, 4605 relationships, 155 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (2046 symbols, 5102 relationships, 171 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

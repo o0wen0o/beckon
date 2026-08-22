@@ -138,7 +138,6 @@ export const EN = {
       actions: "Actions",
       triggering: "Triggering",
       appearance: "Appearance",
-      defaults: "Model defaults",
       attention: "Something in this section needs attention",
       openFolder: "Open folder",
     },
@@ -152,29 +151,92 @@ export const EN = {
 
     connection: {
       title: "Connection",
-      lede: (store: string) =>
-        `Where requests go, and the credential they go with. The key lives in the ${store}, never in a file.`,
+      /** `fallback` is the default row's label, `store` what the OS calls its
+       *  credential store. Both are in the sentence because both are the answer
+       *  to "where does my text go and what does it carry" (ADR-0021). */
+      lede: (fallback: string, store: string) =>
+        `The endpoints you keep. Each Action posts to one; an Action that does not say posts to ${fallback}. Keys live in the ${store}, one per endpoint, never in a file.`,
       welcomeLead: "Welcome.",
-      welcomeBody: " Beckon needs a DeepSeek API key before it can do anything.",
-      getKey: "Get a key from platform.deepseek.com",
-      credential: "Credential",
+      welcomeBody:
+        " DeepSeek is set up and waiting for a key. Any OpenAI-compatible endpoint works instead, at its own vendor's host — and a local one needs no key at all.",
+      setUp: (label: string) => `Set up ${label}`,
+      getKeyFrom: (host: string) => `Get a key from ${host}`,
+      addPreset: "Add from preset…",
+      addBlank: "Blank",
+      /** The badge on the default row. Sentence case, not an uppercase eyebrow:
+       *  it is a word about the row it sits on, and it says something quiet —
+       *  which row an Action inherits, not a state the row is in. */
+      defaultTag: "Default",
+      defaultForNew: "default for Actions that do not say",
+      makeDefault: "Make default",
+      usedByNone: "no Actions",
+      usedByOne: (name: string) => `1 Action — ${name}`,
+      usedByMany: (count: number) => `${count} Actions`,
+      staysLocal: "stays on this machine",
+      missingKey: "no key",
+      edit: (label: string) => `Edit ${label}`,
+      removeLabel: (label: string) => `Remove ${label}`,
+      removeHint: "Removes the row and its stored key.",
+      /** Refused rather than cascaded: which endpoint those Actions should use
+       *  instead is not a decision this button gets to make. */
+      removeBlocked: (names: string) =>
+        `${names} would be left without an endpoint. Point them elsewhere first.`,
+      removeLast: "The last endpoint cannot be removed.",
+      back: "Connection",
+      unnamed: "(unnamed)",
+
+      endpoint: "Endpoint",
+      name: "Name",
+      nameHint:
+        "Display only. The id beside it is what an Action names and what the stored key is filed under — change that in config.toml, and move the key with it.",
+      baseUrl: "Base URL",
+      baseUrlHint:
+        "Any OpenAI-compatible endpoint, at its own vendor's host. Requests go to /v1/chat/completions; a trailing /v1 is tolerated.",
       apiKey: "API key",
+      apiKeyHint:
+        "A stored key is sent as a Bearer header. Nothing stored means no header — which is what a local endpoint wants.",
       save: "Save",
       saved: "Saved.",
       remove: "Remove",
       removed: "Removed.",
       stored: "Stored — ends in",
       noKeyYet: "No key stored yet.",
+      unauthenticated: "No key — requests go unauthenticated.",
       readError: (store: string, message: string) =>
         `The ${store} could not be read: ${message}. Save the key again to recreate the credential.`,
-      endpoint: "Endpoint",
-      baseUrl: "Base URL",
-      baseUrlHint: "Any OpenAI-compatible endpoint. Requests go to /v1/chat/completions.",
       reachability: "Reachability",
-      reachabilityHint: "Sends one small request with the stored key.",
+      reachabilityHint: "Sends one small request to this endpoint, with its own key.",
       test: "Test connection",
       testing: "Testing…",
-      testOk: "The key and base URL work.",
+      testOk: "Reached it — the endpoint answered.",
+
+      rowDefaults: "Defaults for this endpoint",
+      rowDefaultsNote: "an Action may override either",
+      refresh: "Refresh models",
+      loading: "Loading models…",
+      live: "Listed by this endpoint.",
+      catalogNotice: (cause: string) => `${cause} — showing what your configuration names.`,
+      catalogFallback: "The model list could not be fetched",
+
+      /** The wire field, on a row the user typed themselves. A preset carries
+       *  the right value already, and showing it there invites breaking it. */
+      reasoning: "Thinking control",
+      reasoningName: {
+        deepseek: "DeepSeek",
+        qwen: "Qwen",
+        none: "None",
+      },
+      reasoningHint: {
+        deepseek:
+          'Sends thinking:{type:"enabled"|"disabled"}. DeepSeek V4 reasons unless told not to.',
+        qwen: "Sends chat_template_kwargs.enable_thinking. Qwen3 behind vLLM, SGLang or DashScope.",
+        none: "Nothing sent either way — the endpoint's own default stands. Right for every endpoint with no such switch, which is most of them.",
+      },
+      thinkingHint: (label: string) =>
+        `Off is sent to ${label} explicitly, because its models reason unless told not to.`,
+      thinkingHintNone: (label: string) =>
+        `${label} has no switch Beckon knows how to throw, so nothing is sent either way.`,
+      thisEndpoint: "This endpoint",
     },
 
     triggering: {
@@ -212,24 +274,6 @@ export const EN = {
         "Applies to every window at once, and to the tray. Beckon starts in English unless you say otherwise; your Actions are your own words and are never translated.",
     },
 
-    defaults: {
-      title: "Model defaults",
-      /** `{table}` is `[model]`, set in mono by the caller. */
-      lede: "What every Action inherits unless its own {table} table says otherwise.",
-      catalogNotice: (cause: string) => `${cause} — showing the documented models.`,
-      catalogFallback: "The model list could not be fetched",
-      model: "Model",
-      thinking: "Think before answering",
-      thinkingHint:
-        "DeepSeek thinks by default. Leaving it on adds seconds of latency to translation-shaped Actions, which is why this is off unless you ask for it.",
-      catalog: "Catalog",
-      modelList: "Model list",
-      modelListHint:
-        "Refreshing asks the endpoint for its own list; the documented catalog is the fallback.",
-      refresh: "Refresh models",
-      loading: "Loading models…",
-      live: "Listed by the endpoint at your base URL.",
-    },
 
     actions: {
       title: "Actions",
@@ -263,7 +307,18 @@ export const EN = {
       directHotkeyHint: "Optional. Without one, the Action is Launcher-only.",
 
       overrides: "Model overrides",
-      overridesNote: "Unmarked rows follow Model defaults",
+      overridesNote: (label: string) => `Unmarked rows follow ${label}`,
+      /** The row ADR-0021 added, and the reason there is no global switch. */
+      provider: "Endpoint",
+      providerHint:
+        "Where this Action posts. Leave it unmarked and it follows the default; set it and this Action stops following.",
+      providerLocal: (label: string) => `${label} — local`,
+      /** A model pinned before the endpoint changed. Kept, never rewritten. */
+      strandedModel: (model: string, label: string, fallback: string) =>
+        `${model} is not in ${label}’s list. It is kept, not rewritten — revert to use ${fallback}.`,
+      needsKey: (label: string) =>
+        `No key is stored for ${label}, so this Action would fail before its request leaves. Every other Action is unaffected.`,
+      sends: "What this Action sends",
       thinkingHint:
         "Adds seconds before the first word. Worth it where the Action needs the model to reason, not where it reformats.",
 
@@ -302,12 +357,21 @@ export const EN = {
       needsModifier: (advice: string) => `Add ${advice} — a bare key would fire everywhere.`,
     },
     model: {
+      /** The two control names, here rather than under a pane: both the endpoint
+       *  screen and an Action's overrides draw the same row (ADR-0021). */
+      label: "Model",
+      thinking: "Think before answering",
       configuredGroup: "Named by your configuration",
       unknownLive: "not in the endpoint's model list",
       unknownCatalog: "not one of the models Beckon knows",
       unknown: (model: string, why: string) => `${model} is ${why}. Kept because your configuration names it.`,
       alwaysThinks: (model: string) => `${model} always thinks; it cannot be turned off.`,
-      neverThinks: (model: string) => `${model} cannot think; the request would be refused.`,
+      neverThinks: (model: string) =>
+        `${model} has no thinking mode; nothing is sent about it either way.`,
+      /** Not a failure and not the model's fault: the *endpoint* has no field
+       *  for it, so its own default stands (ADR-0021). */
+      noThinkingSwitch: (label: string) =>
+        `${label} has no thinking switch Beckon can throw; its own default stands.`,
     },
     field: {
       /** The revert control on an overridden row, which names what it reverts to. */

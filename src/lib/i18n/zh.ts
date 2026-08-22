@@ -107,7 +107,6 @@ export const ZH: Strings = {
       actions: "Action",
       triggering: "触发",
       appearance: "外观",
-      defaults: "模型默认值",
       attention: "此分区有需要处理的问题",
       openFolder: "打开文件夹",
     },
@@ -121,29 +120,79 @@ export const ZH: Strings = {
 
     connection: {
       title: "连接",
-      lede: (store: string) =>
-        `请求发往哪里，以及带上哪个凭据。密钥保存在${store}中，绝不写入文件。`,
+      lede: (fallback: string, store: string) =>
+        `你保留的端点。每个 Action 发往其中之一；未指定的 Action 发往${fallback}。密钥保存在${store}中，每个端点一个，绝不写入文件。`,
       welcomeLead: "欢迎。",
-      welcomeBody: " Beckon 需要一个 DeepSeek API 密钥才能开始工作。",
-      getKey: "前往 platform.deepseek.com 获取密钥",
-      credential: "凭据",
+      welcomeBody:
+        " DeepSeek 已配置好，只差一个密钥。也可以改用任何兼容 OpenAI 的端点（直连各家自己的主机）—— 本机端点则完全不需要密钥。",
+      setUp: (label: string) => `配置${label}`,
+      getKeyFrom: (host: string) => `前往 ${host} 获取密钥`,
+      addPreset: "从预设添加…",
+      addBlank: "空白",
+      defaultTag: "默认",
+      defaultForNew: "未指定的 Action 使用它",
+      makeDefault: "设为默认",
+      usedByNone: "没有 Action 使用",
+      usedByOne: (name: string) => `1 个 Action —— ${name}`,
+      usedByMany: (count: number) => `${count} 个 Action`,
+      staysLocal: "不出本机",
+      missingKey: "无密钥",
+      edit: (label: string) => `编辑 ${label}`,
+      removeLabel: (label: string) => `移除 ${label}`,
+      removeHint: "删除此行及其已保存的密钥。",
+      removeBlocked: (names: string) => `${names} 将失去端点。请先把它们指向别处。`,
+      removeLast: "最后一个端点不能移除。",
+      back: "连接",
+      unnamed: "（未命名）",
+
+      endpoint: "端点",
+      name: "名称",
+      nameHint:
+        "仅用于显示。旁边的 id 才是 Action 指向它的名字、以及密钥保存的账户 —— 要改请编辑 config.toml，并把密钥一并迁走。",
+      baseUrl: "Base URL",
+      baseUrlHint:
+        "任何兼容 OpenAI 的端点，直连各家自己的主机。请求发往 /v1/chat/completions；结尾的 /v1 可以保留。",
       apiKey: "API 密钥",
+      apiKeyHint:
+        "已保存的密钥会作为 Bearer 头发送。未保存则不发送该头 —— 这正是本机端点需要的。",
       save: "保存",
       saved: "已保存。",
       remove: "移除",
       removed: "已移除。",
       stored: "已保存 —— 结尾为",
       noKeyYet: "尚未保存密钥。",
+      unauthenticated: "无密钥 —— 请求将不带认证发出。",
       readError: (store: string, message: string) =>
         `无法读取${store}：${message}。请重新保存密钥以重建凭据。`,
-      endpoint: "端点",
-      baseUrl: "Base URL",
-      baseUrlHint: "任何兼容 OpenAI 的端点。请求发往 /v1/chat/completions。",
       reachability: "连通性",
-      reachabilityHint: "用已保存的密钥发送一个很小的请求。",
+      reachabilityHint: "用该端点自己的密钥，向它发送一个很小的请求。",
       test: "测试连接",
       testing: "测试中…",
-      testOk: "密钥与 Base URL 均可用。",
+      testOk: "已连通 —— 端点有响应。",
+
+      rowDefaults: "此端点的默认值",
+      rowDefaultsNote: "Action 可覆盖其中任一项",
+      refresh: "刷新模型",
+      loading: "正在加载模型…",
+      live: "由该端点列出。",
+      catalogNotice: (cause: string) => `${cause} —— 现在显示的是你的配置所指定的模型。`,
+      catalogFallback: "无法获取模型列表",
+
+      reasoning: "思考开关形式",
+      reasoningName: {
+        deepseek: "DeepSeek",
+        qwen: "Qwen",
+        none: "无",
+      },
+      reasoningHint: {
+        deepseek: '发送 thinking:{type:"enabled"|"disabled"}。DeepSeek V4 不特别说明就会思考。',
+        qwen: "发送 chat_template_kwargs.enable_thinking。适用于 vLLM、SGLang 或 DashScope 上的 Qwen3。",
+        none: "两个方向都不发送 —— 由端点自己的默认行为决定。绝大多数端点没有这类开关，都属于这一项。",
+      },
+      thinkingHint: (label: string) => `关闭会显式发给 ${label}，因为它的模型不特别说明就会思考。`,
+      thinkingHintNone: (label: string) =>
+        `${label} 没有 Beckon 会用的开关，因此两个方向都不发送任何东西。`,
+      thisEndpoint: "此端点",
     },
 
     triggering: {
@@ -179,22 +228,6 @@ export const ZH: Strings = {
         "同时作用于所有窗口以及托盘菜单。除非另行指定，Beckon 以英文启动；你的 Action 是你自己的文字，永远不会被翻译。",
     },
 
-    defaults: {
-      title: "模型默认值",
-      lede: "每个 Action 在自身 {table} 表未另行指定时继承的设置。",
-      catalogNotice: (cause: string) => `${cause} —— 现在显示的是文档记载的模型。`,
-      catalogFallback: "无法获取模型列表",
-      model: "模型",
-      thinking: "回答前先思考",
-      thinkingHint:
-        "DeepSeek 默认会思考。对翻译这类 Action，开着它只会多出几秒延迟 —— 所以除非明确需要，此项保持关闭。",
-      catalog: "模型目录",
-      modelList: "模型列表",
-      modelListHint: "刷新会向端点索取它自己的列表；文档记载的目录是兜底。",
-      refresh: "刷新模型",
-      loading: "正在加载模型…",
-      live: "由你的 Base URL 所指端点列出。",
-    },
 
     actions: {
       title: "Action",
@@ -227,7 +260,15 @@ export const ZH: Strings = {
       directHotkeyHint: "可选。不设置时，此 Action 只能从启动器运行。",
 
       overrides: "模型覆盖",
-      overridesNote: "未标记的项沿用模型默认值",
+      overridesNote: (label: string) => `未标记的项沿用${label}`,
+      provider: "端点",
+      providerHint: "此 Action 发往哪里。不标记就跟随默认端点；一旦设定，此 Action 就不再跟随。",
+      providerLocal: (label: string) => `${label} —— 本机`,
+      strandedModel: (model: string, label: string, fallback: string) =>
+        `${model} 不在${label}的列表中。它被保留而不会被改写 —— 恢复默认将使用 ${fallback}。`,
+      needsKey: (label: string) =>
+        `尚未为${label}保存密钥，此 Action 的请求还没发出就会失败。其他 Action 不受影响。`,
+      sends: "此 Action 会发送什么",
       thinkingHint: "会在第一个字出现前多花几秒。需要模型推理时值得，只是改写格式时不值得。",
 
       thisFile: "此文件",
@@ -261,12 +302,16 @@ export const ZH: Strings = {
       needsModifier: (advice: string) => `请加上 ${advice} —— 无修饰键的热键会在任何地方触发。`,
     },
     model: {
+      label: "模型",
+      thinking: "回答前先思考",
       configuredGroup: "由你的配置指定",
       unknownLive: "不在端点的模型列表中",
       unknownCatalog: "不是 Beckon 已知的模型",
       unknown: (model: string, why: string) => `${model} ${why}。因为你的配置指定了它，所以仍然保留。`,
       alwaysThinks: (model: string) => `${model} 始终思考，无法关闭。`,
-      neverThinks: (model: string) => `${model} 无法思考，这样的请求会被拒绝。`,
+      neverThinks: (model: string) => `${model} 没有思考模式；两个方向都不会发送任何东西。`,
+      noThinkingSwitch: (label: string) =>
+        `${label} 没有 Beckon 能使用的思考开关；由它自己的默认行为决定。`,
     },
     field: {
       useDefault: (reading: string) => `使用默认值（${reading}）`,

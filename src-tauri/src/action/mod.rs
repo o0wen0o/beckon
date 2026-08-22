@@ -9,7 +9,7 @@ pub mod watcher;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::ModelDefaults;
+use crate::config::Config;
 
 /// What `prompt.user` defaults to when the file omits it.
 pub const DEFAULT_USER_TEMPLATE: &str = "{{input}}";
@@ -49,24 +49,60 @@ pub struct PromptSpec {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ModelOverrides {
+    /// Which endpoint this Action posts to — a
+    /// [`Provider::id`](crate::config::Provider::id). Absent means
+    /// `[defaults] provider`, exactly as absent means "inherit" for the two
+    /// below (ADR-0021).
+    ///
+    /// This is what replaced a global switch: two endpoints can be live at once,
+    /// so "where does my text go" is a question each Action answers.
+    pub provider: Option<String>,
     pub model: Option<String>,
     pub thinking: Option<bool>,
 }
 
 /// Effective per-request model parameters: the Action's `[model]` table laid
-/// over `config.defaults`.
+/// over the [`Provider`](crate::config::Provider) row it resolves to.
+///
+/// The provider is carried by *id* rather than as the row itself, because the
+/// row is re-read at request time — a `base_url` edited while an Exchange is
+/// open must reach the next follow-up, and a row deleted under one has to be
+/// reportable (`exchange/turn.rs`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelParams {
+    pub provider: String,
     pub model: String,
     pub thinking: bool,
 }
 
 impl ModelOverrides {
     /// Field-by-field override. This is the one merge function in the codebase.
-    pub fn merge_over(&self, defaults: &ModelDefaults) -> ModelParams {
+    ///
+    /// It takes the whole [`Config`] rather than a defaults struct because the
+    /// two values it falls back to now live on whichever row the *first* field
+    /// resolves to: overriding `provider` changes what `model` and `thinking`
+    /// inherit, and that chain is the design (ADR-0021).
+    ///
+    /// A provider id naming no row leaves the overrides standing on their own.
+    /// Nothing is invented here — `turn.rs` reports the missing row, which is
+    /// where the user can be told about it.
+    pub fn merge_over(&self, config: &Config) -> ModelParams {
+        let provider = self
+            .provider
+            .clone()
+            .unwrap_or_else(|| config.defaults.provider.clone());
+        let row = config.api.find(&provider);
         ModelParams {
-            model: self.model.clone().unwrap_or_else(|| defaults.model.clone()),
-            thinking: self.thinking.unwrap_or(defaults.thinking),
+            provider,
+            model: self
+                .model
+                .clone()
+                .or_else(|| row.map(|one| one.model.clone()))
+                .unwrap_or_default(),
+            thinking: self
+                .thinking
+                .or_else(|| row.map(|one| one.thinking))
+                .unwrap_or(false),
         }
     }
 }
@@ -131,8 +167,8 @@ impl Action {
         toml::to_string_pretty(&self.file).map_err(|e| e.to_string())
     }
 
-    pub fn model_params(&self, defaults: &ModelDefaults) -> ModelParams {
-        self.file.model.merge_over(defaults)
+    pub fn model_params(&self, config: &Config) -> ModelParams {
+        self.file.model.merge_over(config)
     }
 
     /// The user message for a turn: `prompt.user` with `{{input}}` substituted,
@@ -225,6 +261,20 @@ thinking = true
         assert!(Action::parse("x.toml", text).is_ok());
     }
 
+    /// The key ADR-0021 added, and the absence that means "inherit".
+    #[test]
+    fn a_provider_override_round_trips() {
+        let text = "name = \"X\"\n[prompt]\nsystem = \"s\"\n[model]\nprovider = \"ollama\"\n";
+        let action = Action::parse("x.toml", text).unwrap();
+        assert_eq!(action.file.model.provider.as_deref(), Some("ollama"));
+        assert!(action.to_toml().unwrap().contains("provider = \"ollama\""));
+
+        let bare = Action::parse("x.toml", "name = \"X\"\n[prompt]\nsystem = \"s\"\n").unwrap();
+        assert_eq!(bare.file.model.provider, None);
+        // Absent is how inheriting is spelled, so nothing is written for it.
+        assert!(!bare.to_toml().unwrap().contains("provider"));
+    }
+
     #[test]
     fn input_source_defaults_to_auto() {
         let action = Action::parse("x.toml", "name = \"X\"\n[prompt]\nsystem = \"s\"\n").unwrap();
@@ -273,24 +323,82 @@ thinking = true
         assert_eq!(action.render_user("Z"), "a Z b Z");
     }
 
+    /// Two rows and a default, so "inherit" has somewhere to come from and
+    /// overriding the provider has somewhere to go.
+    fn config() -> Config {
+        let mut config = Config::default();
+        config.api.providers.push(crate::config::Provider {
+            id: "ollama".into(),
+            label: "Ollama".into(),
+            base_url: "http://localhost:11434/v1".into(),
+            model: "qwen3:8b".into(),
+            thinking: true,
+            ..Default::default()
+        });
+        config
+    }
+
     #[test]
-    fn action_model_overrides_win_over_defaults() {
-        let defaults = ModelDefaults {
-            model: "deepseek-v4-flash".into(),
-            thinking: false,
-        };
-        let overrides = ModelOverrides {
+    fn action_model_overrides_win_over_the_provider_row() {
+        let merged = ModelOverrides {
+            provider: None,
             model: None,
             thinking: Some(true),
-        };
-        let merged = overrides.merge_over(&defaults);
-        assert_eq!(merged.model, "deepseek-v4-flash");
+        }
+        .merge_over(&config());
+        assert_eq!(merged.provider, "deepseek");
+        assert_eq!(merged.model, crate::config::DEFAULT_MODEL);
         assert!(merged.thinking);
 
-        // Empty overrides are exactly the defaults.
-        let untouched = ModelOverrides::default().merge_over(&defaults);
-        assert_eq!(untouched.model, defaults.model);
-        assert_eq!(untouched.thinking, defaults.thinking);
+        // Empty overrides are exactly the default row.
+        let untouched = ModelOverrides::default().merge_over(&config());
+        assert_eq!(untouched.provider, "deepseek");
+        assert_eq!(untouched.model, crate::config::DEFAULT_MODEL);
+        assert!(!untouched.thinking);
+    }
+
+    /// The chain that is the whole design: overriding `provider` moves what the
+    /// two rows below it inherit (ADR-0021).
+    #[test]
+    fn overriding_the_provider_moves_what_model_and_thinking_inherit() {
+        let merged = ModelOverrides {
+            provider: Some("ollama".into()),
+            model: None,
+            thinking: None,
+        }
+        .merge_over(&config());
+        assert_eq!(merged.provider, "ollama");
+        assert_eq!(merged.model, "qwen3:8b");
+        assert!(merged.thinking);
+    }
+
+    /// A model pinned before the provider changed is *kept*, never rewritten to
+    /// something the new endpoint serves — the rule everywhere in this codebase.
+    /// It goes on the wire and the endpoint's own error is the authority.
+    #[test]
+    fn a_pinned_model_survives_a_provider_override() {
+        let merged = ModelOverrides {
+            provider: Some("ollama".into()),
+            model: Some("deepseek-v4-pro".into()),
+            thinking: None,
+        }
+        .merge_over(&config());
+        assert_eq!(merged.provider, "ollama");
+        assert_eq!(merged.model, "deepseek-v4-pro");
+    }
+
+    /// A provider id naming no row invents nothing: the id travels as written so
+    /// `turn.rs` can name it, and the overrides stand alone.
+    #[test]
+    fn an_unknown_provider_is_carried_rather_than_redirected() {
+        let merged = ModelOverrides {
+            provider: Some("deleted".into()),
+            model: None,
+            thinking: None,
+        }
+        .merge_over(&config());
+        assert_eq!(merged.provider, "deleted");
+        assert_eq!(merged.model, "");
     }
 
     #[test]

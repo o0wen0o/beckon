@@ -184,6 +184,36 @@ pub fn test_needs_key(language: Language) -> &'static str {
     }
 }
 
+// --- the provider row (ADR-0021) ------------------------------------------
+
+/// An Action, or `[defaults]`, naming a row that is not in the table. A
+/// hand-edit, or a row removed while a Popover was open. Named rather than
+/// redirected: sending to a different endpoint than the file says would be worse
+/// than refusing.
+pub fn provider_missing(language: Language, id: &str) -> String {
+    match language {
+        Language::En => format!(
+            "No endpoint named \"{id}\" is configured. Open Settings → Connection and add \
+             it, or point this Action at one that is there."
+        ),
+        Language::Zh => format!(
+            "配置中没有名为“{id}”的端点。请在“设置 → 连接”中添加，或让此 Action 指向已有的端点。"
+        ),
+    }
+}
+
+/// The turn's own version of "no credential", naming which endpoint wants one.
+/// With a provider per Action, one Action can be broken while every other one
+/// works, so the sentence has to say *whose* key is missing (ADR-0021).
+pub fn turn_needs_key(language: Language, label: &str) -> String {
+    match language {
+        Language::En => {
+            format!("No API key is stored for {label}. Open Settings to add one.")
+        }
+        Language::Zh => format!("尚未为 {label} 保存 API 密钥。请打开设置添加。"),
+    }
+}
+
 // --- the Capture ----------------------------------------------------------
 
 /// A screenshot over Beckon's ceiling (ADR-0016). Beckon's own prose with
@@ -245,6 +275,8 @@ mod tests {
             models_need_key(Language::En).to_string(),
             models_empty(Language::En).to_string(),
             test_needs_key(Language::En).to_string(),
+            provider_missing(Language::En, "p"),
+            turn_needs_key(Language::En, "p"),
             capture_too_large(Language::En, 1, 2),
             capture_too_many(Language::En, 4),
         ];
@@ -268,6 +300,8 @@ mod tests {
             models_need_key(Language::Zh).to_string(),
             models_empty(Language::Zh).to_string(),
             test_needs_key(Language::Zh).to_string(),
+            provider_missing(Language::Zh, "p"),
+            turn_needs_key(Language::Zh, "p"),
             capture_too_large(Language::Zh, 1, 2),
             capture_too_many(Language::Zh, 4),
         ];

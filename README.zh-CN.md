@@ -18,10 +18,10 @@
 - 通过模拟平台自身的复制快捷键抓取选中内容 —— Windows 上是 Ctrl+C，macOS 上是 Cmd+C —— 之后恢复剪贴板原有内容
 - 光标附近的浮窗：获取焦点、流式输出、支持追问、按 Esc 关闭
 - 浮窗里的截图按钮：调用系统自带的截图工具，把结果作为截图附上，与一起输入的文字作为同一轮发送（[ADR-0016](./docs/adr/0016-captures-from-the-os-snip-tool-via-the-clipboard.md)）。图片会发给该动作指定的模型；该模型能否读取图片，由服务端自己回答
-- 完整的设置窗口：API 密钥、全局热键、主题、语言、全局模型默认值，以及 Action 本身 —— 一个 Action 分区列出全部 Action，每一个都可打开自己的编辑界面
+- 完整的设置窗口：你保留的端点（各自一个密钥）、全局热键、主题、语言，以及 Action 本身 —— 一个 Action 分区列出全部 Action，每一个都可打开自己的编辑界面
 - 英文与简体中文，在设置中切换（[ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)）
 - Action 以 TOML 文件存储，文件监视器会在外部改动后自动重新加载
-- 兼容 OpenAI 的 API，`base_url` 可配置
+- **任何兼容 OpenAI 的端点**，以表格形式保存，并**按 Action 选择** —— 默认 DeepSeek；每个预设都直连各家自己的主机，绝不经过聚合中转（[ADR-0021](./docs/adr/0021-any-openai-compatible-endpoint-chosen-per-action.md)）
 
 **明确不做**
 
@@ -58,8 +58,9 @@
 
 - 在设置窗口录制热键时，**立即尝试注册**；若已被占用，当场标红，并拒绝保存一个注册不了的热键。
 - 启动时的热键注册失败绝不静默：托盘图标切换到错误状态，外加一次性的气泡通知，点击即可打开设置。
-- 模型是**从列表中选择，而不是手动输入**。已保存密钥且请求成功时，列表就是端点自己的 `/v1/models` 响应，否则是官方文档记载的 DeepSeek 模型 —— 没有凭据、密钥被拒或网络不通都会让列表降级并说明原因，但绝不会让它变空。`config.toml` 或某个 Action 里已经写明的模型始终可选，即使没有任何来源为它背书 —— 标记出来，而不是改写掉。
-- 首次运行时（凭据存储里读不到密钥），直接打开设置窗口，其中带有“测试连接”按钮 —— 它会发送一个最小请求，当场验证密钥和 `base_url`。
+- 模型是**从列表中选择，而不是手动输入**，并且**每个端点一份列表**。请求成功时，列表就是该端点自己的 `/v1/models` 响应；否则就是你的配置已经写明的模型 —— 外加官方文档记载的 DeepSeek 模型，且仅限 DeepSeek 自己的主机。没有凭据、密钥被拒或网络不通都会让列表降级并说明原因，但绝不会让它变空。`config.toml` 或某个 Action 里已经写明的模型始终可选，即使没有任何来源为它背书 —— 标记出来，而不是改写掉；某个 Action 在换端点之前钉住的模型也一样。
+- 一个 Action 要么指定端点，要么继承 `[defaults] provider`。因此可以有两个端点同时在用：翻译走快而便宜的云端模型、总结走不出本机的模型，二者只隔一个热键，而不是隔一趟设置。
+- 首次运行时（默认端点读不到密钥），直接打开设置窗口。每个端点都有自己的“测试连接” —— 它用该端点自己的密钥发送一个最小请求。**本机**端点完全不需要密钥，缺少密钥也不会被当作故障报出。
 - 首次运行时，若 `actions/` 不存在，写入两个示例 Action（一个 `auto`、一个 `prompt`），覆盖两种输入来源。一旦删除，不会再生成。
 - 主题是 `light`、`dark` 或 `system`，同时作用于三个界面。**默认是 `light`**，即使机器的系统外观是深色也一样：系统偏好只有在 `theme = "system"` 时才会被读取，而这需要主动选择。
 - 语言是 `en` 或 `zh`，同时作用于三个界面**以及**托盘菜单。**默认是 `en`**，在中文机器上也是如此，而且没有 `system` 这一档：系统区域设置是对**读者**的猜测，而不是一项设置，猜错了就会替换掉产品里的每一个词 —— 包括那些说明如何改回来的词（[ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)）。你的 Action 在任何方向上都不会被翻译：那是你自己的文字，在你自己的文件里。
@@ -69,13 +70,13 @@
 ```
 %APPDATA%\Beckon\                        # Windows
 ~/Library/Application Support/Beckon/    # macOS
-├── config.toml        # 全局热键、开机自启、主题、语言、base_url、全局模型默认值
+├── config.toml        # 全局热键、开机自启、主题、语言、端点表、Popover 尺寸
 └── actions/
     ├── translate.toml
     └── ask.toml
 ```
 
-API 密钥**不在这里** —— 它保存在操作系统的凭据存储中（Windows 凭据管理器，或 macOS 的登录钥匙串），服务名为 `Beckon`（[ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md)）。磁盘上任何地方都没有明文密钥文件。
+API 密钥**不在这里** —— 它们保存在操作系统的凭据存储中（Windows 凭据管理器，或 macOS 的登录钥匙串），服务名为 `Beckon`，每个端点一个账户（`provider:{id}`）（[ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md)、[ADR-0021](./docs/adr/0021-any-openai-compatible-endpoint-chosen-per-action.md)）。磁盘上任何地方都没有明文密钥文件。
 
 配置目录可以在两个平台之间原样复制：`Ctrl`、`Alt`、`Shift` 和 `Cmd`／`Super` 在两边都能解析。不同的只是*默认值*，而且只在原装机器会拒绝注册的地方才不同。
 
@@ -89,13 +90,34 @@ autostart = true
 theme = "light"                 # light | dark | system
 language = "en"                 # en | zh
 
-[api]
-base_url = "https://api.deepseek.com"
-
 [defaults]
+provider = "deepseek"           # 未指定 provider 的 Action 使用它
+
+# 每个端点一张表。写在最后：数组表会吞掉它之后的一切表头。
+# `id` 既是 Action 指向它的名字，也是凭据账户名。
+[[api.providers]]
+id = "deepseek"
+label = "DeepSeek"              # 仅用于显示
+base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
 thinking = false
+reasoning = "deepseek"          # deepseek | qwen | none —— 如何告诉此端点*不要*
+                                # 思考。这是端点的属性而非模型的属性，由预设填好。
+temperature = 1.3               # 可选；省略即交给端点自己决定
+key_page = "https://platform.deepseek.com/api_keys"
+
+[[api.providers]]
+id = "ollama"
+label = "Ollama（本机）"
+base_url = "http://localhost:11434/v1"
+model = "qwen3:8b"
+thinking = false
+reasoning = "qwen"
+# 没有 key_page，也不需要密钥：本机端点不会收到 Authorization 头。
 ```
+
+旧格式的文件 —— `[api] base_url` 加上 `[defaults]` 里的 `model` 与 `thinking` —— 仍然可用：加载时会折叠成一行，
+下一次写入文件时旧键就会消失。
 
 ### actions/translate.toml
 
@@ -112,8 +134,12 @@ Output only the translation — no explanation, no quotes, no prefix or suffix o
 """
 # user 可以省略，默认为 "{{input}}"
 
-# [model] 整块都可以省略；`model` 与 `thinking` 会回落到 config.toml 里的默认值。
-# 不存在按 Action 设置的温度（ADR-0019）。
+# [model] 整块都可以省略。每个键缺省即表示“继承”：
+#   provider  [defaults] provider 所指的那一行
+#   model     该行的 model
+#   thinking  该行的 thinking
+# 因此覆盖 `provider` 会同时改变另外两项继承的来源。
+# 不存在按 Action 设置的温度（ADR-0019、ADR-0021）。
 ```
 
 ### actions/ask.toml
@@ -126,6 +152,7 @@ input_source = "prompt"
 system = "Answer concisely. Unless asked, do not enumerate bullet points and do not preamble at length."
 
 [model]
+provider = "ollama"             # 可选；省略即使用 [defaults] provider
 thinking = true
 ```
 

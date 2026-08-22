@@ -15,7 +15,6 @@ import { actionStore } from "./actions";
 import { Actions } from "./sections/actions/Actions";
 import { Appearance } from "./sections/Appearance";
 import { Connection } from "./sections/Connection";
-import { ModelDefaults } from "./sections/ModelDefaults";
 import { Triggering } from "./sections/Triggering";
 import { settings, type SectionRoute } from "./store";
 
@@ -27,7 +26,6 @@ const PANES: Record<SectionRoute, React.ComponentType> = {
   actions: Actions,
   triggering: Triggering,
   appearance: Appearance,
-  defaults: ModelDefaults,
 };
 
 export function Settings() {
@@ -111,6 +109,9 @@ export function Settings() {
   const editing = actions.editing;
   const paneKey = [
     store.route,
+    // Connection's second layer (ADR-0021), the same way Actions' two are here:
+    // opening an endpoint is a view change the route does not see.
+    store.editingProvider ?? "",
     editing?.file ?? "",
     editing?.kind === "action" ? editing.screen : "",
   ].join(":");

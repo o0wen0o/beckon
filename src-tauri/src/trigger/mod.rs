@@ -103,16 +103,23 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     let state = app.state::<AppState>();
     state.exchanges.discard_all();
 
-    let (action, defaults) = {
+    let action = {
         let registry = state.registry.read().expect("registry lock");
         let Some(action) = registry.get(action_id).cloned() else {
             log::warn!("hotkey fired for unknown Action \"{action_id}\"");
             return;
         };
-        (action, state.config_snapshot().defaults)
+        action
     };
 
-    let params = action.model_params(&defaults);
+    // Merged under the read guard rather than against a snapshot: this is the
+    // hotkey path, and a whole `Config` — the provider table included — is a deep
+    // clone taken to read one row. Taken after the registry guard is dropped, so
+    // the two are never nested (`get_models` holds them the other way round).
+    let params = {
+        let config = state.config.read().expect("config lock");
+        action.model_params(&config)
+    };
     let selection = selection.filter(|text| !text.trim().is_empty());
 
     let (phase, input) = match action.file.input_source {
@@ -185,16 +192,20 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
         .map(|view| view.action_id.clone())
         .ok_or_else(|| "there is no Action to send".to_string())?;
 
-    let (action, defaults) = {
+    let action = {
         let registry = state.registry.read().expect("registry lock");
-        let action = registry
+        registry
             .get(&action_id)
             .cloned()
-            .ok_or_else(|| format!("the Action \"{action_id}\" no longer exists"))?;
-        (action, state.config_snapshot().defaults)
+            .ok_or_else(|| format!("the Action \"{action_id}\" no longer exists"))?
     };
 
-    let params = action.model_params(&defaults);
+    // Under the read guard, for the same reason `open_action` does it: a submit
+    // reads one row, not a copy of the whole file.
+    let params = {
+        let config = state.config.read().expect("config lock");
+        action.model_params(&config)
+    };
     let exchange_id = state
         .exchanges
         .create(&action.file.prompt.system, params.clone());

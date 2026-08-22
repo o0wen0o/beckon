@@ -7,12 +7,12 @@ import {
   ListIcon,
   PaletteIcon,
   PlugIcon,
-  SlidersIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
 import { useT } from "@/lib/i18n";
 import { revealConfigDir } from "@/lib/ipc";
+import { keyProblem } from "@/lib/providers";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "./actions";
 import { settings, type SectionRoute } from "./store";
@@ -23,8 +23,24 @@ const SECTIONS: { id: SectionRoute; icon: typeof PlugIcon }[] = [
   { id: "actions", icon: ListIcon },
   { id: "triggering", icon: KeyboardIcon },
   { id: "appearance", icon: PaletteIcon },
-  { id: "defaults", icon: SlidersIcon },
 ];
+
+/**
+ * Go to a section, at its **first layer**.
+ *
+ * Two sections have anything under them — Connection opens one endpoint's own
+ * screen, Actions opens one file and then a screen inside that (ADR-0012) — and
+ * a nav click resets both, whichever one it lands on. So the nav row is always
+ * the way back out, and coming back to a section never resumes a screen the user
+ * left minutes ago in another part of the window.
+ *
+ * All three calls flush, so nothing pending is stranded on the way.
+ */
+function enter(section: SectionRoute) {
+  settings.go(section);
+  settings.editProvider(null);
+  actionStore.close();
+}
 
 export function SettingsNav() {
   const t = useT();
@@ -34,11 +50,28 @@ export function SettingsNav() {
   /** A section is flagged when something inside it needs attention, so a
    *  problem in a pane you are not looking at is still discoverable. A degraded
    *  model list is the warning colour, not red: the dropdown still works. */
+  const tests = Object.values(store.test);
+  const catalogs = Object.values(store.models);
+  // Every row's credential verdict, through the one reader that knows a local
+  // endpoint wants no key: any row can be the one an Action posts to (ADR-0021),
+  // so any row's problem belongs on this dot.
+  const problems = (store.config?.api.providers ?? []).map((provider) =>
+    keyProblem(provider, store.keyStatuses[provider.id]),
+  );
   const flags: Record<SectionRoute, "bad" | "warn" | null> = {
+    // A degraded model list is the warning tone, not red: the dropdown still
+    // works, which is why it shares this dot rather than its own section — Model
+    // defaults was the pane that used to carry it.
     connection:
-      store.keyStatus?.kind === "read-error" || store.test.state === "failed"
+      problems.includes("unreadable") || tests.some((test) => test.state === "failed")
         ? "bad"
-        : store.keyStatus?.kind === "no-credential"
+        : problems.includes("missing") ||
+            // Degraded because a fetch *failed*, not because none was attempted:
+            // a reveal primes every row's list offline and asks only the row
+            // about to be read for its live one, so `!live` on its own is a dot
+            // that is always lit — and a warning that is always lit is the line
+            // nobody learns to read.
+            catalogs.some((catalog) => !catalog.live && catalog.fallback !== null)
           ? "warn"
           : null,
     // A file that does not parse, or a Direct Hotkey that lost its conflict:
@@ -50,7 +83,6 @@ export function SettingsNav() {
     triggering:
       store.startupErrors.length > 0 || store.inputPermission === "denied" ? "bad" : null,
     appearance: null,
-    defaults: store.models !== null && !store.models.live ? "warn" : null,
   };
 
   return (
@@ -69,17 +101,12 @@ export function SettingsNav() {
         {SECTIONS.map((section) => {
           const Icon = section.icon;
           const active = store.route === section.id;
-          // Actions is the one section with anything under it: a file open in
-          // the editor, and a screen inside that (ADR-0012). Its nav row is the
-          // way back out, so clicking the current row closes the editor instead
-          // of doing nothing. `close` flushes, so a pending edit is written.
-          const closesEditor = active && section.id === "actions" && actions.editing !== null;
           return (
             <li key={section.id}>
               <button
                 type="button"
                 aria-current={active ? "page" : undefined}
-                onClick={() => (closesEditor ? actionStore.close() : store.go(section.id))}
+                onClick={() => enter(section.id)}
                 className={[
                   "flex w-full items-center justify-start gap-2.25 rounded-md px-2.25 py-1.5 text-left",
                   "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",

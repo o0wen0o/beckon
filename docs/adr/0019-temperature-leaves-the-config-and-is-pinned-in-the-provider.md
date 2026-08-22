@@ -44,6 +44,14 @@ the only home for provider quirks. 1.3 *is* a DeepSeek quirk — it is their rec
 general truth about language models — and `ModelParams` is the shape a request is built from, not a
 place to keep a number the request layer already knows.
 
+> **Where 1.3 lives now.**
+> [ADR-0021](./0021-any-openai-compatible-endpoint-chosen-per-action.md) moved it onto the DeepSeek row of the provider table, as an optional per-row value,
+> and `llm/deepseek.rs` became `llm/request.rs`. The argument above is what put it there: 1.3 is a
+> fact about DeepSeek, and once there is more than one endpoint in the file, "a DeepSeek quirk" has a
+> row of its own to sit on rather than a global constant. The decision this ADR actually made — that a
+> *temperature control* is not something this product offers — is unchanged: there is still no
+> per-Action temperature and no control for it anywhere in Settings.
+
 ## Files that still name it
 
 An Action file with `temperature = 0.2` under `[model]` keeps loading: `ActionFile` tolerates unknown

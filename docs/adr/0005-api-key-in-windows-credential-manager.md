@@ -28,3 +28,10 @@ A reminder: the rationale behind an early decision can be quietly hollowed out b
 - The key cannot be eyeballed in a text editor. The settings window must be able to echo it back (showing only the last four characters is suggested), or the user has no way to tell which key is stored.
 - **The condition for "first run" is "no key readable from the Credential Manager"**, not the presence or absence of some file.
 - A read failure (the credential was manually deleted by the user from Control Panel) must be distinguished from "the key is invalid": the former should guide the user through reconfiguration, the latter should report a bad key.
+
+> **One credential became one per endpoint.** [ADR-0021](./0021-any-openai-compatible-endpoint-chosen-per-action.md) keeps every distinction above and adds a
+> reading none of them had to consider: the account is now `provider:{id}`, and **nothing stored for a
+> *local* endpoint is a working setup rather than a fault** — a local server wants no `Authorization`
+> header at all. So "no credential" is still its own kind, distinct from an unreadable store and from a
+> rejected key, but it is only raised where the host is remote. "First run" is still "no key readable"
+> and never a file check; it is asked of the default row.
