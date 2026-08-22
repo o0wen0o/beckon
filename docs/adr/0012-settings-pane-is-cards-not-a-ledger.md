@@ -74,7 +74,9 @@ the other direction. The controls that have no intrinsic width still take `--con
 Two consequences follow from right-aligning:
 
 - `Temperature` takes a width rather than a ceiling (`w-control max-w-full`). Shrink-to-fit, its
-  `flex-1` track collapsed to the number input beside it.
+  `flex-1` track collapsed to the number input beside it. (The component is deleted under
+  [ADR-0019](0019-temperature-leaves-the-config-and-is-pinned-in-the-provider.md); the rule is kept
+  here because it is the general one for any control with an elastic track.)
 - `ModelSelect` keeps `w-fit min-w-48 max-w-control` from ADR-0011, and the edge its column now
   keeps is the trigger's right one rather than its left.
 

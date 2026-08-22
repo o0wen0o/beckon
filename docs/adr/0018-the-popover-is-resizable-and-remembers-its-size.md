@@ -20,7 +20,7 @@ box, and a full-screen snip fitted into it is a third of its real size. Reading 
 opening the file somewhere else, which is the workflow the Capture existed to avoid. Nothing about a
 fixed window makes that better; only a bigger one does.
 
-The second case is prose. A `selection` Action pointed at a long paragraph produces an answer taller
+The second case is prose. An Action pointed at a long paragraph produces an answer taller
 than the window twice over, and a user who wants to read it beside the source has a scroll wheel and
 nothing else.
 
@@ -42,9 +42,13 @@ only honest label is "the size you last left the Popover".
 
 ## Telling our own resize from the user's
 
-Every resize reports itself, including the `set_size` at the start of each trigger — and including
-the deliberately short `empty-selection` window, which is 220px tall on purpose. Persisting reports
-indiscriminately would mean one hint-sized Popover shrinking every later one.
+Every resize reports itself, including the `set_size` at the start of each trigger. Persisting
+reports indiscriminately would write our own summon back as if the user had dragged to it, so a
+clamp or a rounding difference would walk the remembered size a pixel at a time. (When this was
+written there was a louder version of the same bug: the `empty-selection` window was 220px on
+purpose, and one of those would have shrunk every later Popover. That phase is gone under
+[ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md); the mechanism below is unchanged
+and still necessary.)
 
 So `AppState::popover_asked_size` records the size the window was last *told* to be, and
 `remember_popover_size` drops any report that matches it (to the pixel: the round trip through

@@ -11,7 +11,7 @@ A preset prompt together with how it is triggered. This is the basic unit users 
 _Avoid_: Skill, Command, Preset, feature
 
 **Input Source**:
-A property of an Action declaring where its input comes from — `selection` (selection only), `prompt` (typed input only), `auto` (use the selection if there is one, otherwise ask for typed input).
+A property of an Action declaring where its input comes from — `auto` (use the Selection if there is one, otherwise ask for typed input) or `prompt` (typed input only; the Selection is ignored). Two values, not three: `selection` was retired by ADR-0020 and still loads as `auto`.
 _Avoid_: input mode, mode
 
 **Selection**:
@@ -55,7 +55,7 @@ the same failure as a synonym in English.
 | Term | 中文 | Note |
 | --- | --- | --- |
 | Action | Action | Untranslated on purpose: it is also the file in `actions/`, and the filename is the identity |
-| Input Source | 输入来源 | Its three values are 选中内容 / 手动输入 / 自动 — the *values* stay `selection` / `prompt` / `auto` on disk |
+| Input Source | 输入来源 | Its two values are 自动 / 手动输入 — the *values* stay `auto` / `prompt` on disk |
 | Selection | 选中内容 | _Avoid_: 选区, 选中文本 |
 | Capture | 截图 | _Avoid_: 屏幕截图, 抓图, 图片 |
 | Launcher | 启动器 | |

@@ -6,7 +6,6 @@ import { FieldGroup } from "@/components/FieldGroup";
 import { ModelSelect } from "@/components/ModelSelect";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
-import { Temperature } from "@/components/Temperature";
 import { describeFailure } from "@/lib/failures";
 import { fill, useT } from "@/lib/i18n";
 import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
@@ -23,7 +22,7 @@ export function ModelDefaults() {
 
   // One option list, derived from once. Four separate calls built it
   // independently and three of them then scanned it for the same id — on every
-  // render, which on this pane is every step of the temperature slider.
+  // render of a pane whose only other control is a switch.
   const options = React.useMemo(() => modelOptions(model ?? "", catalog), [model, catalog]);
   const modelHint = unknownModelHint(model, catalog, t);
   const modelInfo = options.find((option) => option.id === model)?.description ?? "";
@@ -86,22 +85,6 @@ export function ModelDefaults() {
                   checked={config.defaults.thinking}
                   onChange={(on) =>
                     store.editConfig((draft) => (draft.defaults.thinking = on), true)
-                  }
-                />
-              )}
-            </Field>
-
-            <Field
-              label={t.settings.defaults.temperature}
-              hint={t.settings.defaults.temperatureHint}
-            >
-              {({ id, describedBy }) => (
-                <Temperature
-                  id={id}
-                  describedBy={describedBy}
-                  value={config.defaults.temperature}
-                  onChange={(value) =>
-                    store.editConfig((draft) => (draft.defaults.temperature = value))
                   }
                 />
               )}

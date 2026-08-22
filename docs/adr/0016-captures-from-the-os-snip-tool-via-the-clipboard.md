@@ -104,8 +104,11 @@ sent.
 
 ## Considered Options
 
-**A fourth `input_source`, `capture`,** so an Action could declare that it works on a screenshot the
-way `selection` declares it works on the Selection. It is the right shape for "Explain this error
+**A third `input_source`, `capture`,** so an Action could declare that it works on a screenshot the
+way `selection` used to declare it works on the Selection. (It was a *fourth* when this was written;
+[ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md) has since removed `selection`,
+which also removes the analogy — a `capture` arm would now be the first one to name a specific input
+rather than refuse one.) It is the right shape for "Explain this error
 dialog" as a Direct Hotkey, and it is not this ADR: it would need the Launcher to say which Actions
 take images, and a snip cannot run before the Popover exists without the window flashing. Deferred,
 not rejected — `input_source` is where it would go.
@@ -126,9 +129,10 @@ not rejected — `input_source` is where it would go.
 - The attached Capture arrives as its own event, `popover:capture`, not as `popover:view`.
   Re-reading the view is how a *new trigger* is handled: it resets the conversation and remounts the
   composer (ADR-0007), which would throw away the half-typed note the screenshot was taken for.
-- A Capture is only reachable where the composer is — `needs-input`, or a settled turn. The
-  `empty-selection` Popover is a two-line hint with no composer and stays that way; it is sized to
-  never grow ([`POPOVER_HINT_H`](../../src-tauri/src/trigger/window.rs)).
+- A Capture is only reachable where the composer is — `needs-input`, or a settled turn. That was a
+  restriction when it was written, because `empty-selection` was a phase with no composer; since
+  [ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md) removed that phase, every phase
+  short of a running turn has one, and an empty grab is now a place a screenshot can be attached.
 - Two new dependencies, both narrow: `base64`, and `image` with `png`/`bmp`/`tiff` only — the
   clipboard hands over a BMP on Windows and a TIFF on macOS, and neither is a format the provider
   takes.

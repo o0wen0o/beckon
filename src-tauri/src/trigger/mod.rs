@@ -25,7 +25,7 @@ use crate::platform::capture::Capture;
 use crate::state::{AppState, CaptureNotice, PopoverPhase, PopoverView};
 
 use self::foreground::{remember_foreground, restore_foreground_if_idle};
-use self::window::{center_on_active_monitor, reveal, size_and_place_at_cursor, POPOVER_HINT_H};
+use self::window::{center_on_active_monitor, reveal, size_and_place_at_cursor};
 
 pub const WINDOW_LAUNCHER: &str = "launcher";
 pub const WINDOW_POPOVER: &str = "popover";
@@ -116,13 +116,11 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     let selection = selection.filter(|text| !text.trim().is_empty());
 
     let (phase, input) = match action.file.input_source {
-        // An empty grab is not an error (ADR-0002): hint, and send nothing.
-        InputSource::Selection => match selection {
-            Some(text) => (PopoverPhase::Running, Some(text)),
-            None => (PopoverPhase::EmptySelection, None),
-        },
-        // The grab is ignored — it was taken before the Action was known.
+        // The grab is ignored — it was taken before the Action was known, so
+        // whatever happened to be selected is not this Action's input (ADR-0020).
         InputSource::Prompt => (PopoverPhase::NeedsInput, None),
+        // An empty grab is not an error (ADR-0002): fall through to the composer
+        // and let the user type. This is the only other arm (ADR-0020).
         InputSource::Auto => match selection {
             Some(text) => (PopoverPhase::Running, Some(text)),
             None => (PopoverPhase::NeedsInput, None),
@@ -160,16 +158,12 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_VIEW, ());
 
     if let Some(window) = app.get_webview_window(WINDOW_POPOVER) {
-        // Whatever size the user last left the window at (ADR-0018). The hint
-        // is a ceiling on top of that, never a floor: a Popover already shorter
-        // than the hint stays that short.
+        // Whatever size the user last left the window at, unconditionally
+        // (ADR-0018). The one phase that used to override it was the hint, which
+        // could never grow; every surviving phase offers a composer, so there is
+        // no longer a size the product knows better than the user (ADR-0020).
         let size = state.config_snapshot().popover;
-        let height = if phase == PopoverPhase::EmptySelection {
-            size.height.min(POPOVER_HINT_H)
-        } else {
-            size.height
-        };
-        size_and_place_at_cursor(&window, size.width, height);
+        size_and_place_at_cursor(&window, size.width, size.height);
         reveal(&window);
     }
 }

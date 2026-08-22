@@ -39,7 +39,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 **Triggering and grabbing text**
 
 - The global hotkey defaults to `Ctrl+Shift+Space` on Windows and `Cmd+Shift+Space` on macOS: Space with two modifiers on both, and only the first differs, because the platform's own launcher does — Spotlight is `Cmd+Space`. Both avoid the IME chords (`Ctrl+Space` Chinese/English on Microsoft Pinyin and "previous input source" on macOS, `Shift+Space` full-width/half-width, `Win+Space` switch IME), `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools), and any `Ctrl+Alt` combination, which is `AltGr` on an ISO keyboard and so composes characters as well as the modifier state the grab must release before it can copy.
-- If the grab comes back empty, handle it according to the Action's `input_source` — this is **not an error**: `selection` shows a hint and sends no request, `auto` falls through to the input box.
+- If the grab comes back empty, this is **not an error**: the Popover falls through to its input box and the user types instead ([ADR-0020](./docs/adr/0020-the-input-source-loses-its-selection-only-arm.md)). There is no arm of `input_source` that answers an empty grab with a hint and no window to act in.
 - The Popover always takes focus. Remember what was in front before showing it — the window on Windows, the application on macOS — and hand focus back on close.
 - The Popover is **620×500 to start with and resizable by dragging any edge or corner**, between 380×200 and 3840×2160. The size it is left at is remembered in `config.toml` and is what the next summon opens at ([ADR-0018](./docs/adr/0018-the-popover-is-resizable-and-remembers-its-size.md)). The Launcher is not resizable: its height is its match list.
 - On macOS the grab needs Accessibility permission, and the OS refuses it **silently**: the Selection just comes back empty. Settings reads the permission directly and says so, with a link to the pane; the hotkey itself still fires either way.
@@ -59,7 +59,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - A hotkey registration failure at startup is never silent: the tray icon switches to an error state plus a one-time balloon notification that opens settings when clicked.
 - The model is **chosen from a list, not typed**. The list is the endpoint's own `/v1/models` response when a key is stored and the request succeeds, and the officially documented DeepSeek models otherwise — no credential, a rejected key or a dead network downgrades the list and says why, but never empties it. A model already named in `config.toml` or in an Action stays selectable even when nothing vouches for it, flagged rather than rewritten.
 - On first run (no key readable from the credential store), open the settings window directly, including a "Test connection" button — it sends a minimal request to verify the key and `base_url` on the spot.
-- On first run, if `actions/` does not exist, write two example Actions (one `selection` type and one `prompt` type) covering both main paths. Once deleted, they are not regenerated.
+- On first run, if `actions/` does not exist, write two example Actions — one `auto` and one `prompt` — covering both Input Sources. Once deleted, they are not regenerated.
 - The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose OS appearance is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
 - The language is `en` or `zh`, and it applies to all three surfaces *and* the tray menu at once. **The default is `en`**, on a Chinese machine too, and there is no `system` arm: an OS locale is a guess about a reader rather than a setting, and a wrong guess replaces every word in the product — including the words explaining how to change it back ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)). Your Actions are never translated in either direction: they are your words, in your files.
 
@@ -94,7 +94,6 @@ base_url = "https://api.deepseek.com"
 [defaults]
 model = "deepseek-v4-flash"
 thinking = false
-temperature = 1.3
 
 [popover]
 width = 620.0                   # written by dragging the window, not by hand
@@ -106,7 +105,7 @@ height = 500.0
 ```toml
 name = "Translate"
 description = "Chinese <-> English"
-input_source = "selection"      # selection | prompt | auto
+input_source = "auto"           # auto | prompt
 hotkey = "Ctrl+Alt+T"           # optional; if omitted, only callable from the Launcher
 
 [prompt]
@@ -116,8 +115,8 @@ Output only the translation — no explanation, no quotes, no prefix or suffix o
 """
 # user may be omitted; it defaults to "{{input}}"
 
-[model]
-temperature = 1.3               # all three of these may be omitted, falling back to defaults in config.toml
+# [model] may be omitted entirely; `model` and `thinking` fall back to the
+# defaults in config.toml. There is no per-Action temperature (ADR-0019).
 ```
 
 ### actions/ask.toml

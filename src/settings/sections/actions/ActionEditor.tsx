@@ -15,7 +15,6 @@ import { ModelSelect } from "@/components/ModelSelect";
 import { NavCard } from "@/components/NavCard";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { Segmented } from "@/components/Segmented";
-import { Temperature } from "@/components/Temperature";
 import { useT } from "@/lib/i18n";
 import { SOURCES as SOURCE_ORDER, sourceLabel } from "@/lib/inputSource";
 import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
@@ -203,25 +202,6 @@ export function ActionEditor({ action }: ActionEditorProps) {
               label={t.settings.defaults.thinking}
               checked={effectiveThinking}
               onChange={(value) => store.editDraft((next) => (next.model.thinking = value), true)}
-            />
-          )}
-        </Field>
-
-        <Field
-          label={t.settings.defaults.temperature}
-          hint={t.settings.defaults.temperatureHint}
-          override={{
-            overridden: draft.model.temperature !== null,
-            defaultReading: String(defaults.temperature),
-            onRevert: () => store.editDraft((next) => (next.model.temperature = null), true),
-          }}
-        >
-          {({ id, describedBy }) => (
-            <Temperature
-              id={id}
-              describedBy={describedBy}
-              value={draft.model.temperature ?? defaults.temperature}
-              onChange={(value) => store.editDraft((next) => (next.model.temperature = value))}
             />
           )}
         </Field>

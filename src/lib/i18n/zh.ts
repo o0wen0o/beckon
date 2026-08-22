@@ -15,15 +15,11 @@ export const ZH: Strings = {
     autostart: IS_MAC ? "登录时启动" : "开机时启动",
     systemAppearance: IS_MAC ? "macOS 外观设置" : "Windows 外观设置",
     modifierAdvice: IS_MAC ? "Cmd、Control、Option 或 Shift" : "Ctrl、Alt 或 Shift",
-    emptyGrabCause: IS_MAC
-      ? "没有辅助功能权限时什么都读不到 —— 若是这个原因，设置里会说明。"
-      : "以管理员权限运行的窗口完全无法读取。",
     settings: "设置",
     cancel: "取消",
   },
 
   inputSource: {
-    selection: "选中内容",
     prompt: "手动输入",
     auto: "自动",
     cell: (label: string) => `输入来源：${label}`,
@@ -65,8 +61,6 @@ export const ZH: Strings = {
     close: "关闭",
     thinking: "思考",
     nothingToShow: "没有可显示的内容。",
-    needsSelection: "{name} 需要选中内容，但当前没有选中任何文本。",
-    selectAndRetry: "选中一段文本后再按一次热键。",
     typeYourInput: "输入要发送给 {name} 的内容。",
     waiting: "正在等待第一个 token",
     runningWaiting: "等待中",
@@ -194,9 +188,6 @@ export const ZH: Strings = {
       thinking: "回答前先思考",
       thinkingHint:
         "DeepSeek 默认会思考。对翻译这类 Action，开着它只会多出几秒延迟 —— 所以除非明确需要，此项保持关闭。",
-      temperature: "温度",
-      temperatureHint:
-        "模型措辞的自由度。低值直白、可复现 —— 翻译或改写要的就是这一端；高值多变，也更容易跑偏。范围 0 到 2。",
       catalog: "模型目录",
       modelList: "模型列表",
       modelListHint: "刷新会向端点索取它自己的列表；文档记载的目录是兜底。",
@@ -229,7 +220,6 @@ export const ZH: Strings = {
       trigger: "触发",
       inputSource: "输入来源",
       sourceHint: {
-        selection: "只用选中内容。没有抓到内容时给出提示，不发送请求。",
         prompt: "只用手动输入的内容。任何选中内容都会被忽略。",
         auto: "有选中内容就用它，否则请求手动输入。",
       },
@@ -268,11 +258,6 @@ export const ZH: Strings = {
       recording: "请按下按键…",
       clear: "清除专属热键",
       needsModifier: (advice: string) => `请加上 ${advice} —— 无修饰键的热键会在任何地方触发。`,
-    },
-    temperature: {
-      low: "0 · 精确",
-      mid: "1",
-      high: "2 · 发散",
     },
     model: {
       configuredGroup: "由你的配置指定",

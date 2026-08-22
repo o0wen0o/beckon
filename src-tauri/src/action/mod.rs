@@ -19,13 +19,18 @@ pub const INPUT_PLACEHOLDER: &str = "{{input}}";
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum InputSource {
-    /// Selection only. An empty grab shows a hint and sends nothing.
-    Selection,
-    /// Typed input only; any Selection is ignored.
+    /// Typed input only; any Selection is ignored. The arm that has to exist:
+    /// the grab lands before the Action is known (ADR-0006), so without it an
+    /// "ask anything" Action fired while text happens to be selected would send
+    /// that text (ADR-0020).
     Prompt,
-    /// Selection if there is one, otherwise ask for typed input. The default
-    /// because it degrades to an input box instead of a hint.
+    /// Selection if there is one, otherwise ask for typed input. The default,
+    /// and now the only other arm — `selection` was a third that only ever
+    /// produced a hint where this one produces an input box (ADR-0020). The
+    /// alias keeps a config that still names it loading, rather than failing the
+    /// whole file on an unknown variant.
     #[default]
+    #[serde(alias = "selection")]
     Auto,
 }
 
@@ -42,7 +47,6 @@ pub struct PromptSpec {
 pub struct ModelOverrides {
     pub model: Option<String>,
     pub thinking: Option<bool>,
-    pub temperature: Option<f64>,
 }
 
 /// Effective per-request model parameters: the Action's `[model]` table laid
@@ -51,7 +55,6 @@ pub struct ModelOverrides {
 pub struct ModelParams {
     pub model: String,
     pub thinking: bool,
-    pub temperature: f64,
 }
 
 impl ModelOverrides {
@@ -60,7 +63,6 @@ impl ModelOverrides {
         ModelParams {
             model: self.model.clone().unwrap_or_else(|| defaults.model.clone()),
             thinking: self.thinking.unwrap_or(defaults.thinking),
-            temperature: self.temperature.unwrap_or(defaults.temperature),
         }
     }
 }
@@ -170,7 +172,7 @@ mod tests {
     const TRANSLATE: &str = r#"
 name = "Translate"
 description = "Chinese <-> English"
-input_source = "selection"
+input_source = "prompt"
 hotkey = "Ctrl+Alt+T"
 
 [prompt]
@@ -180,7 +182,7 @@ Output only the translation — no explanation, no quotes, no prefix or suffix o
 """
 
 [model]
-temperature = 1.3
+thinking = true
 "#;
 
     #[test]
@@ -188,10 +190,10 @@ temperature = 1.3
         let action = Action::parse("translate.toml", TRANSLATE).unwrap();
         assert_eq!(action.id, "translate");
         assert_eq!(action.file.name, "Translate");
-        assert_eq!(action.file.input_source, InputSource::Selection);
+        assert_eq!(action.file.input_source, InputSource::Prompt);
         assert_eq!(action.file.hotkey.as_deref(), Some("Ctrl+Alt+T"));
-        assert_eq!(action.file.model.temperature, Some(1.3));
-        assert_eq!(action.file.model.thinking, None);
+        assert_eq!(action.file.model.thinking, Some(true));
+        assert_eq!(action.file.model.model, None);
     }
 
     #[test]
@@ -225,6 +227,29 @@ temperature = 1.3
         assert_eq!(action.file.input_source, InputSource::Auto);
     }
 
+    /// The arm ADR-0020 removed still has to load, or trimming the enum would
+    /// break every Action file written before it.
+    #[test]
+    fn the_retired_selection_arm_still_loads_as_auto() {
+        let text = "name = \"X\"\ninput_source = \"selection\"\n[prompt]\nsystem = \"s\"\n";
+        let action = Action::parse("x.toml", text).unwrap();
+        assert_eq!(action.file.input_source, InputSource::Auto);
+        // ...and is written back under the surviving name, not preserved.
+        assert!(action
+            .to_toml()
+            .unwrap()
+            .contains("input_source = \"auto\""));
+    }
+
+    /// Likewise the `[model]` key ADR-0019 removed: an unknown key is tolerated,
+    /// so the file loads and the stale value is dropped on the next write.
+    #[test]
+    fn a_stale_temperature_key_is_ignored() {
+        let text = "name = \"X\"\n[prompt]\nsystem = \"s\"\n[model]\ntemperature = 0.2\n";
+        let action = Action::parse("x.toml", text).unwrap();
+        assert!(!action.to_toml().unwrap().contains("temperature"));
+    }
+
     #[test]
     fn empty_name_or_system_is_a_parse_error() {
         assert!(Action::parse("x.toml", "[prompt]\nsystem = \"s\"\n").is_err());
@@ -249,23 +274,19 @@ temperature = 1.3
         let defaults = ModelDefaults {
             model: "deepseek-v4-flash".into(),
             thinking: false,
-            temperature: 1.3,
         };
         let overrides = ModelOverrides {
             model: None,
             thinking: Some(true),
-            temperature: Some(0.2),
         };
         let merged = overrides.merge_over(&defaults);
         assert_eq!(merged.model, "deepseek-v4-flash");
         assert!(merged.thinking);
-        assert_eq!(merged.temperature, 0.2);
 
         // Empty overrides are exactly the defaults.
         let untouched = ModelOverrides::default().merge_over(&defaults);
         assert_eq!(untouched.model, defaults.model);
         assert_eq!(untouched.thinking, defaults.thinking);
-        assert_eq!(untouched.temperature, defaults.temperature);
     }
 
     #[test]

@@ -13,7 +13,6 @@ import {
 import { fill, useT } from "@/lib/i18n";
 import { hasCommandModifier } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
-import { Callout } from "@/components/Callout";
 import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
 import { CapturePreview } from "./CapturePreview";
@@ -153,28 +152,13 @@ export function Popover() {
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3.5 py-3 scrollbar-gutter-stable"
       >
         {/* Which notice this is comes from the store; a notice has no side to
-            sit on. Only one of them is an alarm, and it gets the marker the rest
-            of the product uses for one — a rule, not a box; the other two are
-            ordinary prose. */}
+            sit on. Neither is an alarm any more — the one that was is the hint
+            ADR-0020 removed, and an empty grab now lands in the composer. */}
         {store.notice === "no-view" ? (
           <p className="text-muted-foreground">{t.popover.nothingToShow}</p>
-        ) : store.notice === "empty-selection" ? (
-          // `mb-0`: the margin baked into a callout is the ledger's rhythm
-          // below one, and this scroller spaces its children with a gap.
-          <Callout tone="warn" className="mb-0">
-            <p>
-              {fill(t.popover.needsSelection, {
-                name: <strong>{view?.action_name}</strong>,
-              })}
-            </p>
-            <p>
-              {t.popover.selectAndRetry} {t.words.emptyGrabCause}
-            </p>
-          </Callout>
         ) : store.notice === "awaiting-input" ? (
-          // Body size and a bold name, matching `Callout`: all three notices
-          // land in the same slot, so a step of difference between them says
-          // nothing a reader can act on.
+          // Body size and a bold name: both notices land in the same slot, so a
+          // step of difference between them says nothing a reader can act on.
           <p className="text-muted-foreground">
             {fill(t.popover.typeYourInput, {
               name: (

@@ -30,17 +30,12 @@ export const EN = {
     systemAppearance: IS_MAC ? "macOS appearance" : "Windows preference",
     /** Which modifiers `hotkey::parse` accepts, in the platform's own names. */
     modifierAdvice: IS_MAC ? "Cmd, Control, Option or Shift" : "Ctrl, Alt or Shift",
-    /** Why an empty grab happens here, which is not the same reason on both. */
-    emptyGrabCause: IS_MAC
-      ? "Without Accessibility permission nothing can be read at all — Settings says so if that is what happened."
-      : "Elevated windows cannot be read at all.",
     settings: "Settings",
     cancel: "Cancel",
   },
 
   /** How an Input Source reads. The value itself stays the CONTEXT.md term. */
   inputSource: {
-    selection: "Selection",
     prompt: "Prompt",
     auto: "Auto",
     /** The Launcher's and the Actions list's shared cell title. */
@@ -87,9 +82,6 @@ export const EN = {
     close: "Close",
     thinking: "thinking",
     nothingToShow: "Nothing to show.",
-    /** `{name}` is the Action, set bold by the caller. */
-    needsSelection: "{name} works on a Selection, and nothing was selected.",
-    selectAndRetry: "Select some text and press the hotkey again.",
     /** `{name}` is the Action, set bold by the caller. */
     typeYourInput: "Type what you want to send to {name}.",
     waiting: "Waiting for the first token",
@@ -230,9 +222,6 @@ export const EN = {
       thinking: "Think before answering",
       thinkingHint:
         "DeepSeek thinks by default. Leaving it on adds seconds of latency to translation-shaped Actions, which is why this is off unless you ask for it.",
-      temperature: "Temperature",
-      temperatureHint:
-        "How freely the model words its answer. Low is literal and repeatable — the right end for translation or reformatting; high is varied, and drifts. 0 to 2.",
       catalog: "Catalog",
       modelList: "Model list",
       modelListHint:
@@ -267,7 +256,6 @@ export const EN = {
       trigger: "Trigger",
       inputSource: "Input Source",
       sourceHint: {
-        selection: "Uses the Selection only. An empty grab shows a hint and sends nothing.",
         prompt: "Uses typed input only. Any Selection is ignored.",
         auto: "Uses the Selection if there is one, otherwise asks for typed input.",
       },
@@ -308,11 +296,6 @@ export const EN = {
       recording: "Press keys…",
       clear: "Clear the Direct Hotkey",
       needsModifier: (advice: string) => `Add ${advice} — a bare key would fire everywhere.`,
-    },
-    temperature: {
-      low: "0 · precise",
-      mid: "1",
-      high: "2 · loose",
     },
     model: {
       configuredGroup: "Named by your configuration",

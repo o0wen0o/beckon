@@ -100,8 +100,10 @@ mod tests {
     /// It is pure, so a stale number here would never fail a test; it would just
     /// quietly stop describing the app.
     const POPOVER: (i32, i32) = (620, 500);
-    /// The `empty-selection` Popover, which is deliberately shorter.
-    const POPOVER_HINT: (i32, i32) = (620, 220);
+    /// A Popover dragged short. No phase produces one on its own any more
+    /// (ADR-0020), but the user can, and the placement has to follow the height
+    /// it is given rather than the one it started at.
+    const POPOVER_SHORT: (i32, i32) = (620, 220);
 
     #[test]
     fn sits_below_right_of_the_cursor_when_it_fits() {
@@ -114,12 +116,13 @@ mod tests {
         assert_eq!((x, y), (1900 - 12 - 620, 1030 - 12 - 500));
     }
 
-    /// The shorter hint window still fits below a cursor where the full one
-    /// would have had to flip.
+    /// A short Popover still fits below a cursor where the full one would have
+    /// had to flip — the height it is placed with is the height it is, which is
+    /// the whole reason this function takes a size.
     #[test]
-    fn the_hint_sized_popover_fits_where_the_full_one_would_flip() {
+    fn a_short_popover_fits_where_the_full_one_would_flip() {
         let (_, tall) = place_near_cursor((100, 600), POPOVER, SCREEN);
-        let (_, short) = place_near_cursor((100, 600), POPOVER_HINT, SCREEN);
+        let (_, short) = place_near_cursor((100, 600), POPOVER_SHORT, SCREEN);
         assert_eq!(tall, 600 - 12 - 500);
         assert_eq!(short, 612);
     }

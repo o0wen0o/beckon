@@ -10,6 +10,12 @@ three bordered boxes indented into the value column, each collapsed to a summary
 That exception is removed, and with it `OverrideField` and `InfoHint`. The rest of ADR-0008
 stands.
 
+**Narrowed by [ADR-0019](0019-temperature-leaves-the-config-and-is-pinned-in-the-provider.md):**
+`temperature` is no longer one of the `[model]` keys, so the row this ADR uses as its worked example
+no longer exists. Every claim below holds for the two keys that remain — the live control showing the
+effective value, the dot, the revert control, the group head's note; what is history is the
+temperature slider, the sentence that stood under it, and the `InfoHint` it used to hide behind.
+
 **Amended by [ADR-0012](0012-settings-pane-is-cards-not-a-ledger.md):** the pane is cards now, not
 a ledger, so "row" below reads as "card" throughout. Every decision in this ADR survives that —
 the live control showing the effective value, the dot beside the name, the revert

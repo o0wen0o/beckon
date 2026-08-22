@@ -36,5 +36,7 @@ it silently breaks the most useful combination there is: select text, summon the
   pick consumes it, and it is never written anywhere — the same "no extra retained copy" rule
   ADR-0002 sets for the clipboard backup.
 - `input_source` resolution has to happen *after* the pick, because until then we do not know
-  whether the grab is even wanted. The resolution therefore lives in Rust next to the trigger flow,
+  whether the grab is even wanted. That ordering is also the reason `prompt` survived the trim in
+  [ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md): a Selection is always in hand by
+  the time an Action is known, so ignoring it has to be something an Action can declare. The resolution therefore lives in Rust next to the trigger flow,
   not in the window that renders the result.

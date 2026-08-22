@@ -29,7 +29,7 @@ export const CARD_HOVER =
 
 /**
  * The two measures a control may take, named rather than numbered, so a control
- * that has to cap itself (`ModelSelect`, `Temperature`) reaches the same number
+ * that has to cap itself (`ModelSelect`) reaches the same number
  * this card does. `wide` is for a control sharing its line with buttons.
  */
 const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;

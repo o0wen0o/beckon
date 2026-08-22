@@ -12,6 +12,14 @@
 //! DeepSeek model would leave thinking on and quietly add seconds of latency to
 //! every translation — the exact failure the README wants gone.
 //!
+//! ## Temperature
+//!
+//! Pinned here, not configurable (ADR-0019). 1.3 is the value DeepSeek's own
+//! guidance gives for general conversation and translation, and this is the
+//! module that gets to hold an opinion about DeepSeek. Omitting the field
+//! instead would hand the choice to whatever the endpoint defaults to, which a
+//! custom `base_url` makes unknowable.
+//!
 //! ## Images
 //!
 //! A Capture goes on the wire as an OpenAI-style content part and is never
@@ -27,6 +35,9 @@
 use serde_json::{json, Value};
 
 use crate::action::ModelParams;
+
+/// What every request carries (ADR-0019). See the module header for why 1.3.
+const TEMPERATURE: f64 = 1.3;
 
 use super::models::{self, Thinking};
 use super::Message;
@@ -45,7 +56,7 @@ pub fn build_body(params: &ModelParams, messages: &[Message]) -> Result<Value, S
         "model": params.model,
         "messages": messages,
         "stream": true,
-        "temperature": params.temperature,
+        "temperature": TEMPERATURE,
     });
 
     if let ThinkingWire::Object(enabled) = thinking_wire(&params.model, params.thinking)? {
@@ -125,7 +136,6 @@ mod tests {
         ModelParams {
             model: model.to_string(),
             thinking,
-            temperature: 1.3,
         }
     }
 

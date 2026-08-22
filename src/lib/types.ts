@@ -1,18 +1,16 @@
 // Mirrors the serde shapes in src-tauri. Rust is authoritative for all of it
 // (ADR-0003) — nothing here is a local source of truth.
 
-export type InputSource = "selection" | "prompt" | "auto";
+export type InputSource = "prompt" | "auto";
 
 export interface ModelParams {
   model: string;
   thinking: boolean;
-  temperature: number;
 }
 
 export interface ModelOverrides {
   model: string | null;
   thinking: boolean | null;
-  temperature: number | null;
 }
 
 export interface PromptSpec {
@@ -110,7 +108,7 @@ export interface ModelCatalog {
   fallback: Failure | null;
 }
 
-export type PopoverPhase = "needs-input" | "empty-selection" | "running";
+export type PopoverPhase = "needs-input" | "running";
 
 /**
  * A screenshot the user grabbed with the OS snip tool, normalised to PNG in Rust

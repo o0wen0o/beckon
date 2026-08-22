@@ -41,7 +41,7 @@
 **触发与抓取文本**
 
 - 全局热键在 Windows 上默认为 `Ctrl+Shift+Space`，macOS 上默认为 `Cmd+Shift+Space`：两边都是「Space 加两个修饰键」，只有第一个修饰键不同 —— 因为平台自己的启动器就是这样，Spotlight 是 `Cmd+Space`。两个默认值都避开了输入法组合键（微软拼音的 `Ctrl+Space` 中英文切换、macOS 的“上一个输入法”，`Shift+Space` 全角半角，`Win+Space` 切换输入法）、`Alt+Space`（系统窗口菜单，且常被 PowerToys Run／uTools 占用），以及任何 `Ctrl+Alt` 组合 —— 它在 ISO 键盘上就是 `AltGr`，既会参与字符合成，也正是抓取动作在复制之前必须先释放的修饰键状态。
-- 如果抓取回来是空的，按 Action 的 `input_source` 处理 —— 这**不是错误**：`selection` 给出提示且不发送请求，`auto` 落回到输入框。
+- 如果抓取回来是空的，这**不是错误**：浮窗落回到输入框，由用户改为手动输入（[ADR-0020](./docs/adr/0020-the-input-source-loses-its-selection-only-arm.md)）。`input_source` 里不再有哪一档会用一句提示回应空抓取，却不给任何可操作的窗口。
 - 浮窗总是获取焦点。在显示之前记住前台是谁 —— Windows 上是窗口，macOS 上是应用 —— 关闭时把焦点交还。
 - 在 macOS 上，抓取需要辅助功能权限，而系统会**静默**拒绝：选中内容只是回来是空的。设置直接读取该权限并说明情况，并附上前往对应面板的链接；热键本身无论如何都会触发。
 
@@ -60,7 +60,7 @@
 - 启动时的热键注册失败绝不静默：托盘图标切换到错误状态，外加一次性的气泡通知，点击即可打开设置。
 - 模型是**从列表中选择，而不是手动输入**。已保存密钥且请求成功时，列表就是端点自己的 `/v1/models` 响应，否则是官方文档记载的 DeepSeek 模型 —— 没有凭据、密钥被拒或网络不通都会让列表降级并说明原因，但绝不会让它变空。`config.toml` 或某个 Action 里已经写明的模型始终可选，即使没有任何来源为它背书 —— 标记出来，而不是改写掉。
 - 首次运行时（凭据存储里读不到密钥），直接打开设置窗口，其中带有“测试连接”按钮 —— 它会发送一个最小请求，当场验证密钥和 `base_url`。
-- 首次运行时，若 `actions/` 不存在，写入两个示例 Action（一个 `selection` 类型、一个 `prompt` 类型），覆盖两条主要路径。一旦删除，不会再生成。
+- 首次运行时，若 `actions/` 不存在，写入两个示例 Action（一个 `auto`、一个 `prompt`），覆盖两种输入来源。一旦删除，不会再生成。
 - 主题是 `light`、`dark` 或 `system`，同时作用于三个界面。**默认是 `light`**，即使机器的系统外观是深色也一样：系统偏好只有在 `theme = "system"` 时才会被读取，而这需要主动选择。
 - 语言是 `en` 或 `zh`，同时作用于三个界面**以及**托盘菜单。**默认是 `en`**，在中文机器上也是如此，而且没有 `system` 这一档：系统区域设置是对**读者**的猜测，而不是一项设置，猜错了就会替换掉产品里的每一个词 —— 包括那些说明如何改回来的词（[ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)）。你的 Action 在任何方向上都不会被翻译：那是你自己的文字，在你自己的文件里。
 
@@ -95,7 +95,6 @@ base_url = "https://api.deepseek.com"
 [defaults]
 model = "deepseek-v4-flash"
 thinking = false
-temperature = 1.3
 ```
 
 ### actions/translate.toml
@@ -103,7 +102,7 @@ temperature = 1.3
 ```toml
 name = "Translate"
 description = "Chinese <-> English"
-input_source = "selection"      # selection | prompt | auto
+input_source = "auto"           # auto | prompt
 hotkey = "Ctrl+Alt+T"           # 可选；省略时只能从启动器调用
 
 [prompt]
@@ -113,8 +112,8 @@ Output only the translation — no explanation, no quotes, no prefix or suffix o
 """
 # user 可以省略，默认为 "{{input}}"
 
-[model]
-temperature = 1.3               # 这三项都可以省略，省略时回落到 config.toml 里的默认值
+# [model] 整块都可以省略；`model` 与 `thinking` 会回落到 config.toml 里的默认值。
+# 不存在按 Action 设置的温度（ADR-0019）。
 ```
 
 ### actions/ask.toml

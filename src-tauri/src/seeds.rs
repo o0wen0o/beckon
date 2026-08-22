@@ -10,7 +10,7 @@ use crate::atomic::write_atomic;
 
 pub const TRANSLATE: &str = r#"name = "Translate"
 description = "Chinese <-> English"
-input_source = "selection"
+input_source = "auto"
 hotkey = "Ctrl+Alt+T"
 
 [prompt]
@@ -18,9 +18,6 @@ system = """
 You are a translation engine. Translate Chinese input into English; translate any other language into Chinese.
 Output only the translation — no explanation, no quotes, no prefix or suffix of any kind.
 """
-
-[model]
-temperature = 1.3
 "#;
 
 pub const ASK: &str = r#"name = "Quick ask"
@@ -53,7 +50,7 @@ mod tests {
     #[test]
     fn both_examples_parse_and_cover_both_paths() {
         let translate = Action::parse("translate.toml", TRANSLATE).unwrap();
-        assert_eq!(translate.file.input_source, InputSource::Selection);
+        assert_eq!(translate.file.input_source, InputSource::Auto);
         assert_eq!(translate.file.hotkey.as_deref(), Some("Ctrl+Alt+T"));
 
         let ask = Action::parse("ask.toml", ASK).unwrap();
