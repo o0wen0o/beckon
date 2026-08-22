@@ -85,8 +85,9 @@ export function isSettled(status: Status) {
 }
 
 /**
- * The standing notice a conversation carries when it has no turns yet. Only one
- * of them is an alarm, which is what the Popover renders as a `Callout`.
+ * The standing notice a conversation carries when it has no turns yet. None of
+ * them is an alarm since ADR-0020 removed the hint, so the Popover renders each
+ * of them as ordinary prose rather than as a `Callout`.
  */
 export type Notice = "none" | "no-view" | "awaiting-input";
 
@@ -160,10 +161,10 @@ class ExchangeStore extends Notifier {
     return this.view !== null && (this.view.phase === "needs-input" || this.canFollowUp);
   }
 
-  /** `PopoverPhase` is resolved in Rust so the rule lives in one place; picking
-   *  the notice here keeps the second half of it out of markup. `needs-input` is
-   *  the only phase left that carries one: ADR-0020 removed the phase that had
-   *  no composer to fall through to. */
+  /** Structural rather than a phase read: whether there is a view, and whether
+   *  it has turns yet. ADR-0020 removed the phase that used to pick between two
+   *  notices here, so an empty grab lands in the same notice typed input does —
+   *  which is why no `PopoverPhase` is consulted below. */
   get notice(): Notice {
     if (this.view === null) return "no-view";
     if (this.turns.length > 0) return "none";

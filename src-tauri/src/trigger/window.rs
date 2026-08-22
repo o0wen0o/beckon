@@ -55,7 +55,8 @@ pub(super) fn reveal(window: &WebviewWindow) {
 /// The physical size is derived from the logical one rather than read back with
 /// `outer_size()`. This runs on the hotkey thread, so `set_size` is dispatched
 /// to the event loop and an immediate read can still return the old rect —
-/// which would place a hint-sized window using the full-sized bounds.
+/// which would place a window the user has dragged short using the previous
+/// rect's bounds (ADR-0020).
 pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, height: f64) {
     let size = LogicalSize::new(width, height);
     let _ = window.set_size(size);

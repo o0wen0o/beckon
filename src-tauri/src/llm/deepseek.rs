@@ -36,11 +36,11 @@ use serde_json::{json, Value};
 
 use crate::action::ModelParams;
 
-/// What every request carries (ADR-0019). See the module header for why 1.3.
-const TEMPERATURE: f64 = 1.3;
-
 use super::models::{self, Thinking};
 use super::Message;
+
+/// What every request carries (ADR-0019). See the module header for why 1.3.
+const TEMPERATURE: f64 = 1.3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ThinkingWire {

@@ -153,20 +153,19 @@ export function Popover() {
       >
         {/* Which notice this is comes from the store; a notice has no side to
             sit on. Neither is an alarm any more — the one that was is the hint
-            ADR-0020 removed, and an empty grab now lands in the composer. */}
-        {store.notice === "no-view" ? (
-          <p className="text-muted-foreground">{t.popover.nothingToShow}</p>
-        ) : store.notice === "awaiting-input" ? (
-          // Body size and a bold name: both notices land in the same slot, so a
-          // step of difference between them says nothing a reader can act on.
+            ADR-0020 removed, and an empty grab now lands in the composer. They
+            share one element rather than two matching ones, so "the same slot,
+            with no step of difference between them" is structural instead of two
+            class strings kept equal by hand. */}
+        {store.notice === "none" ? null : (
           <p className="text-muted-foreground">
-            {fill(t.popover.typeYourInput, {
-              name: (
-                <strong className="text-foreground font-bold">{view?.action_name}</strong>
-              ),
-            })}
+            {store.notice === "no-view"
+              ? t.popover.nothingToShow
+              : fill(t.popover.typeYourInput, {
+                  name: <strong className="text-foreground font-bold">{view?.action_name}</strong>,
+                })}
           </p>
-        ) : null}
+        )}
 
         {store.turns.map((turn, index) => (
           <TurnView key={index} turn={turn} index={index} />

@@ -42,6 +42,10 @@ pub struct PromptSpec {
     pub user: Option<String>,
 }
 
+/// The Action's `[model]` table. Unknown keys are tolerated deliberately, and
+/// no `deny_unknown_fields` may be added here: it is what lets an Action still
+/// naming the withdrawn `temperature` load and drop it on the next write rather
+/// than becoming a diagnostic (ADR-0019).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ModelOverrides {

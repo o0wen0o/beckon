@@ -55,14 +55,14 @@ So `AppState::popover_asked_size` records the size the window was last *told* to
 physical pixels at a fractional scale factor does not come back exact). What is left is a size the
 user produced.
 
-Two consequences worth naming:
+One consequence worth naming:
 
-- `MIN_POPOVER_H` is **200**, under the 220px hint height, not the 240 the composer would like. A
-  floor above the shortest window the product shows itself is a floor `set_size` cannot meet, and the
-  window manager clamping our own call would look exactly like a drag.
-- the hint height is now a *ceiling* rather than a height: `min(remembered, 220)`. A Popover the user
-  has already made shorter than the hint stays that short, because a hint is not a reason to make a
-  window bigger than it was asked to be.
+- `MIN_POPOVER_H` is **200**, not the 240 the composer would like. When this was written the reason
+  was the 220px hint: a floor above the shortest window the product shows itself is a floor
+  `set_size` cannot meet, and the window manager clamping our own call would look exactly like a
+  drag. [ADR-0020](0020-the-input-source-loses-its-selection-only-arm.md) removed that window, and
+  with it the second consequence recorded here — the hint height as a *ceiling* on the remembered
+  size, `min(remembered, 220)`. 200 stays on its own merits: a composer plus one line of answer.
 
 ## Grips, because an undecorated window has no border
 

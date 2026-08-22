@@ -35,7 +35,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
   const config = useStore(settings).config;
 
   /** Derived rather than restated: this is the one place an Input Source is
-   *  chosen, so a third hand-written copy of the three values and their labels
+   *  chosen, so a third hand-written copy of the two values and their labels
    *  is the copy most likely to disagree with the two lists that display them. */
   const sources = SOURCE_ORDER.map((value) => ({ value, label: sourceLabel(value, t) }));
 
@@ -153,13 +153,12 @@ export function ActionEditor({ action }: ActionEditorProps) {
 
       {/* Every `[model]` key is optional, and absent means "inherit Model
           defaults". The control is live either way and shows the effective
-          value, so touching it *is* the override — one gesture for a select, a
-          switch and a slider alike. What says which side of the default a row is
-          on is `Field`'s `override`: a dot in the label's gutter and a revert
-          control, on an overridden row only, with the head's note covering the
-          rest. This was three bordered boxes indented into the value column,
-          and the only thing on the pane that was not a row of its own
-          (ADR-0011). */}
+          value, so touching it *is* the override — one gesture for a select and
+          a switch alike. What says which side of the default a row is on is
+          `Field`'s `override`: a dot in the label's gutter and a revert control,
+          on an overridden row only, with the head's note covering the rest. This
+          was three bordered boxes indented into the value column, and the only
+          thing on the pane that was not a row of its own (ADR-0011). */}
       <FieldGroup title={t.settings.actions.overrides} note={t.settings.actions.overridesNote}>
         <Field
           label={t.settings.defaults.model}

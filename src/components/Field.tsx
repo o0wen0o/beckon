@@ -29,8 +29,8 @@ export const CARD_HOVER =
 
 /**
  * The two measures a control may take, named rather than numbered, so a control
- * that has to cap itself (`ModelSelect`) reaches the same number
- * this card does. `wide` is for a control sharing its line with buttons.
+ * that has to cap itself (`ModelSelect`) reaches the same number this card
+ * does. `wide` is for a control sharing its line with buttons.
  */
 const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;
 
@@ -39,7 +39,7 @@ const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;
  * keys, absent from the file until overridden (ADR-0011).
  *
  * The control is live either way and shows the *effective* value, so touching
- * it is what overrides: one gesture for a select, a switch and a slider alike.
+ * it is what overrides: one gesture for a select and a switch alike.
  * All this adds is which side of the default the row is on, in the least that
  * still tells the truth — a dot hung in the card's padding beside the name,
  * and a revert control that names the default in its own label.
