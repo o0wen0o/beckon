@@ -12,7 +12,8 @@ OpenAI-compatible one — DeepSeek by default — kept as a table and chosen **p
 
 Read before non-trivial work:
 
-- [README.md](./README.md) — the spec: scope, decided behaviour, config-file layout.
+- [README.md](./README.md) — the user-facing surface: what Beckon does, install, first run, the
+  config-file and Action-file layout, and what it deliberately does not do.
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.

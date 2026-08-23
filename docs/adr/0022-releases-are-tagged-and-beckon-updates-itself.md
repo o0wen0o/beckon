@@ -43,16 +43,28 @@ unverified one, and every update after it is authenticated against a key that al
 carries. Getting an updater before a code-signing certificate is therefore not backwards — it means
 the number of unverified installs per user is one, forever, instead of one per version.
 
-## NSIS updates; the MSI does not
+## Both Windows installers can update; only one should
 
-Windows gets both bundles and only one of them can update itself. The updater replaces files in place
-and hands off to an installer that must have those files closed; an MSI is a transaction the Windows
-Installer service owns and cannot be driven that way. So `latest.json` names the NSIS `.exe`, and the
-MSI stays in the release as the install-only target — the one an administrator deploys.
+Windows gets both bundles, and both leave the release with an updater signature beside them —
+`..._x64-setup.exe.sig` and `..._x64_en-US.msi.sig`. The plugin runs whichever the manifest names: the
+NSIS installer directly, the MSI through `msiexec.exe` (`WindowsUpdaterType` in
+`tauri-plugin-updater`). "An MSI cannot update itself" is a convenient story and it is not true.
 
-`installMode` is `passive`: a progress window, no wizard, no questions. A tray app's update should not
-open a five-page installer, and `silent` would replace the app under the user with no visible sign
-that anything happened.
+What is true is that the two update differently, and the difference is elevation. NSIS here installs
+per-user, so replacing those files asks nobody's permission and the app can do it while the user
+watches a progress bar. An MSI is machine-wide: every update through it raises a UAC prompt — the
+wrong ceremony for a background process the user did not deliberately launch, and on a managed machine
+not a prompt they can answer at all.
+
+So the intent is that `latest.json` names the NSIS `.exe`, and the MSI stays in the release for the
+administrator deploying Beckon across a fleet — who is not going to let each machine update itself
+anyway. The manifest carries exactly one `windows-x86_64` entry, so which of the two it is comes down
+to what `tauri-action` writes there. Check it on the first release; if it picks the MSI, the lever is
+`bundle.targets`, currently `"all"`.
+
+`installMode` is `passive`: a progress window, no wizard, no questions — `/passive` to `msiexec` on the
+path this ADR would rather not take. A tray app's update should not open a five-page installer, and
+`silent` would replace the app under the user with no visible sign that anything happened.
 
 macOS gets one **universal** `.dmg` rather than the runner's native arm64. The manifest names one
 macOS asset, so an arm64-only build would leave Intel users with neither an install nor an update
@@ -74,7 +86,7 @@ built from, so what it says and what it does cannot drift apart.
 
 ## An install is refused while the Popover is open
 
-Installing ends the process. On Windows the NSIS installer requires it; on macOS the swapped bundle
+Installing ends the process. On Windows the installer requires it; on macOS the swapped bundle
 has to be relaunched. Either way the Exchange in an open Popover is gone, and it was never on disk to
 come back to (ADR-0004).
 

@@ -2,100 +2,88 @@
 
 English | [简体中文](./README.zh-CN.md)
 
-A background-resident LLM shortcut for Windows and macOS: press a hotkey to summon it, send a preset prompt plus your current input to DeepSeek, and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
+Press a hotkey. Whatever text you had selected goes to an LLM with a prompt you wrote, and the
+answer streams into a popover next to your cursor. Then it gets out of the way.
 
-For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see [docs/adr/](./docs/adr/).
+Beckon lives in the tray, starts with the machine, and stores nothing. The name comes from
+"beckoning" — you wave, it comes.
 
-## MVP scope
+**Windows and macOS.** Bring your own key: any OpenAI-compatible endpoint works, DeepSeek by
+default, always the vendor's own host and never an aggregator.
 
-**In scope**
+<!-- screenshot: the Popover mid-stream, over a browser -->
 
-- Lives in the tray (the menu bar on macOS), starts with the machine
-- Global hotkey summons the Launcher (a searchable list of Actions)
-- An Action can also be bound to a Direct Hotkey — press it and go straight to the result with zero interaction
-- The platform's copy shortcut is simulated to grab the Selection — Ctrl+C, or Cmd+C on macOS — with the clipboard restored afterwards
-- Popover near the cursor: takes focus, streams output, supports follow-up turns, closes on Esc
-- A screenshot button in the Popover: it runs the platform's own snip tool, attaches the result as a Capture, and sends it with whatever is typed beside it ([ADR-0016](./docs/adr/0016-captures-from-the-os-snip-tool-via-the-clipboard.md)). Up to four Captures ride one turn, shown as a rail of thumbnails; clicking one opens it full size over the window ([ADR-0017](./docs/adr/0017-a-turn-carries-several-captures-and-preview-is-a-layer.md)). The images go to whichever model the Action names; whether that model reads images is the endpoint's answer to give
-- Full settings window: the endpoints you keep with a key each, global hotkey, theme, language, and the Actions themselves — one Actions section listing every Action, each opening into its own editor
-- English and Simplified Chinese, switched in Settings ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md))
-- Actions stored as TOML files, with a file watcher that reloads them automatically on external changes
-- **Any OpenAI-compatible endpoint**, kept as a table and chosen **per Action** — DeepSeek by default, and every preset points at the vendor's own host, never an aggregator ([ADR-0021](./docs/adr/0021-any-openai-compatible-endpoint-chosen-per-action.md))
+## Install
 
-**Explicitly out of scope**
+Grab the latest [release](https://github.com/o0wen0o/beckon/releases):
 
-| Not doing | Why |
-| --- | --- |
-| Persisting Exchanges / history / search | [ADR-0004](./docs/adr/0004-exchanges-are-never-persisted.md) |
-| Action categories / tags | At a scale of a dozen or so Actions, fuzzy search is already enough; subdirectories can do this later at zero migration cost |
-| Parameterized Actions (choosing/filling variables at invocation time) | Breaks "press it and just wait for the result"; bidirectional translation can be left to the model to figure out in the system prompt |
-| "Replace the original text" write-back | [ADR-0002](./docs/adr/0002-selection-via-simulated-ctrl-c.md) |
-| Auto-popping a small icon after selecting text (PopClip style) | Requires globally polling the selection — power-hungry, easy to trigger by accident, and it fights the Ctrl+C grab approach |
-| Token usage display | A flash translation costs a fraction of a cent; seeing the number changes nothing |
-| Linux | [ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md) ports the platform layer to macOS; nobody has asked for a third. The stubs in `platform/fallback.rs` keep the crate compiling elsewhere, and are not a promise |
-| Code signing and notarization | Not set up on either platform. On macOS this is the difference between "runs on the machine that built it" and "runs on anyone else's" — see ADR-0013. Distinct from the signature on an *update*, which is mandatory and is [ADR-0022](./docs/adr/0022-releases-are-tagged-and-beckon-updates-itself.md) |
+| Platform | File | Note |
+| --- | --- | --- |
+| Windows | `Beckon_x.y.z_x64-setup.exe` | Recommended — this one self-updates |
+| Windows | `Beckon_x.y.z_x64_en-US.msi` | Installs fine, but cannot update itself |
+| macOS | `Beckon_x.y.z_universal.dmg` | Intel and Apple Silicon |
 
-## Decided behavior
+Nothing is code-signed, so the **first** install meets SmartScreen or Gatekeeper. Every update
+after it is verified against Beckon's own signing key instead.
 
-**Triggering and grabbing text**
+On macOS, grant **Accessibility** permission — without it, grabbing the selection silently returns
+nothing. Settings reads the permission and links you to the pane.
 
-- The global hotkey defaults to `Ctrl+Shift+Space` on Windows and `Cmd+Shift+Space` on macOS: Space with two modifiers on both, and only the first differs, because the platform's own launcher does — Spotlight is `Cmd+Space`. Both avoid the IME chords (`Ctrl+Space` Chinese/English on Microsoft Pinyin and "previous input source" on macOS, `Shift+Space` full-width/half-width, `Win+Space` switch IME), `Alt+Space` (system window menu, and commonly taken by PowerToys Run / uTools), and any `Ctrl+Alt` combination, which is `AltGr` on an ISO keyboard and so composes characters as well as the modifier state the grab must release before it can copy.
-- If the grab comes back empty, this is **not an error**: the Popover falls through to its input box and the user types instead ([ADR-0020](./docs/adr/0020-the-input-source-loses-its-selection-only-arm.md)). There is no arm of `input_source` that answers an empty grab with a hint and no window to act in.
-- The Popover always takes focus. Remember what was in front before showing it — the window on Windows, the application on macOS — and hand focus back on close.
-- The Popover is **620×500 to start with and resizable by dragging any edge or corner**, between 380×200 and 3840×2160. The size it is left at is remembered in `config.toml` and is what the next summon opens at ([ADR-0018](./docs/adr/0018-the-popover-is-resizable-and-remembers-its-size.md)). The Launcher is not resizable: its height is its match list.
-- On macOS the grab needs Accessibility permission, and the OS refuses it **silently**: the Selection just comes back empty. Settings reads the permission directly and says so, with a link to the pane; the hotkey itself still fires either way.
+## First run
 
-**Failure and waiting**
+Settings opens by itself, because there is no API key yet.
 
-- No timeout. When the network is down the HTTP layer errors immediately, and the Popover shows the error rather than spinning.
-- The UI must distinguish "waiting for the first token" from "currently streaming" — otherwise there is no way to tell whether the request is still alive.
-- Request failed → show the error inline in the Popover with a retry button; no system notification.
-- Stream cut off midway → keep whatever was already output and mark it "interrupted" underneath.
-- Esc cancels the request at any time.
-- A Capture is attached, then sent — never captured-and-sent. A cancelled snip is **not an error**: nothing was captured, nothing was sent, and the Popover says so. A screenshot that cannot be sent — over Beckon's 8 MB ceiling, past the four-per-turn ceiling, or bytes no decoder reads — is named as its own cause, distinct from a cancel, and leaves whatever is already attached alone.
+1. **Providers** — the default row is DeepSeek. Paste a key, hit **Test connection**. A local
+   endpoint (Ollama, LM Studio) needs no key at all.
+2. **Actions** — two examples are written for you on first launch. Edit them, or add your own.
+3. Press `Ctrl+Shift+Space` (`Cmd+Shift+Space` on macOS) to open the Launcher.
 
-**Configuration**
+## Using it
 
-- When recording a hotkey in the settings window, **attempt to register it immediately**; if it is taken, flag it red on the spot and refuse to save a hotkey that cannot be registered.
-- A hotkey registration failure at startup is never silent: the tray icon switches to an error state plus a one-time balloon notification that opens settings when clicked.
-- The model is **chosen from a list, not typed**, and there is one list **per endpoint**. It is that endpoint's own `/v1/models` response when the request succeeds, and otherwise what the configuration already names — plus the documented DeepSeek models, for DeepSeek's own host only. No credential, a rejected key or a dead network downgrades the list and says why, but never empties it. A model already named in `config.toml` or in an Action stays selectable even when nothing vouches for it, flagged rather than rewritten — including a model an Action pinned before its endpoint changed.
-- An Action names an endpoint or inherits `[defaults] provider`. Two endpoints can therefore be live at once: Translate on a fast hosted model and Summarise on one that never leaves the machine are the same hotkey away from each other, not a settings trip apart.
-- On first run (no key readable for the default endpoint), open the settings window directly. Each endpoint has its own "Test connection" — it sends a minimal request with that endpoint's own key. A **local** endpoint needs no key at all, and its absence is not reported as a fault.
-- On first run, if `actions/` does not exist, write two example Actions — one `auto` and one `prompt` — covering both Input Sources. Once deleted, they are not regenerated.
-- The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose OS appearance is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
-- The language is `en` or `zh`, and it applies to all three surfaces *and* the tray menu at once. **The default is `en`**, on a Chinese machine too, and there is no `system` arm: an OS locale is a guess about a reader rather than a setting, and a wrong guess replaces every word in the product — including the words explaining how to change it back ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)). Your Actions are never translated in either direction: they are your words, in your files.
+An **Action** is a saved prompt: a system prompt, a model, and how it gets its input. You pick one
+from the Launcher, or bind it to its own hotkey and skip the Launcher entirely.
 
-**Releases and updates**
+- **Launcher** — global hotkey, type to filter, Enter to run.
+- **Direct Hotkey** — per-Action, straight to the answer with zero interaction.
+- **Selection** — the platform copy shortcut is simulated to grab it, and your clipboard is put
+  back afterwards. Nothing selected is not an error: the Popover just gives you a box to type in.
+- **Popover** — takes focus, streams, accepts follow-up turns. Drag any edge or corner to resize;
+  the size sticks for next time. `Esc` cancels a running request, then closes.
+- **Screenshot** — the button in the Popover runs your OS snip tool and attaches the result, up to
+  four per turn. It is attached, then sent — never captured-and-sent. Whether the model reads
+  images is between you and your endpoint.
 
-- A `v*` tag is the only thing that ships. It builds both platforms, publishes a **draft** GitHub release, and writes the signed `latest.json` the installed app reads ([ADR-0022](./docs/adr/0022-releases-are-tagged-and-beckon-updates-itself.md)). The draft is the gate: nothing serves that manifest until it is published by hand with both platforms' assets on it.
-- The version lives in `package.json` and nowhere else. `tauri.conf.json` reads it, and it reaches the bundle, the release, the manifest and what the app reports about itself.
-- Beckon checks for a new version **once per launch**, thirty seconds in, and says nothing unless there is one. The tray menu's one variable item is the loud path: `Check for Updates…` with nothing pending, `Update to 0.2.0…` once there is. The automatic check can be turned off in Settings → Triggering; the tray item still asks whenever you click it.
-- An update is refused while the Popover is open, with a reason. Installing ends the process, and an Exchange is never on disk to come back to ([ADR-0004](./docs/adr/0004-exchanges-are-never-persisted.md)).
-- On Windows the `.exe` (NSIS) updates itself and the `.msi` does not — an MSI cannot be driven to replace files in place. Both ship; the manifest names the NSIS one. On macOS one universal `.dmg`, so Intel machines get an install and an update path too.
-- Updates are verified against Beckon's own signing key, compiled into the binary. That is not code signing: the **first** install still meets SmartScreen or Gatekeeper unsigned, and every update after it does not.
+Everything is bilingual — English and Simplified Chinese, all three windows plus the tray menu,
+switched in Settings. Default is `en`, and there is no "follow the system" arm: a wrong locale
+guess would replace every word in the product, including the words explaining how to change it
+back. Your own Actions are never translated in either direction.
 
-## Config file layout
+## Configuration
+
+Settings covers all of it, but the files are yours to edit — a watcher reloads them on change.
 
 ```
 %APPDATA%\Beckon\                        # Windows
 ~/Library/Application Support/Beckon/    # macOS
-├── config.toml        # global hotkey, autostart, theme, language, the endpoint table, Popover size
+├── config.toml
 └── actions/
     ├── translate.toml
     └── ask.toml
 ```
 
-The API keys are **not here** — they live in the OS credential store (the Windows Credential Manager, or the login Keychain on macOS) under the service name `Beckon`, one account per endpoint (`provider:{id}`) ([ADR-0005](./docs/adr/0005-api-key-in-windows-credential-manager.md), [ADR-0021](./docs/adr/0021-any-openai-compatible-endpoint-chosen-per-action.md)). There is no plaintext secret file anywhere on disk.
+The whole directory copies between platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super`
+all parse on both, and only the defaults differ.
 
-A config directory copies between the two platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super` all parse on both. Only the *defaults* differ, and only where a stock machine would refuse to register them.
-
-An Action's **identity is its filename**; the `name` field is only for display.
+**API keys are not in these files.** They live in the OS credential store — Windows Credential
+Manager, or the login Keychain — under service `Beckon`, one account per endpoint. There is no
+plaintext secret anywhere on disk.
 
 ### config.toml
 
 ```toml
 launcher_hotkey = "Ctrl+Shift+Space" # "Cmd+Shift+Space" is the macOS default
 autostart = true
-update_check = true             # the once-per-launch check; the tray item is not this switch
+update_check = true             # the once-per-launch check
 theme = "light"                 # light | dark | system
 language = "en"                 # en | zh
 
@@ -106,17 +94,17 @@ provider = "deepseek"           # what an Action that names no provider gets
 width = 620.0                   # written by dragging the window, not by hand
 height = 500.0
 
-# One table per endpoint. Written last: an array of tables swallows any header
-# after it. `id` is both what an Action names and the credential account.
+# One table per endpoint. Keep these last: an array of tables swallows any
+# header after it. `id` is both what an Action names and the credential account.
 [[api.providers]]
 id = "deepseek"
 label = "DeepSeek"              # display only
 base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
-thinking = false
+thinking = false                # DeepSeek thinks by default; off saves seconds
 reasoning = "deepseek"          # deepseek | qwen | none — how this endpoint is
                                 # told *not* to think. A property of the endpoint,
-                                # not of the model; prefilled by its preset.
+                                # not the model; prefilled by its preset.
 temperature = 1.3               # optional; omitted means let the endpoint decide
 key_page = "https://platform.deepseek.com/api_keys"
 
@@ -130,16 +118,21 @@ reasoning = "qwen"
 # No key_page, and no key needed: a local endpoint gets no Authorization header.
 ```
 
-A pre-provider file — `[api] base_url` with `[defaults] model` and `thinking` — keeps working: it folds
-into one row on load and the old keys leave the file the next time it is written.
+Two endpoints can be live at once — Translate on a fast hosted model, Summarise on one that never
+leaves the machine, one hotkey apart rather than a settings trip apart. Models are picked from a
+list per endpoint, not typed: the endpoint's own `/v1/models` when it answers, and otherwise what
+your config already names, flagged rather than rewritten. A pre-provider config file still works;
+it folds into one row on load.
 
-### actions/translate.toml
+### An Action
+
+An Action's **identity is its filename**. `name` is display only.
 
 ```toml
 name = "Translate"
 description = "Chinese <-> English"
 input_source = "auto"           # auto | prompt
-hotkey = "Ctrl+Alt+T"           # optional; if omitted, only callable from the Launcher
+hotkey = "Ctrl+Alt+T"           # optional; Launcher-only without it
 
 [prompt]
 system = """
@@ -152,28 +145,49 @@ Output only the translation — no explanation, no quotes, no prefix or suffix o
 #   provider  the [defaults] provider row
 #   model     that row's model
 #   thinking  that row's thinking
-# Overriding `provider` therefore moves what the other two inherit. There is no
-# per-Action temperature (ADR-0019, ADR-0021).
-```
-
-### actions/ask.toml
-
-```toml
-name = "Quick ask"
-input_source = "prompt"
-
-[prompt]
-system = "Answer concisely. Unless asked, do not enumerate bullet points and do not preamble at length."
-
+# Overriding `provider` therefore moves what the other two inherit.
 [model]
-provider = "ollama"             # optional; absent means [defaults] provider
+provider = "ollama"
 thinking = true
 ```
 
-## Tech stack
+## Updates
 
-Tauri v2 (Rust + web UI). For the reasoning and the rejected alternatives, see [ADR-0001](./docs/adr/0001-tauri-v2-on-windows-only.md); for the macOS port and what it changed, [ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md).
+Beckon checks once per launch, thirty seconds in, and says nothing unless there is something. The
+tray menu is the loud path: `Check for Updates…` normally, `Update to 0.2.0…` once there is one.
+The automatic check is a switch in Settings → Triggering; the tray item asks whenever you click it.
 
-Both platforms are built on every push by [.github/workflows/ci.yml](./.github/workflows/ci.yml). Half of `src-tauri/src/platform/` cannot be compiled on a Windows machine and half cannot be compiled on a Mac, so a green build on one is not evidence about the other. What a compiler cannot check is in [docs/macos-testing.md](./docs/macos-testing.md), along with the one Windows behaviour the port touched.
+An update is refused while a Popover is open, and says why — installing ends the process, and an
+Exchange is never on disk to come back to.
 
-DeepSeek is accessed via the OpenAI-compatible format at `https://api.deepseek.com`. Current models are `deepseek-v4-flash` / `deepseek-v4-pro`, 1M context, with **thinking mode on by default** — which is why `thinking = false` exists in the global defaults: leaving thinking on for translation-type Actions adds several seconds of latency and a pile of reasoning tokens for nothing. The legacy names `deepseek-chat` / `deepseek-reasoner` were discontinued on 2026-07-24; Beckon still recognises them so an old config keeps working, but does not offer them.
+## Not doing
+
+| | Why |
+| --- | --- |
+| History, search, saved conversations | An Exchange dies with the window, on purpose ([ADR-0004](./docs/adr/0004-exchanges-are-never-persisted.md)) |
+| Action categories or tags | At a dozen Actions, fuzzy search is enough; subdirectories can do it later for free |
+| Fill-in-the-blank Actions | Breaks "press it and wait"; the system prompt can decide instead |
+| Replacing the selected text in place | [ADR-0002](./docs/adr/0002-selection-via-simulated-ctrl-c.md) |
+| A floating icon after you select text | Needs global selection polling — power-hungry, easy to misfire, and it fights the copy-shortcut grab |
+| Token usage display | A flash translation costs a fraction of a cent; the number changes nothing |
+| Linux | The stubs in `platform/fallback.rs` keep the crate compiling, and are not a promise |
+| Code signing and notarization | Not set up on either platform ([ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md)) |
+
+## Building it yourself
+
+Tauri v2 — Rust backend, React webviews. Needs Node and a Rust toolchain.
+
+```bash
+npm install
+npm run tauri dev             # the real app, tray and all
+npm run tauri build           # installers; needs an updater signing key
+```
+
+`npx tauri signer generate` makes a throwaway key that bundles fine and signs nothing anyone else
+will accept. See [CLAUDE.md](./CLAUDE.md) for the four gates CI enforces.
+
+## Reading further
+
+- [CONTEXT.md](./CONTEXT.md) — the vocabulary, one name per concept, English and Chinese.
+- [docs/adr/](./docs/adr/) — 22 decisions, each with what was rejected and why.
+- [docs/macos-testing.md](./docs/macos-testing.md) — the behaviour no compiler checks.

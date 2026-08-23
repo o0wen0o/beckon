@@ -64,7 +64,10 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
     },
     "macOS": {
       "minimumSystemVersion": "10.15"
