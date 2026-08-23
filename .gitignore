@@ -6,7 +6,7 @@ src-tauri/target/
 .DS_Store
 .vite/
 
-.claude/
+.claude/skills/gitnexus
 AGENTS.md
 # Never the updater signing key, nor the DPAPI blob holding its password,
 # wherever someone parks a copy (ADR-0022).
