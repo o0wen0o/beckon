@@ -8,6 +8,7 @@
     "build": "vite build",
     "check": "tsc --noEmit",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/gen-icons.ps1",
+    "build:signed": "powershell -ExecutionPolicy Bypass -File scripts/build-signed.ps1",
     "tauri": "tauri"
   },
   "dependencies": {

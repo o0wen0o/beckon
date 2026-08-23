@@ -8,3 +8,7 @@ src-tauri/target/
 
 .claude/
 AGENTS.md
+# Never the updater signing key, nor the DPAPI blob holding its password,
+# wherever someone parks a copy (ADR-0022).
+*.key
+*.pass

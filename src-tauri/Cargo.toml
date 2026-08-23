@@ -1,5 +1,8 @@
 [package]
 name = "beckon"
+# Not the version Beckon reports. `tauri.conf.json` reads `../package.json`, and
+# that is what reaches the bundle, the manifest and `package_info().version`
+# (ADR-0022). This one is the crate's, and nothing consumes it.
 version = "0.1.0"
 description = "A background-resident LLM shortcut for Windows and macOS"
 edition = "2021"
@@ -22,6 +25,10 @@ tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
+# The self-update channel (ADR-0022). The signature it verifies is the minisign
+# one over the release artifact, not a platform code signature — the trust
+# anchor is `plugins.updater.pubkey`, compiled into this binary.
+tauri-plugin-updater = "2"
 
 # A Capture leaves the clipboard as a BMP on Windows and a TIFF on macOS, and
 # goes on the wire as base64 PNG (ADR-0016). Default features off: the two

@@ -16,7 +16,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 21 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 22 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -35,8 +35,21 @@ cargo test place_near_cursor  # one test by name substring
 cargo test platform::         # one module
 
 npm run tauri build           # MSI/NSIS or .app/.dmg; unsigned on both platforms
+npm run build:signed          # the same build, with the updater key set for that process only
 npm run icons                 # regenerate icons/ from assets (PowerShell, Windows)
 ```
+
+`tauri build` needs an updater signing key since ADR-0022 — `createUpdaterArtifacts` is on, so an
+unsigned bundle is an error, not an artifact. `npm run build:signed` is that build with
+`TAURI_SIGNING_PRIVATE_KEY_PATH` and `..._PASSWORD` set for the one process and nothing written to the
+user environment; `pwsh scripts/build-signed.ps1` is the same on macOS. Without the maintainer's key,
+`npx tauri signer generate` makes a throwaway that bundles fine and signs nothing anyone will accept.
+Nothing else needs it: `tauri dev` does not bundle, and neither do the four gates.
+
+Releasing is a tag and nothing else: bump `version` in `package.json` (the only file that carries it —
+`tauri.conf.json` reads it from there), tag `vX.Y.Z`, push. `release.yml` builds both platforms and
+leaves a **draft** release; publishing it by hand is what starts serving `latest.json` to installed
+copies.
 
 **Not done until** all four gates pass: `tsc --noEmit`, `cargo fmt --check`, `cargo clippy
 --all-targets -- -D warnings`, `cargo test`. [CI](./.github/workflows/ci.yml) runs them on
@@ -110,6 +123,7 @@ thread on Windows.
 | `hotkey.rs` | Parsing (`Ctrl`/`Alt`/`Shift`/`Cmd` parse on both platforms) and registration; failures surface in `ApplyReport`, never silently. |
 | `secrets.rs` | One API key **per Provider** via `keyring`, account `provider:{id}`, never plaintext on disk (ADR-0005, ADR-0021). "First run" means "no key readable" for the default row, never a file check — and never for a local row, which wants no header at all. |
 | `i18n.rs` | Only what Rust writes: the tray menu, the balloon, derived diagnostics. |
+| `update.rs` | The self-update channel (ADR-0022): check, verify, install, restart. Reaches `i18n`, `tray`, `state` and one constant from `trigger` and nothing else — an available update is neither config nor an Action, so it never touches the reload path, and no window renders it. |
 
 Read under a lock, drop the guard, then `await` — plain `std` locks, never held across a suspension
 point. `TurnPlan` exists for exactly this.
@@ -190,7 +204,11 @@ never translated in either direction.
   endpoint is a working setup, not a fault); 0011's override machinery gained a third row and needed
   no new mechanism for it; and 0019's decision — no temperature *control* — stands, while the 1.3 it
   pinned moved onto the DeepSeek row, which is the argument 0019 itself made about where a DeepSeek
-  quirk belongs.
+  quirk belongs. ADR-0022 supersedes nothing and adds a channel rather than changing one: 0013's
+  "nothing is signed or notarized" still holds for the *installer*, and the signature 0022 makes
+  mandatory is a different one over a different artifact; 0004's "the Exchange dies with the window"
+  is why an install is refused while a Popover is open; and 0003 is the reason update state lives in
+  `AppState` and the tray rather than in `config.toml` and a pane.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each
@@ -200,7 +218,7 @@ never translated in either direction.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (2046 symbols, 5102 relationships, 171 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (2099 symbols, 5246 relationships, 175 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

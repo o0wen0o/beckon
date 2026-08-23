@@ -34,7 +34,7 @@
 | 选中文本后自动弹出小图标（PopClip 那种） | 需要全局轮询选区 —— 费电、容易误触，而且与 Ctrl+C 抓取的思路冲突 |
 | 显示 token 用量 | 一次快速翻译的成本不到一分钱；看到这个数字改变不了任何决定 |
 | Linux | [ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md) 把平台层移植到了 macOS；第三个平台没人提出需求。`platform/fallback.rs` 里的桩代码只是让 crate 在别处仍能编译，不是承诺 |
-| 代码签名与公证 | 两个平台都没有配置。在 macOS 上，这是“只能在打包它的那台机器上运行”和“别人也能运行”之间的区别 —— 见 ADR-0013 |
+| 代码签名与公证 | 两个平台都没有配置。在 macOS 上，这是“只能在打包它的那台机器上运行”和“别人也能运行”之间的区别 —— 见 ADR-0013。这与**更新**包上的签名是两回事，后者是强制的，见 [ADR-0022](./docs/adr/0022-releases-are-tagged-and-beckon-updates-itself.md) |
 
 ## 已定行为
 
@@ -65,6 +65,15 @@
 - 主题是 `light`、`dark` 或 `system`，同时作用于三个界面。**默认是 `light`**，即使机器的系统外观是深色也一样：系统偏好只有在 `theme = "system"` 时才会被读取，而这需要主动选择。
 - 语言是 `en` 或 `zh`，同时作用于三个界面**以及**托盘菜单。**默认是 `en`**，在中文机器上也是如此，而且没有 `system` 这一档：系统区域设置是对**读者**的猜测，而不是一项设置，猜错了就会替换掉产品里的每一个词 —— 包括那些说明如何改回来的词（[ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)）。你的 Action 在任何方向上都不会被翻译：那是你自己的文字，在你自己的文件里。
 
+**发布与更新**
+
+- 只有 `v*` 标签会发布。它会构建两个平台、发布一个 GitHub **草稿**版本，并写出已安装的应用要读取的、带签名的 `latest.json`（[ADR-0022](./docs/adr/0022-releases-are-tagged-and-beckon-updates-itself.md)）。草稿就是闸门：在手动发布、且两个平台的产物都在上面之前，没有人能拿到那份清单。
+- 版本号只写在 `package.json` 里。`tauri.conf.json` 读取它，它再进入安装包、发布页、更新清单，以及应用对自己版本的回答。
+- Beckon **每次启动检查一次**新版本，启动后 30 秒执行，没有新版本就什么都不说。托盘菜单里那一个会变的条目是主动路径：没有待更新时是“检查更新…”，有了就是“更新到 0.2.0…”。自动检查可以在“设置 → 触发”中关掉；托盘菜单里的条目仍然点一次就检查一次。
+- 浮窗打开时会拒绝更新，并说明原因。安装会结束进程，而对话从来不在磁盘上，回不来（[ADR-0004](./docs/adr/0004-exchanges-are-never-persisted.md)）。
+- Windows 上能自我更新的是 `.exe`（NSIS），`.msi` 不能 —— MSI 无法被驱动去就地替换文件。两者都会发布，清单指向 NSIS 那一个。macOS 只有一个通用（universal）`.dmg`，这样 Intel 机器也有安装包，也有更新路径。
+- 更新包会用编译进二进制里的 Beckon 自有签名密钥校验。这不是代码签名：**第一次**安装依然会遇到未签名的 SmartScreen 或 Gatekeeper，之后的每次更新都不会。
+
 ## 配置文件布局
 
 ```
@@ -87,6 +96,7 @@ API 密钥**不在这里** —— 它们保存在操作系统的凭据存储中�
 ```toml
 launcher_hotkey = "Ctrl+Shift+Space" # macOS 默认值是 "Cmd+Shift+Space"
 autostart = true
+update_check = true             # 每次启动检查一次；托盘菜单里的条目不受这个开关管
 theme = "light"                 # light | dark | system
 language = "en"                 # en | zh
 

@@ -63,26 +63,50 @@ export function Triggering() {
       ) : null}
 
       {config ? (
-        <FieldGroup title={t.settings.triggering.summoning}>
-          <Field
-            label={t.settings.triggering.launcherHotkey}
-            hint={t.settings.triggering.launcherHotkeyHint}
-          >
-            {() => <HotkeyInput value={config.launcher_hotkey} onChange={setLauncherHotkey} />}
-          </Field>
+        <>
+          <FieldGroup title={t.settings.triggering.summoning}>
+            <Field
+              label={t.settings.triggering.launcherHotkey}
+              hint={t.settings.triggering.launcherHotkeyHint}
+            >
+              {() => <HotkeyInput value={config.launcher_hotkey} onChange={setLauncherHotkey} />}
+            </Field>
 
-          <Field label={autostartLabel} hint={t.settings.triggering.autostartHint(t.words.tray)}>
-            {({ id, describedBy }) => (
-              <OnOffSwitch
-                id={id}
-                describedBy={describedBy}
-                label={autostartLabel}
-                checked={config.autostart}
-                onChange={(on) => store.editConfig((draft) => (draft.autostart = on), true)}
-              />
-            )}
-          </Field>
-        </FieldGroup>
+            <Field label={autostartLabel} hint={t.settings.triggering.autostartHint(t.words.tray)}>
+              {({ id, describedBy }) => (
+                <OnOffSwitch
+                  id={id}
+                  describedBy={describedBy}
+                  label={autostartLabel}
+                  checked={config.autostart}
+                  onChange={(on) => store.editConfig((draft) => (draft.autostart = on), true)}
+                />
+              )}
+            </Field>
+          </FieldGroup>
+
+          {/* Here rather than on a pane of its own: the two settings on this
+              pane that are not the hotkey are both about the resident process
+              rather than about a request, and a fifth nav item for one switch is
+              more chrome than the switch (ADR-0022). What it governs is the
+              automatic check only — the tray item beside it is a click. */}
+          <FieldGroup title={t.settings.triggering.updates}>
+            <Field
+              label={t.settings.triggering.updateCheck}
+              hint={t.settings.triggering.updateCheckHint(t.words.tray)}
+            >
+              {({ id, describedBy }) => (
+                <OnOffSwitch
+                  id={id}
+                  describedBy={describedBy}
+                  label={t.settings.triggering.updateCheck}
+                  checked={config.update_check}
+                  onChange={(on) => store.editConfig((draft) => (draft.update_check = on), true)}
+                />
+              )}
+            </Field>
+          </FieldGroup>
+        </>
       ) : null}
     </>
   );

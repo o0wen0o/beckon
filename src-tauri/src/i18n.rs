@@ -31,6 +31,14 @@ const MODIFIERS: [&str; 2] = [
     "Cmd、Control、Option 或 Shift",
 ];
 
+/// What the platform calls the thing the tray icon sits in — the sentences that
+/// send a reader to the update item have to name a place they can find. Same
+/// shape as [`MODIFIERS`]: one wording per platform, both languages in a row.
+#[cfg(not(target_os = "macos"))]
+const TRAY_SURFACE: [&str; 2] = ["tray menu", "通知区域菜单"];
+#[cfg(target_os = "macos")]
+const TRAY_SURFACE: [&str; 2] = ["menu bar", "菜单栏"];
+
 // --- tray -----------------------------------------------------------------
 
 pub fn tray_settings(language: Language) -> &'static str {
@@ -69,6 +77,108 @@ pub fn settings_window_title(language: Language) -> &'static str {
     match language {
         Language::En => "Beckon Settings",
         Language::Zh => "Beckon 设置",
+    }
+}
+
+// --- updates (ADR-0022) -------------------------------------------------------
+
+/// The update item with nothing pending. It asks; it does not promise.
+pub fn tray_check_updates(language: Language) -> &'static str {
+    match language {
+        Language::En => "Check for Updates…",
+        Language::Zh => "检查更新…",
+    }
+}
+
+/// The same item once a check has found something. Named by version, because
+/// that is the one fact that makes clicking it a decision rather than a leap.
+pub fn tray_update_to(language: Language, version: &str) -> String {
+    match language {
+        Language::En => format!("Update to {version}…"),
+        Language::Zh => format!("更新到 {version}…"),
+    }
+}
+
+pub fn update_available_title(language: Language, version: &str) -> String {
+    match language {
+        Language::En => format!("Beckon {version} is available"),
+        Language::Zh => format!("Beckon {version} 可更新"),
+    }
+}
+
+/// Where to go, not what happened: neither platform routes a notification's
+/// click back to us reliably (see `tray::build`), so the sentence has to name
+/// the surface the reader must open themselves.
+pub fn update_available_body(language: Language, version: &str) -> String {
+    match language {
+        Language::En => format!(
+            "Open Beckon's {} and choose \"Update to {version}…\".",
+            TRAY_SURFACE[0]
+        ),
+        Language::Zh => format!(
+            "打开 Beckon 的{}，选择“更新到 {version}…”。",
+            TRAY_SURFACE[1]
+        ),
+    }
+}
+
+pub fn update_current_title(language: Language) -> &'static str {
+    match language {
+        Language::En => "Beckon is up to date",
+        Language::Zh => "Beckon 已是最新版本",
+    }
+}
+
+pub fn update_current_body(language: Language, version: &str) -> String {
+    match language {
+        Language::En => format!("Version {version} is the latest release."),
+        Language::Zh => format!("当前版本 {version} 已是最新发布。"),
+    }
+}
+
+/// One title for both halves of the channel: an endpoint that cannot be
+/// reached, a manifest that does not parse, a signature that does not verify and
+/// a download that died are the same event to the reader — Beckon tried to get a
+/// newer version and did not. Which one it was is the quoted cause below.
+pub fn update_failed_title(language: Language) -> &'static str {
+    match language {
+        Language::En => "Beckon: the update failed",
+        Language::Zh => "Beckon：更新失败",
+    }
+}
+
+pub fn update_failed_body(language: Language, detail: &str) -> String {
+    match language {
+        Language::En => format!(
+            "{detail}
+
+Try again from the {} later.",
+            TRAY_SURFACE[0]
+        ),
+        Language::Zh => format!(
+            "{detail}
+
+稍后可从{}再试。",
+            TRAY_SURFACE[1]
+        ),
+    }
+}
+
+/// A refusal, not a delay: installing ends this process, and the Exchange in an
+/// open Popover is not on disk anywhere to come back to (ADR-0004).
+pub fn update_busy_title(language: Language) -> &'static str {
+    match language {
+        Language::En => "Beckon cannot update right now",
+        Language::Zh => "Beckon 暂时无法更新",
+    }
+}
+
+pub fn update_busy_body(language: Language) -> &'static str {
+    match language {
+        Language::En => {
+            "Close the Popover first: Beckon restarts to finish updating, and an Exchange is never saved."
+        }
+        Language::Zh => "请先关闭浮窗：Beckon 需要重启以完成更新，而对话不会被保存。",
     }
 }
 
@@ -261,6 +371,16 @@ mod tests {
             tray_error_title(Language::En).to_string(),
             tray_error_body(Language::En, "x"),
             settings_window_title(Language::En).to_string(),
+            tray_check_updates(Language::En).to_string(),
+            tray_update_to(Language::En, "1.2.3"),
+            update_available_title(Language::En, "1.2.3"),
+            update_available_body(Language::En, "1.2.3"),
+            update_current_title(Language::En).to_string(),
+            update_current_body(Language::En, "1.2.3"),
+            update_failed_title(Language::En).to_string(),
+            update_failed_body(Language::En, "d"),
+            update_busy_title(Language::En).to_string(),
+            update_busy_body(Language::En).to_string(),
             hotkey_launcher(Language::En).to_string(),
             hotkey_missing(Language::En).to_string(),
             hotkey_invalid(Language::En, "a", "d"),
@@ -286,6 +406,16 @@ mod tests {
             tray_error_title(Language::Zh).to_string(),
             tray_error_body(Language::Zh, "x"),
             settings_window_title(Language::Zh).to_string(),
+            tray_check_updates(Language::Zh).to_string(),
+            tray_update_to(Language::Zh, "1.2.3"),
+            update_available_title(Language::Zh, "1.2.3"),
+            update_available_body(Language::Zh, "1.2.3"),
+            update_current_title(Language::Zh).to_string(),
+            update_current_body(Language::Zh, "1.2.3"),
+            update_failed_title(Language::Zh).to_string(),
+            update_failed_body(Language::Zh, "d"),
+            update_busy_title(Language::Zh).to_string(),
+            update_busy_body(Language::Zh).to_string(),
             hotkey_launcher(Language::Zh).to_string(),
             hotkey_missing(Language::Zh).to_string(),
             hotkey_invalid(Language::Zh, "a", "d"),
@@ -320,6 +450,13 @@ mod tests {
             assert!(hotkey_invalid(language, "Banana+T", "why").contains("why"));
             assert!(hotkey_needs_modifier(language, "T").contains("T"));
             assert!(tray_error_body(language, "summary").contains("summary"));
+            // The version is what makes the update item a decision rather than
+            // a leap, so it has to survive into both arms of all three.
+            assert!(tray_update_to(language, "0.2.0").contains("0.2.0"));
+            assert!(update_available_title(language, "0.2.0").contains("0.2.0"));
+            assert!(update_available_body(language, "0.2.0").contains("0.2.0"));
+            assert!(update_current_body(language, "0.1.0").contains("0.1.0"));
+            assert!(update_failed_body(language, "no route to host").contains("no route to host"));
             // Both numbers, or a reader who hits the ceiling cannot tell what
             // to aim under.
             let too_large = capture_too_large(language, 9 * 1024 * 1024, 8 * 1024 * 1024);

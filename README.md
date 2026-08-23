@@ -32,7 +32,7 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 | Auto-popping a small icon after selecting text (PopClip style) | Requires globally polling the selection — power-hungry, easy to trigger by accident, and it fights the Ctrl+C grab approach |
 | Token usage display | A flash translation costs a fraction of a cent; seeing the number changes nothing |
 | Linux | [ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md) ports the platform layer to macOS; nobody has asked for a third. The stubs in `platform/fallback.rs` keep the crate compiling elsewhere, and are not a promise |
-| Code signing and notarization | Not set up on either platform. On macOS this is the difference between "runs on the machine that built it" and "runs on anyone else's" — see ADR-0013 |
+| Code signing and notarization | Not set up on either platform. On macOS this is the difference between "runs on the machine that built it" and "runs on anyone else's" — see ADR-0013. Distinct from the signature on an *update*, which is mandatory and is [ADR-0022](./docs/adr/0022-releases-are-tagged-and-beckon-updates-itself.md) |
 
 ## Decided behavior
 
@@ -64,6 +64,15 @@ For terminology see [CONTEXT.md](./CONTEXT.md); for architectural decisions see 
 - The theme is `light`, `dark`, or `system`, and it applies to all three surfaces at once. **The default is `light`**, including on a machine whose OS appearance is dark: the system preference is read only by `theme = "system"`, which has to be chosen.
 - The language is `en` or `zh`, and it applies to all three surfaces *and* the tray menu at once. **The default is `en`**, on a Chinese machine too, and there is no `system` arm: an OS locale is a guess about a reader rather than a setting, and a wrong guess replaces every word in the product — including the words explaining how to change it back ([ADR-0015](./docs/adr/0015-english-and-chinese-from-one-config-field.md)). Your Actions are never translated in either direction: they are your words, in your files.
 
+**Releases and updates**
+
+- A `v*` tag is the only thing that ships. It builds both platforms, publishes a **draft** GitHub release, and writes the signed `latest.json` the installed app reads ([ADR-0022](./docs/adr/0022-releases-are-tagged-and-beckon-updates-itself.md)). The draft is the gate: nothing serves that manifest until it is published by hand with both platforms' assets on it.
+- The version lives in `package.json` and nowhere else. `tauri.conf.json` reads it, and it reaches the bundle, the release, the manifest and what the app reports about itself.
+- Beckon checks for a new version **once per launch**, thirty seconds in, and says nothing unless there is one. The tray menu's one variable item is the loud path: `Check for Updates…` with nothing pending, `Update to 0.2.0…` once there is. The automatic check can be turned off in Settings → Triggering; the tray item still asks whenever you click it.
+- An update is refused while the Popover is open, with a reason. Installing ends the process, and an Exchange is never on disk to come back to ([ADR-0004](./docs/adr/0004-exchanges-are-never-persisted.md)).
+- On Windows the `.exe` (NSIS) updates itself and the `.msi` does not — an MSI cannot be driven to replace files in place. Both ship; the manifest names the NSIS one. On macOS one universal `.dmg`, so Intel machines get an install and an update path too.
+- Updates are verified against Beckon's own signing key, compiled into the binary. That is not code signing: the **first** install still meets SmartScreen or Gatekeeper unsigned, and every update after it does not.
+
 ## Config file layout
 
 ```
@@ -86,6 +95,7 @@ An Action's **identity is its filename**; the `name` field is only for display.
 ```toml
 launcher_hotkey = "Ctrl+Shift+Space" # "Cmd+Shift+Space" is the macOS default
 autostart = true
+update_check = true             # the once-per-launch check; the tray item is not this switch
 theme = "light"                 # light | dark | system
 language = "en"                 # en | zh
 

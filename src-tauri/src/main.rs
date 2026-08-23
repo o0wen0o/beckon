@@ -17,6 +17,7 @@ mod seeds;
 mod state;
 mod tray;
 mod trigger;
+mod update;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
@@ -40,6 +41,7 @@ fn main() {
         .manage(state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
@@ -240,6 +242,11 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
     if needs_key {
         trigger::show_settings(&handle);
     }
+
+    // One quiet check per launch (ADR-0022). Last, and on its own task: it is
+    // network-bound, nothing else in `setup` waits on it, and a machine that is
+    // offline at login must reach the end of this function anyway.
+    update::check_on_startup(&handle);
 
     Ok(())
 }

@@ -60,6 +60,12 @@ jobs:
   # The bundlers themselves — MSI/NSIS on Windows, .app/.dmg on macOS. Slower
   # than `check`, and nothing above it exercises the icon set or Info.plist, so
   # it runs on demand rather than on every push.
+  #
+  # Not a release: `release.yml` does that from a tag (ADR-0022). This is the
+  # smoke test for the bundlers, and it needs the signing key for the same
+  # reason a local `tauri build` does — `createUpdaterArtifacts` is on, so an
+  # unsigned bundle is an error rather than an artifact. A fork without the
+  # secret cannot run this job; it can run everything above it.
   bundle:
     name: bundle (${{ matrix.os }})
     if: github.event_name == 'workflow_dispatch'
@@ -81,6 +87,9 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npm run tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: beckon-${{ matrix.os }}

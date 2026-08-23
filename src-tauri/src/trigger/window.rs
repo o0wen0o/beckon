@@ -37,7 +37,7 @@ pub(super) fn build_settings_window(app: &AppHandle) -> tauri::Result<WebviewWin
 }
 
 /// The title bar is chrome, not markup, so `config-changed` does not reach it —
-/// the same gap `tray::retranslate` fills. Only Settings has one to redraw.
+/// the same gap `tray::rebuild` fills. Only Settings has one to redraw.
 pub fn retitle_settings(app: &AppHandle, language: crate::config::Language) {
     if let Some(window) = app.get_webview_window(WINDOW_SETTINGS) {
         let _ = window.set_title(i18n::settings_window_title(language));

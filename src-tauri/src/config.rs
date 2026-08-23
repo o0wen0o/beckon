@@ -68,6 +68,12 @@ pub const MAX_POPOVER_H: f64 = 2160.0;
 pub struct Config {
     pub launcher_hotkey: String,
     pub autostart: bool,
+    /// Whether the automatic once-per-launch update check runs (ADR-0022).
+    ///
+    /// Only the automatic one. The tray's own item is a click, and a click is
+    /// never what this declines — turning it off means Beckon contacts nothing
+    /// on its own, not that it refuses to answer when asked.
+    pub update_check: bool,
     /// Declared before the tables: `toml` serializes in field order and a
     /// scalar written after a table would land inside it.
     pub theme: Theme,
@@ -495,6 +501,7 @@ impl Default for Config {
         let mut config = Self {
             launcher_hotkey: DEFAULT_LAUNCHER_HOTKEY.to_string(),
             autostart: true,
+            update_check: true,
             theme: Theme::default(),
             language: Language::default(),
             defaults: ModelDefaults::default(),
@@ -684,9 +691,22 @@ mod tests {
     fn missing_fields_fall_back_to_defaults() {
         let parsed = loaded("autostart = false\n");
         assert!(!parsed.autostart);
+        // Container-level `serde(default)` fills a missing field from
+        // `Config::default()` rather than from the field type's default — which
+        // is the only reason a bool that has to arrive `true` can be one.
+        assert!(parsed.update_check);
         assert_eq!(parsed.launcher_hotkey, DEFAULT_LAUNCHER_HOTKEY);
         assert_eq!(parsed.defaults.provider, DEFAULT_PROVIDER_ID);
         assert_eq!(parsed.api.providers, vec![Provider::deepseek()]);
+    }
+
+    /// A file that declines the automatic check is honoured, and nothing else
+    /// about it moves (ADR-0022).
+    #[test]
+    fn the_update_check_can_be_declined() {
+        let parsed = loaded("update_check = false");
+        assert!(!parsed.update_check);
+        assert!(parsed.autostart);
     }
 
     /// The whole point of the layer: DeepSeek out of the box, and one row.
@@ -1069,6 +1089,7 @@ mod tests {
             r#"
 launcher_hotkey = "{DEFAULT_LAUNCHER_HOTKEY}"
 autostart = true
+update_check = true
 theme = "light"
 language = "en"
 

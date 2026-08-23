@@ -88,6 +88,9 @@ export type Language = "en" | "zh";
 export interface Config {
   launcher_hotkey: string;
   autostart: boolean;
+  /** The automatic once-per-launch update check (ADR-0022). The tray's own item
+   *  is a click and is never what this declines. */
+  update_check: boolean;
   theme: Theme;
   language: Language;
   /** What an Action that names no provider gets. Not "active": nothing is. */

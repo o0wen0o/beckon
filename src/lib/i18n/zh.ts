@@ -197,7 +197,7 @@ export const ZH: Strings = {
 
     triggering: {
       title: "触发",
-      lede: "如何唤起 Beckon。每个热键在录制的一刻即注册生效。",
+      lede: "如何唤起 Beckon，以及它如何自我更新。每个热键在录制的一刻即注册生效。",
       hotkeyDeadLead: "有热键未生效。",
       hotkeyDeadBody: "请在下方录制另一个组合键；录制的一刻即注册生效。",
       permissionLead: "Beckon 无法读取选中内容。",
@@ -210,6 +210,10 @@ export const ZH: Strings = {
       launcherHotkey: "启动器热键",
       launcherHotkeyHint: "若组合键已被占用，它会变红且不会保存。",
       autostartHint: (tray: string) => `Beckon 常驻在${tray}；随机器一起启动才是它的意义所在。`,
+      updates: "更新",
+      updateCheck: "自动检查更新",
+      updateCheckHint: (tray: string) =>
+        `每次启动后 30 秒检查一次，没有新版本就什么都不说。${tray}里的那个条目每次点击都会检查 —— 那不受这个开关管。`,
     },
 
     appearance: {

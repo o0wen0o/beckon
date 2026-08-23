@@ -1,0 +1,93 @@
+# A tag is the only thing that ships (ADR-0022).
+#
+# `ci.yml` proves the code compiles on both platforms; this file turns one
+# commit into the artifacts a person installs, plus the signed `latest.json` the
+# app in the tray reads. The two are separate because a release is not a check
+# that happens to have run on `main`: it is named, it is signed, and it is
+# published once.
+#
+# The release is left as a **draft**. `fail-fast: false` means one platform can
+# fail without cancelling the other, so a draft is how a half-built release is
+# stopped from reaching anybody: nothing serves `latest.json` until the draft is
+# published by hand, with both platforms' assets on it.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# `tauri-action` creates the release and uploads to it.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # MSI and NSIS both. Only the NSIS build can update itself — the
+          # updater replaces files in place and an MSI cannot be told to — so
+          # the MSI is the install-only target and `latest.json` points at the
+          # NSIS one.
+          - os: windows-latest
+            args: ""
+            rust-targets: ""
+          # One universal `.app`, not an arm64 one: the runner is Apple silicon,
+          # so the default build would leave every Intel Mac with no artifact at
+          # all — and no update path either, because `latest.json` names one
+          # macOS asset.
+          - os: macos-latest
+            args: "--target universal-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The minisign key `plugins.updater.pubkey` verifies against. Without
+          # it the build fails rather than shipping an unsignable release:
+          # `createUpdaterArtifacts` is on in `tauri.conf.json`.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Beckon ${{ github.ref_name }}
+          releaseDraft: true
+          # Neither platform is code-signed, so say so where it is read rather
+          # than only in the README (ADR-0013).
+          releaseBody: |
+            Install, then press the hotkey.
+
+            **Windows** — `.exe` (NSIS) is the one that updates itself; the
+            `.msi` installs but cannot. SmartScreen will warn: nothing here is
+            code-signed.
+
+            **macOS** — universal `.dmg`. Gatekeeper quarantines it, so on first
+            run: `xattr -dr com.apple.quarantine /Applications/Beckon.app`.
+
+            Updates after this install are verified against Beckon's own signing
+            key and need none of the above.
+          # `latest.json` — the manifest every installed copy polls. Without
+          # this the release has artifacts nobody's app can find.
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

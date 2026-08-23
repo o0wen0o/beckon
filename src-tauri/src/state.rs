@@ -239,6 +239,15 @@ pub struct AppState {
     pub capturing: AtomicBool,
     /// The startup hotkey-failure balloon fires once only (README).
     pub balloon_shown: AtomicBool,
+    /// The version the update endpoint is offering, once a check has found one
+    /// (ADR-0022). Not config and not derived from disk: it is what the tray
+    /// menu's one variable item is labelled from, and the only thing that can
+    /// act on it is that item.
+    pub pending_update: Mutex<Option<String>>,
+    /// A download-and-install is running. One at a time, for the same reason
+    /// `capturing` is: the menu stays clickable throughout, and two installers
+    /// writing the same files is not a state worth defining.
+    pub updating: AtomicBool,
     /// The size the Popover window was last *told* to be (ADR-0018).
     ///
     /// Every resize reports itself, ours included, and the two have to be told
@@ -268,6 +277,8 @@ impl AppState {
             watcher: Mutex::new(None),
             capturing: AtomicBool::new(false),
             balloon_shown: AtomicBool::new(false),
+            pending_update: Mutex::new(None),
+            updating: AtomicBool::new(false),
             popover_asked_size: Mutex::new(PopoverSize::default()),
             startup_errors: Mutex::new(Vec::new()),
         }

@@ -241,7 +241,7 @@ export const EN = {
 
     triggering: {
       title: "Triggering",
-      lede: "How Beckon is summoned. Every hotkey is registered the moment you record it.",
+      lede: "How Beckon is summoned, and how it replaces itself. Every hotkey is registered the moment you record it.",
       hotkeyDeadLead: "A hotkey is not active.",
       hotkeyDeadBody: "Record a different combination below; it is registered the moment you record it.",
       permissionLead: "Beckon cannot read the Selection.",
@@ -254,6 +254,13 @@ export const EN = {
       launcherHotkey: "Launcher hotkey",
       launcherHotkeyHint: "If the combination is already taken it goes red and is not saved.",
       autostartHint: (tray: string) => `Beckon lives in the ${tray}; starting with the machine is the point.`,
+      updates: "Updates",
+      updateCheck: "Check for updates automatically",
+      /** Says what the switch does *not* cover: the tray item stays there
+       *  either way, and would otherwise read as the switch being ignored
+       *  (ADR-0022). */
+      updateCheckHint: (tray: string) =>
+        `Once per launch, thirty seconds in, and silent unless there is one. The ${tray} item checks whenever you click it — that is not this switch.`,
     },
 
     appearance: {

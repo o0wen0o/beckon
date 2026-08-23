@@ -55,7 +55,7 @@ pub fn reload_config(app: &AppHandle) {
     // Neither the tray nor a title bar is markup, so no `config-changed` event
     // redraws either of them.
     if language_changed {
-        tray::retranslate(app, language);
+        tray::rebuild(app);
         crate::trigger::window::retitle_settings(app, language);
     }
 

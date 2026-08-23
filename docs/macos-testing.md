@@ -78,6 +78,12 @@ Ordered by how likely they are to be wrong.
 | 14 | Switch the theme to **System** and flip macOS between light and dark | All three surfaces follow, live |
 | 15 | Turn **Start at login** on, log out, log back in | Beckon is running |
 | 16 | Quit Beckon, delete `~/Library/Application Support/Beckon/`, relaunch | The two example Actions are written and Settings opens on Connection |
+| 17 | With no newer release published, open the menu-bar menu and click **Check for Updates…** | A notification says Beckon is up to date and names the running version. The item still reads "Check for Updates…" (ADR-0022) |
+| 18 | Publish a release one version higher, wait for the check (or click the item), then click **Update to X…** with a Popover open | It refuses, saying to close the Popover first: installing ends the process and the Exchange is not saved (ADR-0004) |
+| 19 | Close the Popover and click **Update to X…** again | The `.app` is replaced and Beckon relaunches itself, still in the menu bar, now reporting the new version. This is the macOS half of ADR-0022 — `restart` has to run on AppKit's thread and the bundle swap is not something a compiler can check |
+| 19a | Repeat on an **Intel** Mac | Same. The release ships one universal `.dmg`, so an arm64-only artifact would surface here as "up to date" on a Mac that is not |
+| 19b | Point `plugins.updater.endpoints` at a manifest signed with a **different** key, then check | It fails with a signature error rather than installing. The trust anchor is the key compiled into the running binary, and this is the only test that proves it |
+| 19c | Turn **Check for updates automatically** off in Settings → Triggering, then restart Beckon with a newer release published | Nothing is said, and no request leaves. The menu-bar item still checks when clicked, and still finds it |
 
 ## What to send back
 
@@ -97,6 +103,8 @@ For anything that fails, the useful report is:
 - **Rebuilding changes the app's identity** as far as Accessibility is concerned. If the grab
   stops working after a rebuild, remove Beckon from the Accessibility list and add it again.
 - The Mac App Store is foreclosed by `macOSPrivateApi` (ADR-0013). Direct distribution is not.
+- **The automatic update check runs once per launch** — thirty seconds in, one HTTP GET to GitHub —
+  unless it is turned off in Settings → Triggering. The menu-bar item asks either way (ADR-0022).
 
 ## The one thing to re-check on Windows
 
@@ -114,6 +122,11 @@ That makes Popover placement the Windows regression check, and it is 30 seconds:
 3. On a multi-monitor setup, fire one on the secondary display — including one positioned above
    or to the left of the primary, where coordinates go negative.
 4. On a display at 150% scaling, check the window is the right size.
+
+And one thing that is not the port's: the Windows update path (ADR-0022) has never been run either.
+Install from the `.exe`, publish a newer release, and take the tray menu's **Update to X…** — the NSIS
+installer should replace Beckon and bring it back to the tray without a wizard. The `.msi` is not part
+of that check; it cannot update itself by design.
 
 The unit tests cover the arithmetic (`platform::tests`); what they cannot cover is whether the
 work area handed to it excludes the taskbar.
