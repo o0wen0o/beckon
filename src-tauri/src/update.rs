@@ -141,7 +141,18 @@ pub fn install(app: &AppHandle) {
                 // walks the windows and the tray, which is AppKit's thread and
                 // nobody else's (ADR-0013).
                 let restarting = app.clone();
-                let _ = app.run_on_main_thread(move || restarting.restart());
+                let _ = app.run_on_main_thread(move || {
+                    // Hand the single-instance claim back first (ADR-0023).
+                    // `restart` spawns the successor and only then exits, and
+                    // `cleanup_before_exit` does not reach plugins — so without
+                    // this the new copy can find the old one still listening,
+                    // conclude Beckon is already running, and exit. Booting
+                    // takes far longer than the old process's exit, so the race
+                    // is one Beckon would usually win; usually is not a
+                    // guarantee, and this is the plugin's own way out.
+                    tauri_plugin_single_instance::destroy(&restarting);
+                    restarting.restart()
+                });
             }
             // The version went away between the notification and the click.
             // Said out loud either way: the user asked for something and is

@@ -6,7 +6,7 @@ name = "beckon"
 version = "0.1.0"
 description = "A background-resident LLM shortcut for Windows and macOS"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.77.2"
 default-run = "beckon"
 
 [build-dependencies]
@@ -21,6 +21,9 @@ tauri = { version = "2", features = [
     "image-png",
     "macos-private-api",
 ] }
+# One process, always (ADR-0023). Registered first in `main` so a second launch
+# dies before it can touch the tray, the hotkeys or the config watcher.
+tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"

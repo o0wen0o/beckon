@@ -53,6 +53,10 @@ from the Launcher, or bind it to its own hotkey and skip the Launcher entirely.
   four per turn. It is attached, then sent — never captured-and-sent. Whether the model reads
   images is between you and your endpoint.
 
+Beckon is one process. Launching it again while it is already resident opens Settings instead of
+starting a second copy. On macOS it lives in the menu bar with no Dock tile, so there is nothing to
+double-click in the first place — reopening the app hands back the copy that is already running.
+
 Everything is bilingual — English and Simplified Chinese, all three windows plus the tray menu,
 switched in Settings. Default is `en`, and there is no "follow the system" arm: a wrong locale
 guess would replace every word in the product, including the words explaining how to change it

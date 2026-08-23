@@ -17,7 +17,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 22 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 23 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -107,6 +107,13 @@ eight grips that resize it are markup (`ResizeGrips`) handing the drag to `start
 the window reports the result back debounced. Rust drops any report matching `popover_asked_size` —
 the size it last asked for — because every `set_size` reports itself, and a report echoing what Rust
 just asked for is not a drag.
+
+One process, always (ADR-0023). `tauri-plugin-single-instance` is the **first** plugin registered in
+`main`, because plugin setups run in order and `setup` runs after all of them — so a second launch
+exits before it can claim a hotkey, add a second tray icon or start a second watcher. It exits by
+telling the running copy to open Settings, which is the only surface a *launch* can be asking for.
+`update::install` releases the lock by hand before `restart`, since `cleanup_before_exit` does not
+reach plugins.
 
 Spawn a thread for the grab: it blocks up to ~300ms polling the clipboard and must stay off the
 event-loop thread. `show_settings` spawns too — `WebviewWindowBuilder::build` deadlocks on the main
@@ -209,7 +216,10 @@ never translated in either direction.
   "nothing is signed or notarized" still holds for the *installer*, and the signature 0022 makes
   mandatory is a different one over a different artifact; 0004's "the Exchange dies with the window"
   is why an install is refused while a Popover is open; and 0003 is the reason update state lives in
-  `AppState` and the tray rather than in `config.toml` and a pane.
+  `AppState` and the tray rather than in `config.toml` and a pane. ADR-0023 supersedes nothing and
+  *protects* several: 0003's filesystem-as-truth is why a second writer is a correctness problem and
+  not a waste of memory, `hotkey.rs`'s "failures surface, never silently" is what a second copy would
+  turn into a lie, and 0022's restart is the one place the lock has to be handed back by hand.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each

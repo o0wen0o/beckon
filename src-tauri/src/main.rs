@@ -39,6 +39,20 @@ fn main() {
 
     let app = tauri::Builder::default()
         .manage(state)
+        // The first plugin on purpose (ADR-0023). Beckon is one process: a
+        // second launch reaches the running one, is told to open Settings, and
+        // exits. Registered ahead of everything because plugin setups run in
+        // order and `setup` runs after all of them, so a second instance dies
+        // before it can claim a hotkey, add a second tray icon or start a
+        // second watcher on the same files.
+        //
+        // The callback runs in *this* process, on the thread that pumps events
+        // (a `WM_COPYDATA` handler on Windows). `show_settings` spawns, so the
+        // pump is never blocked and `WebviewWindowBuilder::build` stays off the
+        // main thread.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            trigger::show_settings(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

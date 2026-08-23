@@ -84,6 +84,9 @@ Ordered by how likely they are to be wrong.
 | 19a | Repeat on an **Intel** Mac | Same. The release ships one universal `.dmg`, so an arm64-only artifact would surface here as "up to date" on a Mac that is not |
 | 19b | Point `plugins.updater.endpoints` at a manifest signed with a **different** key, then check | It fails with a signature error rather than installing. The trust anchor is the key compiled into the running binary, and this is the only test that proves it |
 | 19c | Turn **Check for updates automatically** off in Settings → Triggering, then restart Beckon with a newer release published | Nothing is said, and no request leaves. The menu-bar item still checks when clicked, and still finds it |
+| 20 | With Beckon resident, run `open -n /Applications/Beckon.app` | Settings opens and there is still one menu-bar icon. A Finder double-click is *not* this test — LaunchServices reopens the running copy without starting a process, so nothing happens at all (ADR-0023) |
+| 20a | With an installed Beckon resident, run `npm run tauri dev` | The dev build exits at once and the installed copy's Settings opens. Both carry `com.beckon.app`, so quit the installed one from the menu bar before developing (ADR-0023) |
+| 20b | Do step 19, then run `open -n` again | Settings opens, still one process. The successor reclaimed the socket the old copy released by hand before `restart` (ADR-0023) |
 
 ## What to send back
 
