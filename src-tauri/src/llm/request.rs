@@ -6,14 +6,22 @@
 //! Every OpenAI-compatible endpoint agrees about `model`, `messages` and
 //! `stream`. They disagree about exactly one thing Beckon needs: how you say
 //! *do not think*. DeepSeek takes a `thinking` object, Qwen3 behind vLLM /
-//! SGLang / DashScope takes `chat_template_kwargs.enable_thinking`, and most
-//! endpoints have no such control at all.
+//! SGLang / DashScope takes `chat_template_kwargs.enable_thinking`, OpenAI's own
+//! API takes `reasoning_effort: "none"`, and most endpoints have no such control
+//! at all.
 //!
 //! Which of those an endpoint speaks cannot be derived from the model id —
-//! `deepseek-ai/DeepSeek-V3` served by SiliconFlow speaks plain OpenAI — so
+//! `deepseek-ai/DeepSeek-V4-Flash` served by SiliconFlow speaks plain OpenAI — so
 //! [`Reasoning`] is a field on the row, prefilled by its preset. This module
 //! reads it and sends nothing it was not told to: an unrecognised field is a
 //! `400` on a strict endpoint, not a field politely ignored.
+//!
+//! A dialect being the endpoint's property does not mean every model behind that
+//! endpoint takes the field. Two of the three arms consult the model as well —
+//! [`models::find`] for DeepSeek's catalog, [`EFFORT_NONE_FAMILIES`] for
+//! OpenAI's — because both hosts serve models that disagree with their own
+//! sibling about the switch. The row still decides *which* field could be sent;
+//! the model decides whether it is.
 //!
 //! ## Thinking mode
 //!
@@ -58,6 +66,9 @@ enum ThinkingWire {
     /// `chat_template_kwargs: {"enable_thinking": bool}` — the vLLM/SGLang
     /// convention for a Qwen3 chat template.
     Qwen(bool),
+    /// `reasoning_effort: "none"` — OpenAI's own API. No payload: the field is
+    /// only ever sent to suppress, so the variant carries no direction.
+    OpenAi,
     /// Send nothing: this endpoint has no switch, or the model has none.
     Omit,
 }
@@ -86,6 +97,9 @@ pub fn build_body(
         ThinkingWire::Qwen(enabled) => {
             body["chat_template_kwargs"] = json!({ "enable_thinking": enabled });
         }
+        ThinkingWire::OpenAi => {
+            body["reasoning_effort"] = json!("none");
+        }
         ThinkingWire::Omit => {}
     }
 
@@ -105,6 +119,36 @@ pub fn build_probe_body(model: &str) -> Value {
     })
 }
 
+/// The OpenAI model families whose `reasoning_effort` accepts `"none"`.
+///
+/// **Checked 2026-08-24.** Prefixes, matched case-insensitively: a family's dated
+/// snapshots take the same parameter set as the alias that names them.
+///
+/// This is per-*model* knowledge inside a per-endpoint dialect, which ADR-0021
+/// otherwise keeps out — and it is here for the same reason
+/// [`Reasoning::Deepseek`] consults [`models::find`]: one host serves models that
+/// disagree about the field. `api.openai.com` also serves `gpt-4o`, which rejects
+/// `reasoning_effort` outright, and `o3`, whose floor is `low`; `"none"` is a
+/// `400` on every turn for either, and `get_models` offers both from the
+/// endpoint's own list. `gpt-5.6` is the family that added the real floor, which
+/// is what made this arm expressible at all.
+///
+/// **Unmatched is [`ThinkingWire::Omit`], never an error**, and the asymmetry is
+/// deliberate: a model missing from this list either does not reason, in which
+/// case nothing was lost, or reasons at its own default, which costs a slower
+/// turn and not a failed one. The list falling behind OpenAI is therefore cheap,
+/// while an allowlist guessed wide costs the turn — so widen it only by adding a
+/// family the docs state, never by loosening the rule.
+const EFFORT_NONE_FAMILIES: &[&str] = &["gpt-5.6"];
+
+/// Whether OpenAI documents `reasoning_effort: "none"` for this model.
+fn accepts_effort_none(model: &str) -> bool {
+    let model = model.trim().to_ascii_lowercase();
+    EFFORT_NONE_FAMILIES
+        .iter()
+        .any(|family| model.starts_with(family))
+}
+
 fn thinking_wire(
     reasoning: Reasoning,
     model: &str,
@@ -116,6 +160,16 @@ fn thinking_wire(
         // you pick deliberately included.
         Reasoning::None => Ok(ThinkingWire::Omit),
         Reasoning::Qwen => Ok(ThinkingWire::Qwen(thinking)),
+        // One direction only, and only for a family that documents the floor.
+        // `thinking = true` sends nothing and lets the endpoint's own default
+        // effort stand, which is the same shape as an always-on model asked to
+        // think; an undocumented family omits for the reason
+        // [`EFFORT_NONE_FAMILIES`] gives.
+        Reasoning::OpenAi => Ok(if !thinking && accepts_effort_none(model) {
+            ThinkingWire::OpenAi
+        } else {
+            ThinkingWire::Omit
+        }),
         Reasoning::Deepseek => match models::find(model) {
             // A catalogued DeepSeek model: the one table decides, because the
             // legacy ids picked the mode through the id itself.
@@ -212,6 +266,70 @@ mod tests {
         }
     }
 
+    /// The only one-directional arm. OpenAI's `reasoning_effort` has a real
+    /// `none`, so `false` is expressible — but there is no value that means
+    /// "reason as you normally would", and inventing a level the user never
+    /// chose would be worse than silence.
+    #[test]
+    fn an_openai_row_sends_the_effort_floor_only_to_suppress() {
+        let off = build_body(
+            &provider(Reasoning::OpenAi, None),
+            &params("gpt-5.6-terra", false),
+            &[Message::user("hi")],
+        )
+        .unwrap();
+        assert_eq!(off["reasoning_effort"], json!("none"));
+
+        let on = build_body(
+            &provider(Reasoning::OpenAi, None),
+            &params("gpt-5.6-terra", true),
+            &[Message::user("hi")],
+        )
+        .unwrap();
+        assert!(on.get("reasoning_effort").is_none());
+    }
+
+    /// The dialect is the row's, but the field is the model's: `api.openai.com`
+    /// serves models that reject `reasoning_effort` outright and models whose
+    /// floor is `low`, and the dropdown offers whatever `/v1/models` returns. A
+    /// row that sent the floor for all of them would `400` on every turn the
+    /// moment the user picked one.
+    #[test]
+    fn an_openai_row_sends_the_floor_only_for_a_family_that_documents_it() {
+        for model in ["gpt-4o", "o3", "gpt-4.1-mini", "text-embedding-3-large"] {
+            assert_eq!(
+                thinking_wire(Reasoning::OpenAi, model, false).unwrap(),
+                ThinkingWire::Omit,
+                "{model}"
+            );
+        }
+        // A dated snapshot of a family that does document it, and the id's case
+        // is the API's to normalise.
+        for model in ["gpt-5.6-terra", "GPT-5.6-Terra", "gpt-5.6-terra-2026-07-11"] {
+            assert_eq!(
+                thinking_wire(Reasoning::OpenAi, model, false).unwrap(),
+                ThinkingWire::OpenAi,
+                "{model}"
+            );
+        }
+    }
+
+    /// Every family on the allowlist is a prefix rather than a whole id, and the
+    /// preset row's starting model is one of them — a preset whose own model
+    /// silently lost suppression is the failure this arm was added to fix.
+    #[test]
+    fn the_openai_preset_model_can_suppress_its_own_reasoning() {
+        let openai = crate::config::presets()
+            .into_iter()
+            .find(|row| row.reasoning == Reasoning::OpenAi)
+            .expect("a preset row speaks the OpenAI dialect");
+        assert!(
+            accepts_effort_none(&openai.model),
+            "{} is not on EFFORT_NONE_FAMILIES",
+            openai.model
+        );
+    }
+
     /// The default arm, and the one most endpoints get: nothing about thinking
     /// on the wire in either direction. An unknown field is a 400 on a strict
     /// endpoint, so silence is the only safe answer for a host that said nothing.
@@ -220,12 +338,13 @@ mod tests {
         for thinking in [true, false] {
             let body = build_body(
                 &provider(Reasoning::None, None),
-                &params("gpt-5-mini", thinking),
+                &params("some-model", thinking),
                 &[Message::user("hi")],
             )
             .unwrap();
             assert!(body.get("thinking").is_none());
             assert!(body.get("chat_template_kwargs").is_none());
+            assert!(body.get("reasoning_effort").is_none());
         }
     }
 
@@ -248,7 +367,7 @@ mod tests {
     /// ids could have produced.
     #[test]
     fn the_same_model_sends_a_different_body_per_endpoint() {
-        let id = "deepseek-ai/DeepSeek-V3";
+        let id = "deepseek-ai/DeepSeek-V4-Flash";
         let native = build_body(&deepseek(), &params(id, false), &[Message::user("hi")]).unwrap();
         let proxied = build_body(
             &provider(Reasoning::None, None),

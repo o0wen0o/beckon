@@ -106,9 +106,10 @@ label = "DeepSeek"              # display only
 base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
 thinking = false                # DeepSeek thinks by default; off saves seconds
-reasoning = "deepseek"          # deepseek | qwen | none — how this endpoint is
-                                # told *not* to think. A property of the endpoint,
-                                # not the model; prefilled by its preset.
+reasoning = "deepseek"          # deepseek | qwen | openai | none — how this
+                                # endpoint is told *not* to think. A property of
+                                # the endpoint, not the model; prefilled by its
+                                # preset.
 temperature = 1.3               # optional; omitted means let the endpoint decide
 key_page = "https://platform.deepseek.com/api_keys"
 

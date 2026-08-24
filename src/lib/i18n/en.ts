@@ -224,12 +224,15 @@ export const EN = {
       reasoningName: {
         deepseek: "DeepSeek",
         qwen: "Qwen",
+        openai: "OpenAI",
         none: "None",
       },
       reasoningHint: {
         deepseek:
           'Sends thinking:{type:"enabled"|"disabled"}. DeepSeek V4 reasons unless told not to.',
         qwen: "Sends chat_template_kwargs.enable_thinking. Qwen3 behind vLLM, SGLang or DashScope.",
+        openai:
+          'Sends reasoning_effort:"none" to turn thinking off, and nothing to turn it on. OpenAI\'s own API, from GPT-5.6 on.',
         none: "Nothing sent either way — the endpoint's own default stands. Right for every endpoint with no such switch, which is most of them.",
       },
       thinkingHint: (label: string) =>

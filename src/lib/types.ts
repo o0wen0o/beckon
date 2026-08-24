@@ -6,12 +6,12 @@ export type InputSource = "prompt" | "auto";
 /**
  * How an endpoint is told **not** to think (ADR-0021).
  *
- * A property of the endpoint, never of the model — `deepseek-ai/DeepSeek-V3`
+ * A property of the endpoint, never of the model — a DeepSeek-weighted model
  * served by SiliconFlow speaks the plain OpenAI dialect — so it cannot be
  * derived from a model id. `none` is every endpoint with no such control, which
  * is most of them.
  */
-export type Reasoning = "deepseek" | "qwen" | "none";
+export type Reasoning = "deepseek" | "qwen" | "openai" | "none";
 
 /** One endpoint the user keeps. Mirrors `config::Provider`. */
 export interface Provider {

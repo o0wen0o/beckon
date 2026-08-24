@@ -79,8 +79,8 @@ export function Connection() {
   return row ? <EndpointScreen provider={row} /> : <Inventory />;
 }
 
-/** The three arms, derived from the catalog so the order is stated once. */
-const REASONINGS: Reasoning[] = ["deepseek", "qwen", "none"];
+/** Every arm of `config::Reasoning`, in the dropdown's order, stated once. */
+const REASONINGS: Reasoning[] = ["deepseek", "qwen", "openai", "none"];
 
 /** How many Actions a row carries, as its one line of prose. */
 function usedBy(names: string[], t: Strings): string {

@@ -182,11 +182,14 @@ export const ZH: Strings = {
       reasoningName: {
         deepseek: "DeepSeek",
         qwen: "Qwen",
+        openai: "OpenAI",
         none: "无",
       },
       reasoningHint: {
         deepseek: '发送 thinking:{type:"enabled"|"disabled"}。DeepSeek V4 不特别说明就会思考。',
         qwen: "发送 chat_template_kwargs.enable_thinking。适用于 vLLM、SGLang 或 DashScope 上的 Qwen3。",
+        openai:
+          '关闭思考时发送 reasoning_effort:"none"，开启时什么都不发送。适用于 OpenAI 自己的接口，自 GPT-5.6 起。',
         none: "两个方向都不发送 —— 由端点自己的默认行为决定。绝大多数端点没有这类开关，都属于这一项。",
       },
       thinkingHint: (label: string) => `关闭会显式发给 ${label}，因为它的模型不特别说明就会思考。`,

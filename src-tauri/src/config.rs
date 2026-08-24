@@ -123,16 +123,17 @@ pub enum Language {
 
 /// How an endpoint is told **not** to think (ADR-0021).
 ///
-/// A property of the *endpoint*, never of the model: `deepseek-ai/DeepSeek-V3`
+/// A property of the *endpoint*, never of the model: a DeepSeek-weighted model
 /// served by SiliconFlow speaks the plain OpenAI dialect, so no rule over model
 /// ids can produce this — the row states it, or a preset states it for the row.
 ///
 /// The field exists for one reason: `thinking = false` has to be expressible.
-/// That only matters for families that reason *by default* — DeepSeek V4 and
-/// Qwen3 both do — so those are the two named arms. [`Reasoning::None`] is every
-/// other endpoint, reasoning models included: there is nothing to suppress, so
-/// there is nothing to send. An unknown field is a 400 on a strict endpoint, not
-/// a field politely ignored, which is why the default is to send nothing.
+/// That only matters for endpoints that reason *by default* and document a way
+/// to stop — so the named arms are exactly the dialects of that switch, and
+/// [`Reasoning::None`] is every other endpoint, reasoning models included: there
+/// is nothing to suppress, so there is nothing to send. An unknown field is a
+/// 400 on a strict endpoint, not a field politely ignored, which is why the
+/// default is to send nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Reasoning {
@@ -141,6 +142,14 @@ pub enum Reasoning {
     /// `chat_template_kwargs: {"enable_thinking": bool}` — Qwen3 behind vLLM,
     /// SGLang or DashScope.
     Qwen,
+    /// `reasoning_effort: "none"` — OpenAI's own API, where `none` is a real
+    /// floor rather than a low setting: the model answers without reasoning.
+    /// Sent only to suppress; asking *for* thinking sends nothing, because the
+    /// endpoint already reasons by default and naming a level the user never
+    /// chose would be inventing one. The one arm whose host also serves models
+    /// that reject the field, so `llm/request.rs` sends it only for the families
+    /// documented there and stays silent for the rest.
+    OpenAi,
     /// Nothing on the wire either way. The endpoint's own default stands.
     #[default]
     None,
@@ -305,13 +314,35 @@ pub struct ApiConfig {
 /// is what keeps that true, because a broker would satisfy the type and nothing
 /// else in the codebase would notice.
 ///
-/// ## `model` may be empty
+/// ## What a row's `model` may be
 ///
-/// A starting value, not a claim. It is filled where the vendor publishes a
-/// stable id — an alias like `mistral-medium-latest`, or a plain family name —
-/// and left empty where their ids carry dated `-preview` suffixes that rot. An
-/// id that has rotted is a `400` the user has to decode; an empty one sends them
-/// to the dropdown, which is where the endpoint's own list lands anyway.
+/// A starting value, not a claim, and three of them are correct — in this order:
+///
+/// - **An evergreen alias** the vendor repoints themselves, where they publish
+///   one. Best, because it cannot rot. Worth verifying it still tracks their
+///   current model: an alias quietly frozen to an older generation works and is
+///   wrong, which is worse than a name that has stopped resolving.
+/// - **A pinned versioned id**, which is what most vendors leave you, and what
+///   several rows here carry. It will rot; the checked date below is the record
+///   of when it last did not.
+/// - **Empty**, where the vendor's ids carry dated or `-preview` suffixes that
+///   rot fast. An empty value sends the user to the dropdown, which is where the
+///   endpoint's own list lands anyway, while a rotted id is a `400` they have to
+///   decode.
+///
+/// A row departing from the alias — or moving between the three — says in a
+/// comment what it was and why, because that one-liner is what makes the next
+/// audit cheap.
+///
+/// ## When these were last checked
+///
+/// Every `model` in this list is a vendor-side name, and no test here reaches
+/// the network — so this date is the only record of when the list was last known
+/// good. `CATALOG` in [`crate::llm::models`] carries the same note for the same
+/// reason; this table went without one for longer, and a shut-down Groq id rode
+/// eight days of green gates before the first dated pass caught it.
+///
+/// **Checked 2026-08-24** against each vendor's own model list.
 ///
 /// ## Why Rust
 ///
@@ -330,31 +361,43 @@ pub fn presets() -> Vec<Provider> {
     };
     vec![
         Provider::deepseek(),
-        // `None`, not an `openai` arm. `reasoning_effort` is the nearest
-        // thing OpenAI has, and its floor is `minimal` rather than off — the
-        // model still reasons, so sending it for `thinking = false` would be
-        // claiming something untrue. It is also not accepted uniformly: the
-        // o-series takes low/medium/high and rejects `minimal`, which would put
-        // per-model knowledge back into a field that exists to avoid it.
-        row(
-            "openai",
-            "OpenAI",
-            "https://api.openai.com/v1",
-            "gpt-5-mini",
-            "https://platform.openai.com/api-keys",
-        ),
+        // This row was `None` for as long as `reasoning_effort`'s floor was
+        // `minimal`: the model still reasoned at that setting, so sending it for
+        // `thinking = false` claimed something untrue. GPT-5.6 added `none`,
+        // which answers without reasoning, so the switch is real and the arm
+        // says so. `gpt-5-mini` was the starting model until its snapshot was
+        // deprecated on 2026-06-11; `gpt-5.6-terra` is the tier OpenAI names as
+        // its replacement.
+        Provider {
+            reasoning: Reasoning::OpenAi,
+            ..row(
+                "openai",
+                "OpenAI",
+                "https://api.openai.com/v1",
+                "gpt-5.6-terra",
+                "https://platform.openai.com/api-keys",
+            )
+        },
+        // Was `llama-3.3-70b-versatile` until Groq shut that id down on
+        // 2026-08-16; this is the replacement Groq's own deprecation page
+        // names. `openai/` here is the weights' author, not the endpoint — the
+        // key and the inference are Groq's, which is the distinction this list
+        // is drawn on.
         row(
             "groq",
             "Groq",
             "https://api.groq.com/openai/v1",
-            "llama-3.3-70b-versatile",
+            "openai/gpt-oss-120b",
             "https://console.groq.com/keys",
         ),
+        // Pinned, not the bare `grok-4` this row used to carry: xAI keeps the
+        // unversioned name resolvable, but it redirects to an older model at low
+        // reasoning effort, so an alias that still works was still wrong.
         row(
             "xai",
             "xAI",
             "https://api.x.ai/v1",
-            "grok-4",
+            "grok-4.6",
             "https://console.x.ai",
         ),
         row(
@@ -379,7 +422,7 @@ pub fn presets() -> Vec<Provider> {
             "zhipu",
             "Zhipu (GLM)",
             "https://open.bigmodel.cn/api/paas/v4",
-            "glm-4.6",
+            "glm-5.1",
             "https://open.bigmodel.cn/usercenter/apikeys",
         ),
         // Ids here are `org/model`, and `reasoning` is `None` even for a
@@ -390,7 +433,7 @@ pub fn presets() -> Vec<Provider> {
             "siliconflow",
             "SiliconFlow",
             "https://api.siliconflow.cn/v1",
-            "deepseek-ai/DeepSeek-V3",
+            "deepseek-ai/DeepSeek-V4-Flash",
             "https://cloud.siliconflow.cn/account/ak",
         ),
         Provider {
@@ -403,7 +446,7 @@ pub fn presets() -> Vec<Provider> {
                 "dashscope",
                 "Alibaba DashScope",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                "qwen3-max",
+                "qwen3.8-max",
                 "https://bailian.console.aliyun.com",
             )
         },

@@ -99,6 +99,16 @@ suppression is the entire reason this field exists. It is not accepted uniformly
 takes low/medium/high and rejects `minimal`, so an `openai` arm would need per-model knowledge, which
 is exactly what putting the dialect on the endpoint got rid of.
 
+> **Amended 2026-08-24 — the arm now exists.** GPT-5.6 added `reasoning_effort: "none"`, a real floor
+> where the model answers without reasoning, which refutes the first half above: suppression became
+> expressible, so `Reasoning::OpenAi` is an arm. The second half was not refuted but fulfilled — the
+> arm does carry per-model knowledge, as `EFFORT_NONE_FAMILIES` in `llm/request.rs`, for the same
+> reason `Reasoning::Deepseek` consults `CATALOG`: one host serves models that disagree about the
+> field. That narrows "never of the model" rather than reversing it — the row still decides *which*
+> field could be sent, the model only whether it is, and an unmatched model stays silent rather than
+> erroring. The decision this ADR records — the dialect on the row, no host guessing outside
+> `Reasoning::guess` — stands unchanged.
+
 ## What left, and what did not
 
 **`auth` never existed.** It was in the first draft as `bearer | none` and was cut: the header is sent
