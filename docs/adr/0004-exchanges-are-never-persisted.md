@@ -7,5 +7,7 @@ This is a **deliberate scope decision**, not an unimplemented feature. The value
 ## Consequences
 
 - There is no storage layer. An Exchange is pure in-memory state, created and destroyed along with the Popover window.
+
+  **Narrowed by [ADR-0024](0024-fetched-model-lists-are-cached-beside-the-config.md).** There is now one file that is neither the user's config nor an Exchange: the last model list each endpoint served. Nothing in this ADR's argument changes — no prompt, answer, Capture or turn is written anywhere — but the flat sentence above was read as a rule about all state, and it was only ever a rule about the conversation.
 - Follow-up turns resend the full history to the API, so tokens grow linearly with each turn. Because nothing is persisted, a single Exchange is inherently short-lived, so this growth has a natural ceiling and needs no extra truncation strategy.
 - If a user wants to keep something, the path is "Copy" in the Popover — it is the only export mechanism, so it has to be good.

@@ -121,10 +121,13 @@ export type ThinkingSupport = "switchable" | "always-on" | "never";
 
 /**
  * Where one dropdown option came from. `configured` is the user's own value
- * that neither the catalog nor the endpoint vouches for — it is offered so that
- * it is never silently rewritten.
+ * that the endpoint does not vouch for — it is offered so that it is never
+ * silently rewritten.
+ *
+ * There is no `documented` arm. A provider row carries no catalog, so the only
+ * list is the endpoint's own.
  */
-export type ModelOrigin = "documented" | "live" | "configured";
+export type ModelOrigin = "live" | "configured";
 
 export interface ModelOption {
   id: string;
@@ -134,10 +137,26 @@ export interface ModelOption {
   origin: ModelOrigin;
 }
 
+/**
+ * Where the list came from. One field rather than a `live` and a `cached` flag,
+ * which spelled one three-state as two booleans with an impossible combination.
+ *
+ * - `live` — the endpoint answered *just now*.
+ * - `cached` — the list it served last time, kept on disk (ADR-0024), because it
+ *   was not asked or did not answer.
+ * - `none` — it has never answered; only the configuration names anything, and
+ *   on a fresh row that is nothing at all.
+ *
+ * `cached` stays distinct from `live` because `fallback` still carries the
+ * cause: a cached list reported as live would hide a rejected key behind a full
+ * dropdown.
+ */
+export type ModelSource = "live" | "cached" | "none";
+
 /** `get_models` never fails; `fallback` says why the list is not the live one. */
 export interface ModelCatalog {
   options: ModelOption[];
-  live: boolean;
+  source: ModelSource;
   fallback: Failure | null;
 }
 

@@ -62,11 +62,25 @@ pub fn save_config(
 
     // After the write, and failures are logged rather than returned: the config
     // is already on disk, so refusing here would report a save that happened.
-    for id in removed {
-        if let Err(err) = crate::secrets::delete(&id) {
+    // Nothing at all when nothing was removed, which is every ordinary save.
+    if removed.is_empty() {
+        return Ok(());
+    }
+    for id in &removed {
+        if let Err(err) = crate::secrets::delete(id) {
             log::warn!("could not remove the stored key for \"{id}\": {err}");
         }
     }
+    // The cached model lists go with the credentials, for the same reason the
+    // credentials go at all (ADR-0021, ADR-0024): a row re-added later under the
+    // same id must not inherit either. `forget_all` rather than one call per row
+    // because the cache write is an fsync, and removing several rows in one save
+    // is still one edit.
+    state
+        .models_cache
+        .lock()
+        .expect("model cache lock")
+        .forget_all(removed.iter().map(String::as_str));
     Ok(())
 }
 

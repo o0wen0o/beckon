@@ -144,6 +144,14 @@ DeepSeek documents, and it is still the single table both the dropdown and the r
 is now offered as a fallback **only for DeepSeek's own host**: offering `deepseek-v4-flash` as the
 documented list for somebody's Ollama would be a dropdown of ids that endpoint has never served.
 
+**Superseded in part by [ADR-0024](0024-fetched-model-lists-are-cached-beside-the-config.md).** The
+fallback is gone entirely, not just narrowed: a row carries no catalog at all, and the endpoint's own
+list — remembered between launches — is the only source of options. The reasoning above is why: once
+"DeepSeek's list describes DeepSeek's host and nothing else" is admitted, the same argument applies to
+DeepSeek's host too the moment a row stops shipping a model, and a hand-kept id rots silently either
+way. What survives here is the rest of the sentence: `llm/models.rs` is still the single table the
+request layer reads for `thinking`, which is the half that was never about a dropdown.
+
 ## The credential, per row
 
 The account is `provider:{id}` under the same `Beckon` service, so a row's `label` can be renamed

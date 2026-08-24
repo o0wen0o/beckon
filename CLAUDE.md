@@ -17,7 +17,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 23 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 24 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -220,6 +220,12 @@ never translated in either direction.
   *protects* several: 0003's filesystem-as-truth is why a second writer is a correctness problem and
   not a waste of memory, `hotkey.rs`'s "failures surface, never silently" is what a second copy would
   turn into a lie, and 0022's restart is the one place the lock has to be handed back by hand.
+  ADR-0024 *narrows* two and supersedes neither outright: 0004's "no storage layer" gains one sidecar
+  that records ids and the URL they came from and no part of an Exchange, and 0021 is superseded **in
+  part** — its documented-catalog fallback is gone entirely, while the rest of it, including
+  `llm/models.rs` as the single table the request layer reads for `thinking`, stands. 0003 is the
+  reason the sidecar is *not* config: the user did not write it, so it is neither watched nor
+  broadcast, and a fetched list on the reload path would echo back at the window that caused it.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each

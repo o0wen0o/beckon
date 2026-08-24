@@ -55,6 +55,7 @@ export const EN = {
     interrupted: "The answer stopped early",
     empty: "The endpoint listed no models",
     config: "Beckon is not configured for this",
+    "no-model": "No model is chosen for this endpoint",
     "capture-too-large": "The screenshot is too big to send",
     "capture-too-many": "There is no room for another screenshot",
     "capture-unreadable": "The screenshot could not be read",
@@ -215,8 +216,20 @@ export const EN = {
       refresh: "Refresh models",
       loading: "Loading models…",
       live: "Listed by this endpoint.",
-      catalogNotice: (cause: string) => `${cause} — showing what your configuration names.`,
-      catalogFallback: "The model list could not be fetched",
+      /** A list from disk rather than from the endpoint just now (ADR-0024).
+       *  Distinct from `live` because `listNotice` may be showing beside it. */
+      cached: "Listed by this endpoint earlier.",
+      /** Named for the list, not for a catalog: a provider row carries no
+       *  catalog, so the only list is the endpoint's own — whether it answered
+       *  just now or last time (CONTEXT.md, one name per thing). */
+      listNotice: (cause: string) => `${cause} — showing what was listed before.`,
+      /** The initial state of every row a user adds: a row ships no model, so
+       *  until the endpoint answers there is nothing to pick. Two of them,
+       *  because a local endpoint wants no key and telling it to store one names
+       *  the single thing ADR-0021 says is not a fault. */
+      noModelsYet: "Store a key for this endpoint, then press Refresh models.",
+      noModelsYetLocal: "Start this endpoint, then press Refresh models.",
+      listUnavailable: "The model list could not be fetched",
 
       /** The wire field, on a row the user typed themselves. A preset carries
        *  the right value already, and showing it there invites breaking it. */
@@ -372,9 +385,13 @@ export const EN = {
       label: "Model",
       thinking: "Think before answering",
       configuredGroup: "Named by your configuration",
-      unknownLive: "not in the endpoint's model list",
-      unknownCatalog: "not one of the models Beckon knows",
-      unknown: (model: string, why: string) => `${model} is ${why}. Kept because your configuration names it.`,
+      noneChosen: "No model chosen",
+      /** One sentence, not a two-part composition: there used to be a second
+       *  reading — "not one of the models Beckon knows" — for a list that came
+       *  from a documented catalog. A row carries no catalog, so every list is
+       *  the endpoint's own and there is one thing left to say. */
+      unknown: (model: string) =>
+        `${model} is not in the endpoint's model list. Kept because your configuration names it.`,
       alwaysThinks: (model: string) => `${model} always thinks; it cannot be turned off.`,
       neverThinks: (model: string) =>
         `${model} has no thinking mode; nothing is sent about it either way.`,

@@ -36,8 +36,7 @@ export function unknownModelHint(
 ): string | null {
   if (!id) return null;
   if (modelOption(id, catalog)?.origin !== "configured") return null;
-  const missing = catalog?.live ? t.controls.model.unknownLive : t.controls.model.unknownCatalog;
-  return t.controls.model.unknown(id, missing);
+  return t.controls.model.unknown(id);
 }
 
 /**

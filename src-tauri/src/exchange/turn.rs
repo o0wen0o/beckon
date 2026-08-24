@@ -62,6 +62,20 @@ async fn run_turn(app: AppHandle, plan: TurnPlan) {
         }
     };
 
+    // Before the body, because `"model": ""` on the wire is a `400` in the
+    // vendor's words with nothing pointing at the fix. The predicate and the
+    // `"no-model"` kind live in `commands::require_model` once, the way the
+    // credential split above does — so `describeFailure` names it rather than
+    // folding it into "Beckon is not configured for this", and Settings' own
+    // refusal cannot drift from this one.
+    if let Err(failure) = crate::commands::require_model(
+        &plan.params.model,
+        &crate::i18n::turn_needs_model(language, &provider.label),
+    ) {
+        emit_error(&app, &plan.exchange_id, &failure.kind, &failure.message);
+        return;
+    }
+
     let body = match request::build_body(&provider, &plan.params, &plan.messages) {
         Ok(body) => body,
         Err(message) => {

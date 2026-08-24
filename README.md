@@ -70,10 +70,16 @@ Settings covers all of it, but the files are yours to edit — a watcher reloads
 %APPDATA%\Beckon\                        # Windows
 ~/Library/Application Support/Beckon/    # macOS
 ├── config.toml
+├── models.json                          # Beckon's, not yours
 └── actions/
     ├── translate.toml
     └── ask.toml
 ```
+
+`config.toml` and `actions/` are the two the watcher reads and the two Settings writes. `models.json`
+is neither: it is the last model list each endpoint told Beckon it serves, so that a fresh launch has
+something to offer before you ask again. Deleting it costs one fetch. Nothing in it is a prompt, an
+answer or a screenshot.
 
 The whole directory copies between platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super`
 all parse on both, and only the defaults differ.
@@ -125,8 +131,9 @@ reasoning = "qwen"
 
 Two endpoints can be live at once — Translate on a fast hosted model, Summarise on one that never
 leaves the machine, one hotkey apart rather than a settings trip apart. Models are picked from a
-list per endpoint, not typed: the endpoint's own `/v1/models` when it answers, and otherwise what
-your config already names, flagged rather than rewritten. A pre-provider config file still works;
+list per endpoint, not typed, and no endpoint ships one: the list is the endpoint's own
+`/v1/models`, remembered between launches, and otherwise what your config already names — flagged
+rather than rewritten. A pre-provider config file still works;
 it folds into one row on load.
 
 ### An Action

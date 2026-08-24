@@ -27,9 +27,6 @@ pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Ctrl+Shift+Space";
 pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Cmd+Shift+Space";
 
 pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
-/// The authority `DEFAULT_BASE_URL` carries, on its own: the documented model
-/// catalog stands in only for this host (ADR-0021).
-const DEEPSEEK_HOST: &str = "api.deepseek.com";
 pub const DEFAULT_MODEL: &str = "deepseek-v4-flash";
 /// The id of the row a fresh install gets, and therefore of `[defaults]
 /// provider` (ADR-0021). Also the account the pre-provider credential is
@@ -153,6 +150,25 @@ pub enum Reasoning {
     /// Nothing on the wire either way. The endpoint's own default stands.
     #[default]
     None,
+    // TODO(register): MiniMax needs an arm of its own and it is the first one
+    // since ADR-0021. It documents `thinking: {"type": "disabled"}` and
+    // `{"type": "adaptive"}` — a real off-switch, which is the only thing that
+    // justifies departing from `None`. It cannot reuse `Deepseek`: that arm
+    // sends `{"type": "enabled"|"disabled"}`, and while `disabled` matches,
+    // `enabled` is not a value MiniMax documents — `adaptive` is, so sending
+    // `enabled` would be the exact failure this enum exists to prevent. It is
+    // also a mixed host ("for M2.x models, thinking cannot be disabled"), so the
+    // arm needs a per-model list beside it, with the unmatched case `Omit` for
+    // the reason `EFFORT_NONE_FAMILIES` gives. Held because that is the
+    // six-edit dialect procedure plus a new hand-kept id list, not a field.
+    //
+    // TODO(register): Anthropic is held on a different problem — its `/v1/models`
+    // is a native endpoint wanting `x-api-key` and `anthropic-version`, and
+    // per-provider auth headers do not exist: `llm/client::signed` has exactly
+    // two branches, bearer or nothing. A row whose list cannot be fetched is a
+    // row where no model can ever be chosen, so it needs a new field on
+    // `Provider` — a decision, not a patch. Its dialect is settled either way:
+    // their compatibility table lists `reasoning_effort` as *Ignored*.
 }
 
 impl Reasoning {
@@ -249,24 +265,16 @@ impl Provider {
             .and_then(|octet| octet.parse::<u8>().ok())
             .is_some_and(|octet| (16..=31).contains(&octet))
     }
-
-    /// Whether the documented DeepSeek catalog describes what this endpoint
-    /// serves ([`crate::llm::models`]). The host, not the dialect: a vLLM
-    /// speaking DeepSeek's `thinking` object serves its own ids, not these.
-    pub fn is_deepseek_host(&self) -> bool {
-        // The authority, matched whole: a substring test over the entire URL
-        // also answers yes to a path or a query that merely mentions the host.
-        let host = host_of(&self.base_url);
-        host == DEEPSEEK_HOST || host.starts_with(&format!("{DEEPSEEK_HOST}:"))
-    }
 }
 
 /// The authority of a `base_url`: trimmed, scheme dropped, path dropped,
 /// lowercased.
 ///
-/// One normaliser for all three host rules, so "does this look local", "which
-/// dialect does a pre-provider file speak" and "is this DeepSeek's own host"
-/// cannot disagree about what they are reading.
+/// One normaliser for both host rules, so "does this look local" and "which
+/// dialect does a pre-provider file speak" cannot disagree about what they are
+/// reading. There used to be a third — `is_deepseek_host`, which decided whether
+/// the documented catalog described this endpoint. A row carries no catalog now
+/// (`docs/register-audit-2026-08-24.md`), so nothing asks.
 fn host_of(base_url: &str) -> String {
     // Lowercased before the scheme is stripped, not after: a scheme is
     // case-insensitive, and `HTTP://` is a URL a person types.
@@ -305,55 +313,56 @@ pub struct ApiConfig {
 /// **The request has to terminate at the company whose key it carries.** No
 /// aggregator, no gateway, no OpenRouter.
 ///
-/// That is the line, and it is not "does this company own the model". Groq,
-/// SiliconFlow and a hosted vLLM all serve somebody else's open weights on their
-/// own GPUs — your key is theirs, the inference is theirs, and nothing is
-/// forwarded. A broker is different in kind: it holds keys to *other* APIs and
-/// relays your request to one, so a third party ends up inside a relationship
-/// that was between you and a vendor. `every_preset_goes_direct_to_its_own_vendor`
-/// is what keeps that true, because a broker would satisfy the type and nothing
-/// else in the codebase would notice.
+/// That is the line, and it is not "does this company own the model". A hosted
+/// vLLM serves somebody else's open weights on its own GPUs — your key is theirs,
+/// the inference is theirs, and nothing is forwarded. A broker is different in
+/// kind: it holds keys to *other* APIs and relays your request to one, so a third
+/// party ends up inside a relationship that was between you and a vendor.
+/// `every_preset_goes_direct_to_its_own_vendor` is what keeps that true, because
+/// a broker would satisfy the type and nothing else in the codebase would notice.
 ///
-/// ## What a row's `model` may be
+/// TODO(register): OpenRouter was selected for this list deliberately, knowing it
+/// is a broker. Admitting it needs an ADR that narrows ADR-0021 rather than
+/// contradicting it, turning `BROKERS` from a ban list into a *disclosure* list,
+/// plus a string in both i18n catalogs saying the row relays — and its own
+/// dialect read off their docs. Three decisions, so the row is held, not guessed.
 ///
-/// A starting value, not a claim, and three of them are correct — in this order:
+/// ## A row carries no model
 ///
-/// - **An evergreen alias** the vendor repoints themselves, where they publish
-///   one. Best, because it cannot rot. Worth verifying it still tracks their
-///   current model: an alias quietly frozen to an older generation works and is
-///   wrong, which is worse than a name that has stopped resolving.
-/// - **A pinned versioned id**, which is what most vendors leave you, and what
-///   several rows here carry. It will rot; the checked date below is the record
-///   of when it last did not.
-/// - **Empty**, where the vendor's ids carry dated or `-preview` suffixes that
-///   rot fast. An empty value sends the user to the dropdown, which is where the
-///   endpoint's own list lands anyway, while a rotted id is a `400` they have to
-///   decode.
+/// **`model` is empty on every row but `deepseek`.** A row says where to fetch
+/// and how to connect; what an endpoint serves is the endpoint's own answer, read
+/// from `GET {base_url}/models` and kept in [`crate::models_cache`]. A hand-kept
+/// id rots silently — `glm-5.1` sat here two generations behind GLM-5.3, resolving
+/// happily, with every gate in this repo green on it — and no test here reaches
+/// the network, so nothing could have caught it.
 ///
-/// A row departing from the alias — or moving between the three — says in a
-/// comment what it was and why, because that one-liner is what makes the next
-/// audit cheap.
+/// `deepseek` is the one carve-out and it is the principle applied, not an
+/// exception to it: it is the default row, the one a first-run user actually
+/// reaches, and the only id in the codebase with dated provenance beside it
+/// (`CATALOG`, which is load-bearing for `Thinking` regardless). Emptying it
+/// would cost the first turn out of the box for nothing.
 ///
 /// ## When these were last checked
 ///
-/// Every `model` in this list is a vendor-side name, and no test here reaches
-/// the network — so this date is the only record of when the list was last known
-/// good. `CATALOG` in [`crate::llm::models`] carries the same note for the same
-/// reason; this table went without one for longer, and a shut-down Groq id rode
-/// eight days of green gates before the first dated pass caught it.
+/// `base_url` and `key_page` are vendor-side facts, and no test here reaches the
+/// network — so this date is the only record of when they were last known good.
+/// Both rot silently: a moved key page still `301`s, and it is the first link a
+/// new user clicks. The 2026-08-24 pass found two moves and neither was a model.
 ///
-/// **Checked 2026-08-24** against each vendor's own model list.
+/// **Checked 2026-08-24** against each vendor's own documentation.
 ///
 /// ## Why Rust
 ///
 /// A wrong `reasoning` here is a `400` on every turn, so it belongs beside the
 /// enum that documents the wire.
 pub fn presets() -> Vec<Provider> {
-    let row = |id: &str, label: &str, base_url: &str, model: &str, key_page: &str| Provider {
+    // No `model` parameter: every row but `deepseek` leaves it empty, and
+    // `Provider::deepseek` is where that one value lives.
+    let row = |id: &str, label: &str, base_url: &str, key_page: &str| Provider {
         id: id.to_string(),
         label: label.to_string(),
         base_url: base_url.to_string(),
-        model: model.to_string(),
+        model: String::new(),
         thinking: false,
         reasoning: Reasoning::None,
         temperature: None,
@@ -365,76 +374,56 @@ pub fn presets() -> Vec<Provider> {
         // `minimal`: the model still reasoned at that setting, so sending it for
         // `thinking = false` claimed something untrue. GPT-5.6 added `none`,
         // which answers without reasoning, so the switch is real and the arm
-        // says so. `gpt-5-mini` was the starting model until its snapshot was
-        // deprecated on 2026-06-11; `gpt-5.6-terra` is the tier OpenAI names as
-        // its replacement.
+        // says so — and `EFFORT_NONE_FAMILIES` in `llm/request.rs` is why it is
+        // sent only for the families that document it, since this one host also
+        // serves models the field is a 400 on.
         Provider {
             reasoning: Reasoning::OpenAi,
             ..row(
                 "openai",
                 "OpenAI",
                 "https://api.openai.com/v1",
-                "gpt-5.6-terra",
                 "https://platform.openai.com/api-keys",
             )
         },
-        // Was `llama-3.3-70b-versatile` until Groq shut that id down on
-        // 2026-08-16; this is the replacement Groq's own deprecation page
-        // names. `openai/` here is the weights' author, not the endpoint — the
-        // key and the inference are Groq's, which is the distinction this list
-        // is drawn on.
-        row(
-            "groq",
-            "Groq",
-            "https://api.groq.com/openai/v1",
-            "openai/gpt-oss-120b",
-            "https://console.groq.com/keys",
-        ),
-        // Pinned, not the bare `grok-4` this row used to carry: xAI keeps the
-        // unversioned name resolvable, but it redirects to an older model at low
-        // reasoning effort, so an alias that still works was still wrong.
-        row(
-            "xai",
-            "xAI",
-            "https://api.x.ai/v1",
-            "grok-4.6",
-            "https://console.x.ai",
-        ),
-        row(
-            "mistral",
-            "Mistral",
-            "https://api.mistral.ai/v1",
-            "mistral-medium-latest",
-            "https://console.mistral.ai/api-keys",
-        ),
+        // Their docs now brand the company SpaceXAI while every host stays on
+        // `x.ai`; the label follows the hosts until the rename settles.
+        row("xai", "xAI", "https://api.x.ai/v1", "https://console.x.ai"),
         // Mainland China's host. `api.moonshot.ai` is the international one —
         // same API, different account, so it is an edit to `base_url` rather
-        // than a second row. No model: Moonshot's ids carry dated `-preview`
-        // suffixes, so anything here rots.
+        // than a second row. The key page moved: `platform.moonshot.cn` `301`s
+        // to `platform.kimi.com`.
         row(
             "moonshot",
             "Moonshot (Kimi)",
             "https://api.moonshot.cn/v1",
-            "",
-            "https://platform.moonshot.cn/console/api-keys",
+            "https://platform.kimi.com/console/api-keys",
         ),
+        // Mainland China's host, and the one row here whose path is versioned
+        // with something other than `/v1` — `client::api_url` reads *every* path
+        // segment for a version because of this row, which until then posted to
+        // `/api/paas/v4/v1/chat/completions`. `thinking` is documented as opt-in
+        // and nothing documents turning it off, so the row says nothing. The key
+        // page moved to `bigmodel.cn/usercenter/proj-mgmt/apikeys`.
         row(
             "zhipu",
             "Zhipu (GLM)",
             "https://open.bigmodel.cn/api/paas/v4",
-            "glm-5.1",
-            "https://open.bigmodel.cn/usercenter/apikeys",
+            "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
         ),
-        // Ids here are `org/model`, and `reasoning` is `None` even for a
-        // DeepSeek-weighted one: SiliconFlow serves it behind its own stack,
-        // which speaks plain OpenAI. This row is the example ADR-0021 uses for
-        // why the dialect cannot be read off a model id.
+        // Google's OpenAI compatibility layer, which they document as a
+        // first-class path and which terminates at Google. `None` is not a
+        // placeholder: the layer does accept `reasoning_effort`, `none`
+        // included, but the docs say reasoning cannot be turned off for Gemini
+        // 2.5 Pro or any Gemini 3 model — and the lineup is 3.x — so there is no
+        // off-switch to express for anything a user would pick. If Google ever
+        // documents `none` for a shipping tier, that is one family added to
+        // `EFFORT_NONE_FAMILIES`, not a new arm.
         row(
-            "siliconflow",
-            "SiliconFlow",
-            "https://api.siliconflow.cn/v1",
-            "deepseek-ai/DeepSeek-V4-Flash",
-            "https://cloud.siliconflow.cn/account/ak",
+            "gemini",
+            "Google Gemini",
+            "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "https://aistudio.google.com/apikey",
         ),
         Provider {
             // Qwen3 through Alibaba's compatible mode: the one hosted endpoint
@@ -446,29 +435,21 @@ pub fn presets() -> Vec<Provider> {
                 "dashscope",
                 "Alibaba DashScope",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                "qwen3.8-max",
                 "https://bailian.console.aliyun.com",
             )
         },
-        row(
-            "ollama",
-            "Ollama (local)",
-            "http://localhost:11434/v1",
-            "",
-            "",
-        ),
+        row("ollama", "Ollama (local)", "http://localhost:11434/v1", ""),
         row(
             "lmstudio",
             "LM Studio (local)",
             "http://localhost:1234/v1",
-            "",
             "",
         ),
         Provider {
             // A Qwen3 chat template is the usual reason to run vLLM by hand,
             // and it is the case a user cannot discover for themselves.
             reasoning: Reasoning::Qwen,
-            ..row("vllm", "vLLM (Qwen3)", "http://localhost:8000/v1", "", "")
+            ..row("vllm", "vLLM (Qwen3)", "http://localhost:8000/v1", "")
         },
     ]
 }
@@ -763,7 +744,6 @@ mod tests {
         assert_eq!(row.reasoning, Reasoning::Deepseek);
         assert_eq!(row.temperature, Some(DEEPSEEK_TEMPERATURE));
         assert!(!row.is_local());
-        assert!(row.is_deepseek_host());
     }
 
     /// A pre-provider file: one `base_url`, one `[defaults] model`. It must keep
@@ -796,7 +776,6 @@ mod tests {
         assert_eq!(row.reasoning, Reasoning::None);
         assert_eq!(row.temperature, None);
         assert!(row.is_local());
-        assert!(!row.is_deepseek_host());
     }
 
     /// Legacy keys are read and never written: the first save drops them, the
@@ -845,9 +824,9 @@ mod tests {
         );
     }
 
-    /// The three host rules read the same thing: the authority, lowercased, with
-    /// no scheme and no path — so a URL that merely *mentions* DeepSeek's host is
-    /// not DeepSeek's host.
+    /// Both host rules read the same thing: the authority, lowercased, with no
+    /// scheme and no path — so a URL that merely *mentions* a host is not that
+    /// host.
     #[test]
     fn host_rules_read_the_authority_only() {
         let row = |base_url: &str| Provider {
@@ -857,9 +836,6 @@ mod tests {
         assert!(row("HTTP://LocalHost:8000/v1").is_local());
         assert!(row("http://172.20.0.5:11434/v1").is_local());
         assert!(!row("https://api.deepseek.com/v1").is_local());
-        assert!(row("https://api.deepseek.com/v1").is_deepseek_host());
-        assert!(row("https://API.DeepSeek.com").is_deepseek_host());
-        assert!(!row("https://proxy.example.com/api.deepseek.com/v1").is_deepseek_host());
     }
 
     /// An Action's override wins; naming nothing takes the default; naming a row
@@ -904,8 +880,9 @@ mod tests {
     ///
     /// The names below are brokers — they hold keys to other APIs and relay to
     /// one of them. An inference provider serving somebody else's open weights
-    /// on its own GPUs is not one of these and is welcome in the list; Groq and
-    /// SiliconFlow are both already in it.
+    /// on its own GPUs is not one of these and is welcome in the list: a hosted
+    /// vLLM is the shape, and Groq and SiliconFlow were both in this list until
+    /// they were dropped on scope rather than on this rule.
     #[test]
     fn every_preset_goes_direct_to_its_own_vendor() {
         const BROKERS: [&str; 6] = [

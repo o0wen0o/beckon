@@ -67,9 +67,18 @@ pub fn set_api_key(provider_id: String, key: String) -> Result<KeyStatus, String
     Ok(secrets::status(&provider_id))
 }
 
+/// Also drops this row's cached model list (ADR-0024): a list fetched with a key
+/// that is gone has stopped being something the endpoint vouches for, and
+/// offering it afterwards is the "the list has to stop being live when the key
+/// that fetched it is gone" rule the audit's §4.3 states.
 #[tauri::command]
-pub fn delete_api_key(provider_id: String) -> Result<KeyStatus, String> {
+pub fn delete_api_key(app: AppHandle, provider_id: String) -> Result<KeyStatus, String> {
     secrets::delete(&provider_id)?;
+    app.state::<AppState>()
+        .models_cache
+        .lock()
+        .expect("model cache lock")
+        .forget(&provider_id);
     Ok(secrets::status(&provider_id))
 }
 
@@ -119,6 +128,15 @@ pub async fn test_connection(app: AppHandle, provider_id: String) -> Result<(), 
     };
 
     let key = require_api_key(&provider, i18n::test_needs_key(language), language)?;
+
+    // The probe needs a model like any other request, and a row ships none
+    // (`docs/register-audit-2026-08-24.md`) — so on a fresh row this button is
+    // reachable *before* one is chosen, and it sits above the model field on the
+    // pane. The predicate and the kind live in `commands::require_model`, so
+    // this refusal and `exchange/turn.rs`'s cannot come apart; only the sentence
+    // is this caller's, and it names Refresh models rather than Settings because
+    // the reader is already in Settings.
+    super::require_model(&provider.model, i18n::test_needs_model(language))?;
 
     client::test_connection(&http, &provider.base_url, key.as_deref(), &provider.model)
         .await

@@ -1,13 +1,21 @@
 //! Which models Beckon offers, and what each one does with thinking mode.
 //!
-//! ## One table, two consumers
+//! ## One table, one consumer and one enrichment
 //!
-//! [`CATALOG`] is the single source of truth for both the Settings dropdown and
-//! `thinking_wire` in [`super::request`]. That is deliberate. A DeepSeek model
-//! that always thinks, asked to stop, is a *hard error* there — omitting the
-//! field would silently leave thinking on — so a dropdown built from a second,
-//! hand-kept list would be a dropdown that offers models the request layer then
-//! refuses. Both read this table, so the two cannot drift.
+//! [`CATALOG`] used to *source* the Settings dropdown as well as `thinking_wire`
+//! in [`super::request`]. It no longer does. A provider row carries where to
+//! fetch and how to connect, never what to run, so what an endpoint serves is
+//! the endpoint's own answer and there is no documented list to stand in for it
+//! (`docs/register-audit-2026-08-24.md`). What went with that change is
+//! `Origin::Documented` and [`options`]'s `documented` parameter.
+//!
+//! What remains is the half that was never about a dropdown: `Thinking`. A
+//! DeepSeek model that always thinks, asked to stop, is a *hard error* in
+//! [`super::request`] — omitting the field would silently leave thinking on — so
+//! this table is where that answer lives, and it is not optional. The rest of a
+//! row still *enriches* an id the endpoint named: [`describe`] looks every id up
+//! here, so a live `deepseek-v4-flash` keeps its label and its description, and
+//! [`rank`] keeps ordering a live list by the order this table is written in.
 //!
 //! ## Where the ids come from
 //!
@@ -33,20 +41,18 @@
 //!   names one has to keep working and be explained, but neither is offered as
 //!   a fresh choice.
 //!
-//! ## The live list versus this one
+//! ## The live list, and what happens without one
 //!
-//! [`options`] prefers the ids the endpoint actually serves, because there is
-//! one `base_url` per provider row — pointed at a local or non-DeepSeek
-//! endpoint, this table describes nothing that exists there. The documented list
-//! is what we fall back to when there is no credential, the fetch fails, or the
-//! machine is offline. It is a *fallback*, never an empty dropdown: two ids that
-//! are almost certainly right beat nothing to pick.
+//! [`options`] offers the ids the endpoint actually serves, because there is one
+//! `base_url` per provider row — pointed at a local or non-DeepSeek endpoint,
+//! this table describes nothing that exists there.
 //!
-//! Since ADR-0021 that fallback is offered **only for DeepSeek's own host**
-//! ([`Provider::is_deepseek_host`](crate::config::Provider::is_deepseek_host)).
-//! Offering `deepseek-v4-flash` as the documented list for somebody's Ollama
-//! would be a dropdown of ids that endpoint has never served — worse than the
-//! one entry the row already names.
+//! Without a live list there is no fallback, and the dropdown is **empty on
+//! purpose**. That used to be an edge case a shipped `model` field papered over;
+//! it is now the initial state of every row a user adds, so it is a state the
+//! pane renders rather than an accident it hides. Offering `deepseek-v4-flash`
+//! for somebody's Ollama was the alternative, and a dropdown of ids that
+//! endpoint has never served is worse than saying there are none yet.
 
 use serde::Serialize;
 
@@ -162,11 +168,12 @@ pub fn switchable_suggestion() -> &'static str {
 
 /// Where one dropdown entry came from. The UI needs the distinction:
 /// `Configured` is the user's own value that nothing else vouches for.
+///
+/// There is no `Documented` arm. [`CATALOG`] stopped sourcing this list when a
+/// provider row stopped carrying a catalog — see the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Origin {
-    /// From [`CATALOG`] — the officially documented list.
-    Documented,
     /// The endpoint says it serves this.
     Live,
     /// Neither: it is only in the user's config. Kept so the value is never
@@ -189,42 +196,35 @@ pub struct ModelOption {
 
 /// Build the dropdown.
 ///
-/// `live` is the endpoint's own list when we managed to fetch one, `None`
-/// otherwise. `documented` says whether [`CATALOG`] describes *this* endpoint —
-/// it is DeepSeek's own list, so it is a fallback only for DeepSeek's own host
-/// (ADR-0021). `selected` is every model id the configuration currently names
-/// for this provider — the row's own model plus each Action's override — so that
-/// a value we cannot vouch for still appears rather than being rewritten out
-/// from under the user.
+/// `live` is the endpoint's own list when we managed to fetch one — or the last
+/// one it gave us, from [`crate::models_cache`] — and `None` otherwise.
+/// `selected` is every model id the configuration currently names for this
+/// provider — the row's own model plus each Action's override — so that a value
+/// we cannot vouch for still appears rather than being rewritten out from under
+/// the user.
+///
+/// **This may return an empty list, and that is a state rather than a fault.** A
+/// row whose endpoint has never answered and whose `model` is empty has nothing
+/// to offer, and inventing something to put there is what the documented
+/// fallback used to do. The pane renders the emptiness; `llm/request.rs` refuses
+/// the turn.
 pub fn options(
     live: Option<&[String]>,
-    documented: bool,
     selected: &[String],
     language: Language,
 ) -> Vec<ModelOption> {
     let mut out: Vec<ModelOption> = Vec::new();
 
-    match live {
-        // The endpoint told us what it serves; that is the offer, whatever
-        // `base_url` happens to point at.
-        Some(ids) => {
-            for id in ids {
-                push_unique(&mut out, id, Origin::Live, language);
-            }
-            // The provider's order is arbitrary; catalog order is meaningful.
-            // A stable sort keeps the provider's order among the ids we do not
-            // recognise, which trail the ones we do.
-            out.sort_by_key(|option| rank(&option.id));
+    // The endpoint told us what it serves; that is the offer, whatever
+    // `base_url` happens to point at.
+    if let Some(ids) = live {
+        for id in ids {
+            push_unique(&mut out, id, Origin::Live, language);
         }
-        // No live list. The documented one stands in where it describes the
-        // endpoint, and nowhere else — leaving only `selected`, which is at
-        // minimum the model the row already names.
-        None if documented => {
-            for entry in CATALOG.iter().filter(|entry| !entry.retired) {
-                out.push(describe(entry.id, Origin::Documented, language));
-            }
-        }
-        None => {}
+        // The provider's order is arbitrary; catalog order is meaningful. A
+        // stable sort keeps the provider's order among the ids we do not
+        // recognise, which trail the ones we do.
+        out.sort_by_key(|option| rank(&option.id));
     }
 
     for id in selected {
@@ -273,15 +273,6 @@ fn rank(id: &str) -> usize {
 mod tests {
     use super::*;
 
-    /// What the dropdown offers with no live list: every non-retired row of the
-    /// catalog, in catalog order. Named once, because four tests are about what
-    /// happens *around* it rather than about the list itself.
-    const DOCUMENTED: [&str; 3] = [
-        "deepseek-v4-flash",
-        "deepseek-v4-pro",
-        "deepseek-v4-flash-vision-exp",
-    ];
-
     fn ids(options: &[ModelOption]) -> Vec<&str> {
         options.iter().map(|option| option.id.as_str()).collect()
     }
@@ -292,13 +283,13 @@ mod tests {
 
     /// The option *set* is what these tests are about, and it is the same in
     /// both languages; `describes_a_model_in_both_languages` covers the rest.
-    /// `documented` is `true` here — these tests are about the DeepSeek row, and
-    /// `an_endpoint_the_catalog_does_not_describe_gets_no_documented_list`
-    /// covers the other side.
     fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption> {
-        super::options(live, true, selected, Language::En)
+        super::options(live, selected, Language::En)
     }
 
+    /// Driven through a *live* list, because that is the only thing that sources
+    /// the dropdown now — the catalog's job here is to enrich an id the endpoint
+    /// named, and the description is the half a person reads.
     #[test]
     fn describes_a_model_in_both_languages() {
         let entry = find(crate::config::DEFAULT_MODEL).unwrap();
@@ -306,7 +297,8 @@ mod tests {
             entry.description(Language::En),
             entry.description(Language::Zh)
         );
-        let zh = super::options(None, true, &[], Language::Zh);
+        let live = strings(&[crate::config::DEFAULT_MODEL]);
+        let zh = super::options(Some(&live), &[], Language::Zh);
         let flash = zh
             .iter()
             .find(|o| o.id == crate::config::DEFAULT_MODEL)
@@ -336,40 +328,30 @@ mod tests {
         assert!(find("gpt-4o-mini").is_none());
     }
 
+    /// With no live list, the configuration is the whole offer — its own model
+    /// plus any Action override, and nothing invented alongside them.
     #[test]
-    fn without_a_live_list_the_documented_models_are_offered() {
-        let options = options(None, &[]);
-        assert_eq!(ids(&options), DOCUMENTED.to_vec());
-        assert!(options.iter().all(|o| o.origin == Origin::Documented));
-        assert_eq!(options[0].thinking, Some(Thinking::Switchable));
-    }
-
-    #[test]
-    fn retired_models_are_never_offered_on_their_own() {
-        let options = options(None, &[]);
-        let offered = ids(&options);
-        assert!(!offered.contains(&"deepseek-chat"));
-        assert!(!offered.contains(&"deepseek-reasoner"));
-    }
-
-    /// The list is DeepSeek's own, so it stands in only for DeepSeek's own host
-    /// (ADR-0021). Everywhere else the row's own model is the whole offer —
-    /// which is still not an empty dropdown.
-    #[test]
-    fn an_endpoint_the_catalog_does_not_describe_gets_no_documented_list() {
-        let offered = super::options(None, false, &strings(&["qwen3:8b"]), Language::En);
+    fn an_endpoint_that_has_not_answered_gets_only_what_the_config_names() {
+        let offered = options(None, &strings(&["qwen3:8b"]));
         assert_eq!(ids(&offered), vec!["qwen3:8b"]);
         assert_eq!(offered[0].origin, Origin::Configured);
+        // Not even for DeepSeek's own ids: the catalog describes a model, it no
+        // longer claims an endpoint serves one.
+        let offered = options(None, &[]);
+        assert!(offered.is_empty());
         // A live list is the endpoint's own word and needs no vouching either way.
         let live = strings(&["llama3.1:8b"]);
-        let offered = super::options(Some(&live), false, &[], Language::En);
-        assert_eq!(ids(&offered), vec!["llama3.1:8b"]);
+        assert_eq!(ids(&options(Some(&live), &[])), vec!["llama3.1:8b"]);
     }
 
+    /// Was `the_dropdown_is_never_empty`, which claimed an invariant it never
+    /// checked — it only ever covered the DeepSeek row and a live list that came
+    /// back empty. The invariant is now false *by design*: a row carries no
+    /// catalog, so a fresh remote row with no credential has nothing to offer,
+    /// and the pane says so rather than a select rendering a blank box.
     #[test]
-    fn the_dropdown_is_never_empty() {
-        // Offline, no credential, nothing configured: still something to pick.
-        assert!(!options(None, &[]).is_empty());
+    fn an_endpoint_with_no_list_and_no_configured_model_offers_nothing() {
+        assert_eq!(options(None, &[]), Vec::new());
         // An endpoint that serves nothing at all is the one case where the
         // configured value is all there is — and it is still offered.
         let empty: Vec<String> = Vec::new();
@@ -380,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn a_live_list_replaces_the_documented_one() {
+    fn a_live_list_is_the_offer() {
         // A non-DeepSeek endpoint must not be described with DeepSeek ids.
         let live = strings(&["llama3.1:8b", "qwen2.5"]);
         let options = options(Some(&live), &[]);
@@ -418,10 +400,7 @@ mod tests {
     #[test]
     fn a_configured_model_nobody_vouches_for_is_still_offered() {
         let options = options(None, &strings(&["deepseek-v9-quantum"]));
-        assert_eq!(
-            ids(&options),
-            [DOCUMENTED.as_slice(), &["deepseek-v9-quantum"]].concat()
-        );
+        assert_eq!(ids(&options), vec!["deepseek-v9-quantum"]);
         let extra = options.last().unwrap();
         assert_eq!(extra.origin, Origin::Configured);
         assert_eq!(extra.thinking, None);
@@ -439,18 +418,24 @@ mod tests {
         assert!(extra.description.contains("2026-07-24"));
     }
 
+    /// The endpoint's word wins the entry, so a row that names the same id twice
+    /// over does not get it twice — and the origin stays the endpoint's.
     #[test]
     fn a_configured_model_that_is_already_offered_is_not_duplicated() {
-        let options = options(None, &strings(&["DeepSeek-V4-Flash", "deepseek-v4-pro"]));
-        assert_eq!(ids(&options), DOCUMENTED.to_vec());
-        assert!(options.iter().all(|o| o.origin == Origin::Documented));
+        let live = strings(&["deepseek-v4-flash", "deepseek-v4-pro"]);
+        let options = options(
+            Some(&live),
+            &strings(&["DeepSeek-V4-Flash", "deepseek-v4-pro"]),
+        );
+        assert_eq!(ids(&options), vec!["deepseek-v4-flash", "deepseek-v4-pro"]);
+        assert!(options.iter().all(|o| o.origin == Origin::Live));
     }
 
     #[test]
     fn blank_configured_values_are_not_options() {
-        // An Action with no override contributes nothing.
-        let options = options(None, &strings(&["", "   "]));
-        assert_eq!(ids(&options), DOCUMENTED.to_vec());
+        // An Action with no override contributes nothing — and with nothing else
+        // to offer, nothing is the whole answer.
+        assert_eq!(options(None, &strings(&["", "   "])), Vec::new());
     }
 
     #[test]

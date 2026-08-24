@@ -20,15 +20,27 @@ export function host(url: string): string {
 
 /**
  * Where a turn actually posts, as `client::api_url` computes it: a `base_url`
- * that already carries the version segment does not get a second one.
+ * that already carries a version segment does not get a second one.
  *
  * Rendered rather than assembled at each call site, because
  * `api.openai.com/v1/v1/chat/completions` is exactly what a pane that forgets
  * the rule shows — and it did, until a prototype drew it.
+ *
+ * **The two halves move together or this line lies.** It was `endsWith("/v1")`
+ * on both sides until the Rust half learned that a version can sit anywhere in
+ * the path (`open.bigmodel.cn/api/paas/v4`, `…/v1beta/openai/`); a pane left on
+ * the old rule would have drawn `…/v4/v1/…` for a row Rust posts `…/v4/…` to.
+ * `host()` strips the scheme, so the authority is dropped before the split and a
+ * versioned *host* cannot be read as a versioned path.
  */
 export function chatUrl(provider: Provider): string {
   const base = host(provider.base_url);
-  return base.endsWith("/v1") ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
+  const versioned = base
+    .split("/")
+    // The authority, which is never a version segment.
+    .slice(1)
+    .some((segment) => /^v\d/i.test(segment));
+  return versioned ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
 }
 
 /**

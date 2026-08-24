@@ -322,20 +322,26 @@ mod tests {
         }
     }
 
-    /// Every family on the allowlist is a prefix rather than a whole id, and the
-    /// preset row's starting model is one of them — a preset whose own model
-    /// silently lost suppression is the failure this arm was added to fix.
+    /// Every family on the allowlist is a prefix rather than a whole id, so a
+    /// dated snapshot of one suppresses as its alias does.
+    ///
+    /// This used to read the OpenAI preset's own `model` and assert it was on the
+    /// list — a preset whose starting model had silently lost suppression was the
+    /// failure this arm was added to fix. That row carries no model now
+    /// (`docs/register-audit-2026-08-24.md`), so there is nothing to read: the
+    /// ids come from OpenAI's own docs instead, which is where the constant's
+    /// authority was all along.
     #[test]
-    fn the_openai_preset_model_can_suppress_its_own_reasoning() {
-        let openai = crate::config::presets()
-            .into_iter()
-            .find(|row| row.reasoning == Reasoning::OpenAi)
-            .expect("a preset row speaks the OpenAI dialect");
-        assert!(
-            accepts_effort_none(&openai.model),
-            "{} is not on EFFORT_NONE_FAMILIES",
-            openai.model
-        );
+    fn a_documented_family_suppresses_and_its_snapshots_do_too() {
+        for model in ["gpt-5.6-terra", "gpt-5.6-terra-2026-07-11", "gpt-5.5"] {
+            assert!(accepts_effort_none(model), "{model} should suppress");
+        }
+        // An empty model reaches nothing on the list, which is why the turn is
+        // refused before the body is built rather than here.
+        assert!(!accepts_effort_none(""));
+        assert!(EFFORT_NONE_FAMILIES
+            .iter()
+            .all(|family| !family.trim().is_empty()));
     }
 
     /// The default arm, and the one most endpoints get: nothing about thinking

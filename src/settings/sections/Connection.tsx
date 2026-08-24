@@ -364,13 +364,32 @@ function EndpointScreen({ provider }: { provider: Provider }) {
     [provider.model, catalog],
   );
   const modelHint = unknownModelHint(provider.model || null, catalog, t);
-  const modelInfo = options.find((one) => one.id === provider.model)?.description ?? "";
+  // Nothing to pick, which is the initial state of every row a user adds: a row
+  // ships no model and the endpoint has not answered yet. A sentence naming what
+  // to do rather than an empty select — and a different one for a local row,
+  // which wants no key at all (ADR-0021). Read off the memo above rather than
+  // through `modelOption`, which would rebuild the same list to search it.
+  const modelInfo =
+    options.length === 0
+      ? isLocal(provider)
+        ? t.settings.connection.noModelsYetLocal
+        : t.settings.connection.noModelsYet
+      : (options.find((one) => one.id === provider.model)?.description ?? "");
+  // Whose word the list is, said once: a cached list is this endpoint's own ids
+  // but not its answer today, and `listNotice` may be sitting beneath it saying
+  // why (ADR-0024). A lookup rather than a ternary chain, because `source` is
+  // already the one field that decides.
+  const listSource = catalog
+    ? { live: t.settings.connection.live, cached: t.settings.connection.cached, none: null }[
+        catalog.source
+      ]
+    : null;
   const thinkingHint = thinkingWarning(provider, provider.model, provider.thinking, catalog, t);
-  const catalogNotice =
-    !catalog || catalog.live || !catalog.fallback
+  const listNotice =
+    !catalog || catalog.source === "live" || !catalog.fallback
       ? null
-      : t.settings.connection.catalogNotice(
-          describeFailure(catalog.fallback, t, t.settings.connection.catalogFallback),
+      : t.settings.connection.listNotice(
+          describeFailure(catalog.fallback, t, t.settings.connection.listUnavailable),
         );
 
   /** Every edit to this row goes through here, so no field invents its own
@@ -461,9 +480,9 @@ function EndpointScreen({ provider }: { provider: Provider }) {
         )}
       </PaneHeader>
 
-      {catalogNotice ? (
+      {listNotice ? (
         <Callout tone="warn">
-          <p>{catalogNotice}</p>
+          <p>{listNotice}</p>
         </Callout>
       ) : null}
 
@@ -655,6 +674,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
                 describedBy={describedBy}
                 value={provider.model}
                 options={options}
+                placeholder={t.controls.model.noneChosen}
                 onChange={(model) => edit({ model }, true)}
               />
               <Button
@@ -668,10 +688,8 @@ function EndpointScreen({ provider }: { provider: Provider }) {
               {/* Whether the offer is this endpoint's own word or a guess. It
                   belongs on this row rather than in a section of its own: the
                   list it describes is right here. */}
-              {catalog?.live ? (
-                <span className="text-muted-foreground text-meta">
-                  {t.settings.connection.live}
-                </span>
+              {listSource ? (
+                <span className="text-muted-foreground text-meta">{listSource}</span>
               ) : null}
             </div>
           )}

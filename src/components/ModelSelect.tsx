@@ -21,10 +21,21 @@ import {
 const INHERIT = "__inherit__";
 
 interface ModelSelectProps {
-  /** "" means inherit, and is only legitimate when `inheritLabel` is given. */
+  /**
+   * "" means inherit where `inheritLabel` is given, and "nothing chosen"
+   * where it is not — which is the ordinary state of a provider row whose
+   * endpoint has never answered.
+   */
   value: string;
   options: ModelOption[];
   inheritLabel?: string;
+  /**
+   * Shown in the trigger for a bare "". Only reachable **without**
+   * `inheritLabel`: with one, "" is mapped to the sentinel before Radix sees it,
+   * so the two labels are alternatives for the same empty value rather than
+   * things to pass together — see `shown` below.
+   */
+  placeholder?: string;
   id?: string;
   describedBy?: string;
   onChange: (id: string) => void;
@@ -34,6 +45,7 @@ export function ModelSelect({
   value,
   options,
   inheritLabel,
+  placeholder,
   id,
   describedBy,
   onChange,
@@ -64,8 +76,15 @@ export function ModelSelect({
     onChange(resolved);
   }
 
+  // The sentinel stands in for "" only where there is an inherit option to map
+  // it back to. Without one, "" has to reach Radix as "" — that is the single
+  // value it will paint a placeholder for, and a row whose endpoint has never
+  // answered is exactly the case that needs one. `choose` already refuses to
+  // write "" in that situation, so nothing new can be written here.
+  const shown = inheritLabel !== undefined && value === "" ? INHERIT : value;
+
   return (
-    <Select value={value === "" ? INHERIT : value} onValueChange={choose}>
+    <Select value={shown} onValueChange={choose}>
       {/* Sized to its own content, with a floor. Stretched to the control
           measure the chevron parks 200px from the value it belongs to, and the
           control reads as an empty box with a marker in the far corner; the
@@ -82,7 +101,7 @@ export function ModelSelect({
           about this select that is a Field-column argument rather than the
           control's. */}
       <SelectTrigger id={id} aria-describedby={describedBy} className="max-w-control w-fit min-w-40">
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {inheritLabel !== undefined ? <SelectItem value={INHERIT}>{inheritLabel}</SelectItem> : null}

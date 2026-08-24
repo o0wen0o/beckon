@@ -35,6 +35,7 @@ export const ZH: Strings = {
     interrupted: "回答提前中断",
     empty: "端点没有列出任何模型",
     config: "Beckon 的配置不支持这样做",
+    "no-model": "尚未为该端点选择模型",
     "capture-too-large": "截图太大，无法发送",
     "capture-too-many": "已无法再附带更多截图",
     "capture-unreadable": "无法读取这张截图",
@@ -175,8 +176,11 @@ export const ZH: Strings = {
       refresh: "刷新模型",
       loading: "正在加载模型…",
       live: "由该端点列出。",
-      catalogNotice: (cause: string) => `${cause} —— 现在显示的是你的配置所指定的模型。`,
-      catalogFallback: "无法获取模型列表",
+      cached: "此前由该端点列出。",
+      listNotice: (cause: string) => `${cause} —— 现在显示的是此前列出的模型。`,
+      noModelsYet: "请先为该端点保存密钥，然后点击刷新模型。",
+      noModelsYetLocal: "请先启动该端点，然后点击刷新模型。",
+      listUnavailable: "无法获取模型列表",
 
       reasoning: "思考开关形式",
       reasoningName: {
@@ -312,9 +316,8 @@ export const ZH: Strings = {
       label: "模型",
       thinking: "回答前先思考",
       configuredGroup: "由你的配置指定",
-      unknownLive: "不在端点的模型列表中",
-      unknownCatalog: "不是 Beckon 已知的模型",
-      unknown: (model: string, why: string) => `${model} ${why}。因为你的配置指定了它，所以仍然保留。`,
+      noneChosen: "未选择模型",
+      unknown: (model: string) => `${model} 不在端点的模型列表中。因为你的配置指定了它，所以仍然保留。`,
       alwaysThinks: (model: string) => `${model} 始终思考，无法关闭。`,
       neverThinks: (model: string) => `${model} 没有思考模式；两个方向都不会发送任何东西。`,
       noThinkingSwitch: (label: string) =>

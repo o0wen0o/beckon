@@ -64,8 +64,9 @@ export const openKeyPage = (providerId: string) =>
 // --- models ---------------------------------------------------------------
 
 /**
- * `live = false` is the documented catalog, answered without touching the
- * network; `true` asks the endpoint and falls back to the same catalog.
+ * `live = false` answers without touching the network or the credential store —
+ * from the cached list where there is one, and otherwise from whatever the
+ * configuration names. `true` asks the endpoint, and falls back to the same.
  */
 export const getModels = (providerId: string, live: boolean) =>
   invoke<ModelCatalog>("get_models", { providerId, live });

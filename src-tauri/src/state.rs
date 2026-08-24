@@ -17,15 +17,21 @@ use crate::config::{Config, Language, PopoverSize};
 use crate::exchange::ExchangeManager;
 use crate::failure::Failure;
 use crate::hotkey::HotkeyState;
+use crate::models_cache::ModelsCache;
 use crate::platform::capture::{self, Capture, Fault, Outcome};
 
-/// The Beckon directory and the two paths inside it (README): `%APPDATA%\Beckon\`
+/// The Beckon directory and the paths inside it (README): `%APPDATA%\Beckon\`
 /// on Windows, `~/Library/Application Support/Beckon/` on macOS.
+///
+/// Two of the three are the user's, watched and broadcast whole (ADR-0003). The
+/// third, `models_cache`, is Beckon's own and is neither — see
+/// [`crate::models_cache`] and ADR-0024.
 #[derive(Debug, Clone)]
 pub struct Paths {
     pub root: PathBuf,
     pub config_file: PathBuf,
     pub actions_dir: PathBuf,
+    pub models_cache: PathBuf,
 }
 
 impl Paths {
@@ -41,6 +47,7 @@ impl Paths {
         Ok(Self {
             config_file: root.join("config.toml"),
             actions_dir: root.join("actions"),
+            models_cache: root.join("models.json"),
             root,
         })
     }
@@ -223,6 +230,10 @@ pub struct AppState {
     pub hotkeys: Mutex<HotkeyState>,
     pub self_writes: Arc<SelfWrites>,
     pub http: reqwest::Client,
+    /// The last list each endpoint served (ADR-0024). Behind a `Mutex` because
+    /// it is the one writer of its file: `write_atomic` uses a fixed temp path,
+    /// and opening Settings primes every row at once.
+    pub models_cache: Mutex<ModelsCache>,
 
     /// The Selection grabbed eagerly at hotkey press, waiting for the user to
     /// pick an Action in the Launcher.
@@ -263,6 +274,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(paths: Paths, config: Config, registry: Registry) -> Self {
+        let models_cache = Mutex::new(ModelsCache::load(&paths.models_cache));
         Self {
             paths,
             config: RwLock::new(config),
@@ -271,6 +283,7 @@ impl AppState {
             hotkeys: Mutex::new(HotkeyState::default()),
             self_writes: Arc::new(SelfWrites::default()),
             http: crate::llm::client::build_http_client(),
+            models_cache,
             pending_selection: Mutex::new(None),
             previous_foreground: Mutex::new(None),
             popover_view: Mutex::new(None),

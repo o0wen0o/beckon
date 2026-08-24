@@ -287,6 +287,15 @@ pub fn models_empty(language: Language) -> &'static str {
     }
 }
 
+/// The same gap as [`turn_needs_model`], reported from inside Settings — so it
+/// says *this* rather than "open Settings", which is where the reader already is.
+pub fn test_needs_model(language: Language) -> &'static str {
+    match language {
+        Language::En => "No model is chosen yet. Press Refresh models, then pick one.",
+        Language::Zh => "尚未选择模型。请点击刷新模型，然后选择一个。",
+    }
+}
+
 pub fn test_needs_key(language: Language) -> &'static str {
     match language {
         Language::En => "No API key is stored yet. Enter one above, then test again.",
@@ -321,6 +330,19 @@ pub fn turn_needs_key(language: Language, label: &str) -> String {
             format!("No API key is stored for {label}. Open Settings to add one.")
         }
         Language::Zh => format!("尚未为 {label} 保存 API 密钥。请打开设置添加。"),
+    }
+}
+
+/// A turn whose model is empty. A provider row ships no model, so this is the
+/// ordinary state of a row the user has not picked in yet — which is why it
+/// names the action rather than just the fault. Refused here, in Beckon's own
+/// words, because the alternative is a `400` in the vendor's.
+pub fn turn_needs_model(language: Language, label: &str) -> String {
+    match language {
+        Language::En => {
+            format!("No model is chosen for {label}. Open Settings and press Refresh models.")
+        }
+        Language::Zh => format!("尚未为 {label} 选择模型。请打开设置并点击刷新模型列表。"),
     }
 }
 
@@ -395,8 +417,10 @@ mod tests {
             models_need_key(Language::En).to_string(),
             models_empty(Language::En).to_string(),
             test_needs_key(Language::En).to_string(),
+            test_needs_model(Language::En).to_string(),
             provider_missing(Language::En, "p"),
             turn_needs_key(Language::En, "p"),
+            turn_needs_model(Language::En, "p"),
             capture_too_large(Language::En, 1, 2),
             capture_too_many(Language::En, 4),
         ];
@@ -430,8 +454,10 @@ mod tests {
             models_need_key(Language::Zh).to_string(),
             models_empty(Language::Zh).to_string(),
             test_needs_key(Language::Zh).to_string(),
+            test_needs_model(Language::Zh).to_string(),
             provider_missing(Language::Zh, "p"),
             turn_needs_key(Language::Zh, "p"),
+            turn_needs_model(Language::Zh, "p"),
             capture_too_large(Language::Zh, 1, 2),
             capture_too_many(Language::Zh, 4),
         ];

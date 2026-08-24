@@ -10,6 +10,7 @@ mod failure;
 mod hotkey;
 mod i18n;
 mod llm;
+mod models_cache;
 mod platform;
 mod reload;
 mod secrets;

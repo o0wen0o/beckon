@@ -68,10 +68,10 @@ export function SettingsNav() {
         : problems.includes("missing") ||
             // Degraded because a fetch *failed*, not because none was attempted:
             // a reveal primes every row's list offline and asks only the row
-            // about to be read for its live one, so `!live` on its own is a dot
-            // that is always lit — and a warning that is always lit is the line
-            // nobody learns to read.
-            catalogs.some((catalog) => !catalog.live && catalog.fallback !== null)
+            // about to be read for its live one, so a source that is merely not
+            // `live` is a dot that is always lit — and a warning that is always
+            // lit is the line nobody learns to read.
+            catalogs.some((catalog) => catalog.source !== "live" && catalog.fallback !== null)
           ? "warn"
           : null,
     // A file that does not parse, or a Direct Hotkey that lost its conflict:

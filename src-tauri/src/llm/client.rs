@@ -16,16 +16,55 @@ use super::error::{status_error, LlmError};
 use super::sse::SseParser;
 use super::wire::{handle_event, parse_model_list, Flow, StreamEvent};
 
-/// `{base_url}/v1/{path}`, tolerating a `base_url` that already carries the
+/// `{base_url}/v1/{path}`, tolerating a `base_url` that already carries a
 /// version segment. Every endpoint goes through here so the tolerance is one
 /// rule and not one per route.
+///
+/// The rule is **any** path segment that looks like a version, not the last one:
+/// this used to test `ends_with("/v1")`, which was right for the endpoints the
+/// provider table grew up on and wrong for every vendor who versions their path
+/// differently. `open.bigmodel.cn/api/paas/v4` became `…/v4/v1/chat/completions`
+/// and Google's `…/v1beta/openai/` became `…/openai/v1/models` — the first a
+/// shipped row, and no test here reaches the network, so both read to a user as
+/// their own key or their own network.
+///
+/// "Any" rather than "the last", because a version can come first: Cloudflare's
+/// AI Gateway compat root is `gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai`,
+/// which has to be taken literally. And not "any path at all is already
+/// complete", which would score better on the table above at the cost of every
+/// hand-typed `proxy.example.com/openai` that works today *because* `/v1` is
+/// appended.
+///
+/// Two limits, stated rather than hidden. A path segment like `/v2ray/` is a
+/// knowing false positive — cheaper than the alternative, and a user who has one
+/// can spell the whole path. And a lexical test cannot know whether a versioned
+/// path *is* the compatibility root: `…/api/paas/v4` is, `…/client/v4/accounts/x/ai`
+/// would not be. The durable answer is for `base_url` to mean the compat root
+/// outright, which is a migration rather than a fix to this function.
 fn api_url(base_url: &str, path: &str) -> String {
     let base = base_url.trim().trim_end_matches('/');
-    if base.ends_with("/v1") {
+    if has_version_segment(base) {
         format!("{base}/{path}")
     } else {
         format!("{base}/v1/{path}")
     }
+}
+
+/// Whether any path segment of `base` is a version: `v` followed by a digit.
+///
+/// The authority is skipped, so a host like `v2.example.com` is not read as a
+/// version — the scheme separator is what tells them apart, and a base with no
+/// scheme is treated as authority-first the way [`crate::config`]'s `host_of`
+/// does.
+fn has_version_segment(base: &str) -> bool {
+    base.split_once("://")
+        .map_or(base, |(_, rest)| rest)
+        .split('/')
+        // The authority, which is never a version segment.
+        .skip(1)
+        // Deliberately the same shape as the `/^v\d/i` its mirror in
+        // `src/lib/providers.ts` tests with, so the two read as one rule.
+        .any(|segment| matches!(segment.as_bytes(), [b'v' | b'V', digit, ..] if digit.is_ascii_digit()))
 }
 
 /// `POST {base_url}/v1/chat/completions`.
@@ -212,6 +251,55 @@ mod tests {
         ] {
             assert_eq!(api_url(base, "x"), expected, "base {base}");
         }
+    }
+
+    /// The shapes the `ends_with("/v1")` rule got wrong. Both are rows in
+    /// `presets()`, and one of them shipped — so this test is the record that
+    /// the two URLs a user could not have debugged are now the documented ones.
+    #[test]
+    fn a_version_segment_anywhere_in_the_path_means_the_base_is_complete() {
+        for (base, expected) in [
+            // Zhipu: versioned last, but not `v1`.
+            (
+                "https://open.bigmodel.cn/api/paas/v4",
+                "https://open.bigmodel.cn/api/paas/v4/x",
+            ),
+            // Google's compatibility layer: versioned, then a suffix.
+            (
+                "https://generativelanguage.googleapis.com/v1beta/openai/",
+                "https://generativelanguage.googleapis.com/v1beta/openai/x",
+            ),
+            // Cloudflare's AI Gateway: versioned *first*, which is why the rule
+            // reads every segment rather than the last one.
+            (
+                "https://gateway.ai.cloudflare.com/v1/acct/gw/openai",
+                "https://gateway.ai.cloudflare.com/v1/acct/gw/openai/x",
+            ),
+            // Anthropic's trailing slash, trimmed before the test.
+            (
+                "https://api.anthropic.com/v1/",
+                "https://api.anthropic.com/v1/x",
+            ),
+        ] {
+            assert_eq!(api_url(base, "x"), expected, "base {base}");
+        }
+    }
+
+    /// The authority is not a path segment, so a versioned *host* still gets the
+    /// version appended — and the one false positive the rule knowingly accepts
+    /// is a path segment that merely starts like a version.
+    #[test]
+    fn the_version_test_reads_the_path_and_not_the_host() {
+        assert_eq!(
+            api_url("https://v2.example.com", "x"),
+            "https://v2.example.com/v1/x"
+        );
+        // Knowingly wrong, and cheaper than the alternative: a user with this
+        // path can spell the whole thing.
+        assert_eq!(
+            api_url("https://example.com/v2ray", "x"),
+            "https://example.com/v2ray/x"
+        );
     }
 
     #[test]
