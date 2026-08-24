@@ -131,7 +131,9 @@ pub fn build_probe_body(model: &str) -> Value {
 /// `reasoning_effort` outright, and `o3`, whose floor is `low`; `"none"` is a
 /// `400` on every turn for either, and `get_models` offers both from the
 /// endpoint's own list. `gpt-5.6` is the family that added the real floor, which
-/// is what made this arm expressible at all.
+/// is what made this arm expressible at all; `gpt-5.5`'s own model page documents
+/// the same `none, low, medium (default), high and xhigh` set, and OpenAI ships
+/// no `gpt-5.5-mini`, so the prefix cannot reach a sibling that disagrees.
 ///
 /// **Unmatched is [`ThinkingWire::Omit`], never an error**, and the asymmetry is
 /// deliberate: a model missing from this list either does not reason, in which
@@ -139,7 +141,7 @@ pub fn build_probe_body(model: &str) -> Value {
 /// turn and not a failed one. The list falling behind OpenAI is therefore cheap,
 /// while an allowlist guessed wide costs the turn — so widen it only by adding a
 /// family the docs state, never by loosening the rule.
-const EFFORT_NONE_FAMILIES: &[&str] = &["gpt-5.6"];
+const EFFORT_NONE_FAMILIES: &[&str] = &["gpt-5.6", "gpt-5.5"];
 
 /// Whether OpenAI documents `reasoning_effort: "none"` for this model.
 fn accepts_effort_none(model: &str) -> bool {
@@ -183,9 +185,10 @@ fn thinking_wire(
                      thinking off",
                     models::switchable_suggestion()
                 )),
-                // Documented as having no thinking mode — the vision model's
-                // `thinking` object is a 400. Asking for it anyway is a
-                // warning in Settings, not a refused turn.
+                // Documented as having no thinking mode — `deepseek-chat` was
+                // the id that *meant* not thinking, so a `thinking` object on
+                // it is a 400. Asking for it anyway is a warning in Settings,
+                // not a refused turn.
                 Thinking::Never => Ok(ThinkingWire::Omit),
             },
             // Uncatalogued, on an endpoint whose row says it speaks DeepSeek's
@@ -305,7 +308,12 @@ mod tests {
         }
         // A dated snapshot of a family that does document it, and the id's case
         // is the API's to normalise.
-        for model in ["gpt-5.6-terra", "GPT-5.6-Terra", "gpt-5.6-terra-2026-07-11"] {
+        for model in [
+            "gpt-5.6-terra",
+            "GPT-5.6-Terra",
+            "gpt-5.6-terra-2026-07-11",
+            "gpt-5.5",
+        ] {
             assert_eq!(
                 thinking_wire(Reasoning::OpenAi, model, false).unwrap(),
                 ThinkingWire::OpenAi,
@@ -416,9 +424,10 @@ mod tests {
     /// this whole layer exists to make easy.
     #[test]
     fn thinking_that_cannot_be_expressed_is_omitted_rather_than_refused() {
-        // Documented as having no thinking mode.
+        // Documented as having no thinking mode: the retired id that meant
+        // exactly "V4-Flash, not thinking".
         assert_eq!(
-            thinking_wire(Reasoning::Deepseek, "deepseek-v4-flash-vision-exp", true).unwrap(),
+            thinking_wire(Reasoning::Deepseek, "deepseek-chat", true).unwrap(),
             ThinkingWire::Omit
         );
         // An endpoint with no switch at all, whatever the model.
@@ -497,8 +506,10 @@ mod tests {
                 { "type": "image_url", "image_url": { "url": "data:image/png;base64,AA" } }
             ])
         );
-        // Thinking is undocumented for it, so nothing is sent.
-        assert!(body.get("thinking").is_none());
+        // An image changes nothing about the dialect: the vision model takes the
+        // switch like the rest of the catalog, so `thinking = false` still says
+        // so on the wire.
+        assert_eq!(body["thinking"], json!({ "type": "disabled" }));
     }
 
     /// No model is gated on images, catalogued or not, on any endpoint: whether

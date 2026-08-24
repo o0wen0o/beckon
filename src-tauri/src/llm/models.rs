@@ -11,17 +11,20 @@
 //!
 //! ## Where the ids come from
 //!
-//! DeepSeek's official API reference, checked 2026-08-01:
+//! DeepSeek's official API reference, checked 2026-08-24:
 //!
 //! - `GET https://api.deepseek.com/models` documents exactly `deepseek-v4-flash`
 //!   and `deepseek-v4-pro` in its example response
-//!   (<https://api-docs.deepseek.com/api/list-models>); the pricing page lists
-//!   the same two, both 1M context, thinking on by default.
+//!   (<https://api-docs.deepseek.com/api/list-models>); the pricing page
+//!   (<https://api-docs.deepseek.com/quick_start/pricing>) carries a third row
+//!   for the vision model, all three 1M context, all three "supports both
+//!   non-thinking and thinking (default) modes".
 //! - `deepseek-v4-flash-vision-exp` arrived 2026-08-21
 //!   (<https://api-docs.deepseek.com/news/news260821/>) and is DeepSeek's
-//!   image-reading model. It is experimental, and the docs say nothing about
-//!   whether it takes the `thinking` object — hence [`Thinking::Never`] for it,
-//!   which refuses `thinking = true` out loud instead of guessing. This table
+//!   image-reading model. Its announcement said nothing about the `thinking`
+//!   object, so it was [`Thinking::Never`] until the 2026-08-24 pass found the
+//!   pricing table documenting the switch for it like the other two — the
+//!   difference between "the docs are silent" and "the docs say no". This table
 //!   records no image column: nothing is gated on one (ADR-0016).
 //! - The changelog (<https://api-docs.deepseek.com/updates>) records V4-Pro and
 //!   V4-Flash arriving 2026-04-24, and the legacy names `deepseek-chat` /
@@ -100,12 +103,12 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         id: "deepseek-v4-flash-vision-exp",
         label: "DeepSeek V4 Flash Vision (experimental)",
-        description: "DeepSeek's image-reading model. Experimental; no thinking mode.",
-        description_zh: "DeepSeek 的图片阅读模型。实验性质，没有思考模式。",
-        // Undocumented for this model, and a `thinking` object it does not
-        // understand is a 400 on every request — so `true` is refused rather
-        // than sent hopefully.
-        thinking: Thinking::Never,
+        description: "DeepSeek's image-reading model, 1M context. Thinking can be switched off.",
+        description_zh: "DeepSeek 的图片阅读模型，100 万上下文。思考模式可关闭。",
+        // Was `Never` while the launch note was silent about the `thinking`
+        // object; the pricing table documents the same switch as the other two
+        // rows, so it takes the object both directions (checked 2026-08-24).
+        thinking: Thinking::Switchable,
         retired: false,
     },
     CatalogEntry {

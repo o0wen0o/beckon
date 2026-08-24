@@ -183,8 +183,9 @@ Six edits, and only the first is compiler-checked:
 
 Then answer the question the arm's name hides: **does every model behind that endpoint take the
 field?** A dialect is the endpoint's property (ADR-0021) and the row still selects it — but
-`api.deepseek.com` serves a vision model whose `thinking` object is a `400`, and `api.openai.com`
-serves `gpt-4o` and `o3`, which reject the effort floor. Where the host is mixed, have the arm consult
+`api.deepseek.com` still answers to legacy ids that picked the mode through the id itself, so the
+`thinking` object contradicts one of them, and `api.openai.com` serves `gpt-4o` and `o3`, which reject
+the effort floor. Where the host is mixed, have the arm consult
 a per-model list beside it (`CATALOG`, `EFFORT_NONE_FAMILIES`) and make the unmatched case the safe
 direction: `Omit` where silence costs only the feature, a refusal only where silence would cost
 invisible latency on every turn.
