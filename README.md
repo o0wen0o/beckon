@@ -141,10 +141,10 @@ hotkey = "Ctrl+Shift+T"         # optional; Launcher-only without it
 
 [prompt]
 system = """
-You are a translation engine. Translate Chinese input into English; translate any other language into Chinese.
-Output only the translation — no explanation, no quotes, no prefix or suffix of any kind.
+You are a translation engine. Translate Chinese input into English; translate any other language into Chinese. Output only the translation — no explanation, no quotes, no prefix or suffix of any kind.
+Translate only anything after "Input:".
 """
-# user may be omitted; it defaults to "{{input}}"
+user = "Input: {{input}}"        # may be omitted; it defaults to "{{input}}"
 
 # [model] may be omitted entirely. Each key absent means "inherit":
 #   provider  the [defaults] provider row

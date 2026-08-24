@@ -15,17 +15,24 @@ hotkey = "Ctrl+Shift+T"
 
 [prompt]
 system = """
-You are a translation engine. Translate Chinese input into English; translate any other language into Chinese.
-Output only the translation — no explanation, no quotes, no prefix or suffix of any kind.
+You are a translation engine. Translate Chinese input into English; translate any other language into Chinese. Output only the translation — no explanation, no quotes, no prefix or suffix of any kind.
+Translate only anything after "Input:".
 """
+# The label gives the Selection a boundary: a grab that reads like an
+# instruction ("translate this to French") is then text *under* a label rather
+# than the whole message, which is what stops it being obeyed.
+user = "Input: {{input}}"
 "#;
 
 pub const ASK: &str = r#"name = "Quick ask"
-input_source = "prompt"
+input_source = "auto"
 hotkey = "Ctrl+Alt+A"
 
 [prompt]
-system = "Answer concisely. Unless asked, do not enumerate bullet points and do not preamble at length."
+system = """
+Explain the user's input. If it is a question, answer it.
+Be concise: a few sentences, no preamble, no bullet points unless the content really is a list.
+"""
 
 [model]
 thinking = true
@@ -48,13 +55,21 @@ mod tests {
     use crate::action::{Action, InputSource};
 
     #[test]
-    fn both_examples_parse_and_cover_both_paths() {
+    fn both_examples_parse() {
         let translate = Action::parse("translate.toml", TRANSLATE).unwrap();
         assert_eq!(translate.file.input_source, InputSource::Auto);
         assert_eq!(translate.file.hotkey.as_deref(), Some("Ctrl+Shift+T"));
+        // The seed overrides the user template, so the placeholder has to
+        // survive into what is sent.
+        assert_eq!(translate.render_user("hello"), "Input: hello");
 
+        // Both examples are `auto` (the default): a Selection is the input when
+        // there is one, and an empty grab still lands in the composer
+        // (ADR-0020), so neither seed has to spend the `prompt` arm to offer
+        // typing. `prompt` is for an Action that must *never* read the
+        // Selection, which neither of these is.
         let ask = Action::parse("ask.toml", ASK).unwrap();
-        assert_eq!(ask.file.input_source, InputSource::Prompt);
+        assert_eq!(ask.file.input_source, InputSource::Auto);
         assert_eq!(ask.file.hotkey.as_deref(), Some("Ctrl+Alt+A"));
         assert_eq!(ask.file.model.thinking, Some(true));
 
