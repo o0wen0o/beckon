@@ -136,7 +136,7 @@ An Action's **identity is its filename**. `name` is display only.
 name = "Translate"
 description = "Chinese <-> English"
 input_source = "auto"           # auto | prompt
-hotkey = "Ctrl+Alt+T"           # optional; Launcher-only without it
+hotkey = "Ctrl+Shift+T"         # optional; Launcher-only without it
 
 [prompt]
 system = """

@@ -130,7 +130,7 @@ reasoning = "qwen"
 name = "Translate"
 description = "Chinese <-> English"
 input_source = "auto"           # auto | prompt
-hotkey = "Ctrl+Alt+T"           # 可选；省略时只能从启动器调用
+hotkey = "Ctrl+Shift+T"         # 可选；省略时只能从启动器调用
 
 [prompt]
 system = """

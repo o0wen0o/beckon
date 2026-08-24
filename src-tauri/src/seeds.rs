@@ -11,7 +11,7 @@ use crate::atomic::write_atomic;
 pub const TRANSLATE: &str = r#"name = "Translate"
 description = "Chinese <-> English"
 input_source = "auto"
-hotkey = "Ctrl+Alt+T"
+hotkey = "Ctrl+Shift+T"
 
 [prompt]
 system = """
@@ -51,7 +51,7 @@ mod tests {
     fn both_examples_parse_and_cover_both_paths() {
         let translate = Action::parse("translate.toml", TRANSLATE).unwrap();
         assert_eq!(translate.file.input_source, InputSource::Auto);
-        assert_eq!(translate.file.hotkey.as_deref(), Some("Ctrl+Alt+T"));
+        assert_eq!(translate.file.hotkey.as_deref(), Some("Ctrl+Shift+T"));
 
         let ask = Action::parse("ask.toml", ASK).unwrap();
         assert_eq!(ask.file.input_source, InputSource::Prompt);
