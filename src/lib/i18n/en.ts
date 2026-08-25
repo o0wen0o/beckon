@@ -106,6 +106,11 @@ export const EN = {
     openSettings: "Open Settings",
     copy: "Copy",
     copied: "Copied",
+    /** Copy is the only way a result leaves Beckon, so a clipboard write that
+     *  failed cannot be reported by the checkmark simply not appearing. On the
+     *  button rather than as a toast: the Popover hosts no Toaster, and the
+     *  button is where the gesture was made. */
+    copyFailed: "Could not copy",
 
     /** The Capture (CONTEXT.md) is a screenshot in prose — nobody calls it a
      *  Capture out loud, and the term is for code and comments. */
@@ -143,6 +148,10 @@ export const EN = {
       appearance: "Appearance",
       attention: "Something in this section needs attention",
       openFolder: "Open folder",
+      /** A lead for `describeFailure`: `reveal_config_dir` can fail to create
+       *  the directory or to hand it to the OS, and a button that opens nothing
+       *  and says nothing reads as a dead button. */
+      openFolderFailed: "The folder could not be opened",
     },
 
     status: {
@@ -164,6 +173,11 @@ export const EN = {
         " DeepSeek is set up and waiting for a key. Any OpenAI-compatible endpoint works instead, at its own vendor's host — and a local one needs no key at all.",
       setUp: (label: string) => `Set up ${label}`,
       getKeyFrom: (host: string) => `Get a key from ${host}`,
+      /** A lead for `describeFailure`. The row may carry no `key_page`, the URL
+       *  may not be `https`, or the OS may refuse it — and this button is most
+       *  often pressed on a first run, where a dead link is the worst moment for
+       *  one. */
+      keyPageFailed: "The key page could not be opened",
       addPreset: "Add from preset…",
       addBlank: "Blank",
       /** The badge on the default row. Sentence case, not an uppercase eyebrow:
@@ -242,6 +256,18 @@ export const EN = {
       noModelsYet: "Store a key for this endpoint, then press Refresh models.",
       noModelsYetLocal: "Start this endpoint, then press Refresh models.",
       listUnavailable: "The model list could not be fetched",
+      /** The other half of `listUnavailable`. A refresh that succeeds and
+       *  returns the same list it already had changes nothing on screen, so the
+       *  gesture goes unanswered exactly as the failed one used to — the count
+       *  is what makes an unchanged list still an answer. */
+      listRefreshed: (count: number) =>
+        `The endpoint listed ${count} model${count === 1 ? "" : "s"}.`,
+      /** `#adoptOnlyModel` writing the one model on offer onto the row. Said out
+       *  loud because nothing asked for it: Beckon changed config.toml, and a
+       *  write with no gesture behind it is the one that has to announce
+       *  itself. */
+      modelAdopted: (model: string) =>
+        `${model} was the only model on offer, so it is now this endpoint's.`,
 
       /** The wire field, on a row the user typed themselves — a preset carries
        *  the right value already, and showing it there invites breaking it. Not
@@ -286,6 +312,9 @@ export const EN = {
       permissionStillWorks:
         "Hotkeys still fire and Actions that ask you to type still work. Turn Beckon on in the list, then come back to this window.",
       openAccessibility: "Open Accessibility settings",
+      /** A lead for `describeFailure`: there is no such pane off macOS, and the
+       *  OS can refuse the URL. */
+      openAccessibilityFailed: "That settings pane could not be opened",
       summoning: "Summoning",
       launcherHotkey: "Launcher hotkey",
       launcherHotkeyHint: "If the combination is already taken it goes red and is not saved.",
@@ -333,6 +362,19 @@ export const EN = {
       /** `{file}` is the filename, set in mono by the caller. */
       deleteBody: "The file {file} is removed from disk. This cannot be undone.",
       deleteConfirm: "Delete file",
+      /** The four outcomes the status bar used to carry. It says "Not saved",
+       *  which is the wrong sentence about a read, a create and a delete — and
+       *  in the delete's case a standing red line about a write that never
+       *  happened. Each names the file, because the editor closing is the only
+       *  other sign and it does not say which one went. */
+      deleted: (file: string) => `${file} was deleted.`,
+      deleteFailed: "The file could not be deleted",
+      createFailed: "The Action could not be created",
+      rawOpenFailed: "The file could not be read",
+      /** The raw editor swapping back to the form is the answer already, but
+       *  only to someone who knows why — said out loud, it is the repair
+       *  landing rather than the pane changing under them. */
+      rawSaved: (file: string) => `${file} parses — back to the editor.`,
 
       hotkeyDeadLead: "This Action’s Direct Hotkey is not active.",
       hotkeyDeadBody: "No change to this Action can be saved until the hotkey is cleared or changed.",

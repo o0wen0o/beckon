@@ -11,8 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
 import { useT } from "@/lib/i18n";
-import { revealConfigDir } from "@/lib/ipc";
+import { describeFailure } from "@/lib/failures";
+import { describeError, revealConfigDir } from "@/lib/ipc";
 import { keyProblem } from "@/lib/providers";
+import { toasts } from "@/lib/toast";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "./actions";
 import { settings, type SectionRoute } from "./store";
@@ -144,10 +146,22 @@ export function SettingsNav() {
       </ul>
 
       <div className="mt-auto border-t pt-2">
+        {/* The success is the folder appearing, so only the failure is said —
+            and it has to be said somewhere: this used to be a `void` on a
+            command that can fail to create the directory or to hand it to the
+            OS, which made a refused open indistinguishable from a dead
+            button. */}
         <Button
           variant="ghost"
           className="w-full justify-start"
-          onClick={() => void revealConfigDir()}
+          onClick={() =>
+            void revealConfigDir().catch((error: unknown) =>
+              toasts.show(
+                "danger",
+                describeFailure(describeError(error), t, t.settings.nav.openFolderFailed),
+              ),
+            )
+          }
         >
           <FolderIcon className="size-3.5" /> {t.settings.nav.openFolder}
         </Button>

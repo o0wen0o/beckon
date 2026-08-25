@@ -6,7 +6,7 @@
 // alike sit side by side in one file. Output is plain text with preserved
 // whitespace: acceptable for the MVP, and it cannot inject anything into the
 // WebView.
-import { CheckIcon, CopyIcon, RotateCcwIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeFailure } from "@/lib/failures";
 import { useT } from "@/lib/i18n";
@@ -50,6 +50,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
 
   const settled = isSettled(turn.status);
   const copied = exchange.copiedTurn === index;
+  const copyFailed = exchange.copyFailedTurn === index;
 
   return (
     <div className="flex flex-col gap-2">
@@ -207,11 +208,22 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
           <Button
             variant="ghost"
             size="xs"
-            className={cn(QUIET, "-ml-1.5")}
+            // The failure colours the button rather than raising anything: this
+            // window hosts no Toaster, and a clipboard write that was refused is
+            // a fact about the gesture, not a condition to act on. It clears
+            // itself on the same 1600ms as Copied does, so the two are one
+            // behaviour with two outcomes.
+            className={cn(copyFailed ? "text-destructive" : QUIET, "-ml-1.5")}
             onClick={() => void exchange.copy(turn.answer, index)}
           >
-            {copied ? <CheckIcon /> : <CopyIcon />}
-            {copied ? t.popover.copied : t.popover.copy}
+            {copyFailed ? (
+              <TriangleAlertIcon />
+            ) : copied ? (
+              <CheckIcon />
+            ) : (
+              <CopyIcon />
+            )}
+            {copyFailed ? t.popover.copyFailed : copied ? t.popover.copied : t.popover.copy}
           </Button>
         ) : null}
       </div>

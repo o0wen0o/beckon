@@ -104,6 +104,17 @@ class ExchangeStore extends Notifier {
   captureNotice: CaptureNotice | null = null;
   copiedTurn: number | null = null;
   /**
+   * The turn whose Copy just failed, if one did.
+   *
+   * A second field rather than a tri-state on `copiedTurn`, because the two are
+   * not the same shape: a success is one turn's checkmark and a failure is one
+   * turn's warning, and a value that is either would have to be read as both
+   * everywhere it is used. Copy is the only way a result leaves Beckon, so the
+   * checkmark simply not appearing is not a report — that is indistinguishable
+   * from a button that did nothing.
+   */
+  copyFailedTurn: number | null = null;
+  /**
    * Bumped by every reveal. The window is reused (ADR-0007), so the composer
    * still holds the last trigger's draft at the last trigger's height; keying
    * it on this remounts it, which clears both at once.
@@ -264,6 +275,7 @@ class ExchangeStore extends Notifier {
   async load() {
     this.view = await getPopoverView();
     this.copiedTurn = null;
+    this.copyFailedTurn = null;
     this.epoch += 1;
     // A Capture belongs to the Popover that was showing, so a fresh trigger
     // starts with nothing attached — and Rust says so, rather than this
@@ -402,8 +414,31 @@ class ExchangeStore extends Notifier {
   }
 
   async copy(text: string, index: number) {
-    // A user-requested clipboard write: not restored (ADR-0002).
-    await copyToClipboard(text);
+    // Both callers are `void exchange.copy(...)` — the button and the window's
+    // own chord — so a rejection escaping here is swallowed entirely and the
+    // only export path fails in silence. Caught rather than thrown on: the
+    // report belongs on the button that was pressed.
+    try {
+      // A user-requested clipboard write: not restored (ADR-0002).
+      await copyToClipboard(text);
+    } catch {
+      // The cause is not quoted. `write_clipboard_text` fails when another
+      // process holds the clipboard, which is a sentence about Win32 rather
+      // than about anything the reader can act on — and this label sits inside
+      // a 12px button. Everywhere a cause *is* worth quoting there is a toast
+      // or a field to quote it into; the Popover has neither (ADR-0007: the
+      // window is a conversation, not a form).
+      this.copiedTurn = null;
+      this.copyFailedTurn = index;
+      this.notify();
+      setTimeout(() => {
+        if (this.copyFailedTurn !== index) return;
+        this.copyFailedTurn = null;
+        this.notify();
+      }, 1600);
+      return;
+    }
+    this.copyFailedTurn = null;
     this.copiedTurn = index;
     this.notify();
     setTimeout(() => {

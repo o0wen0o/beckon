@@ -319,28 +319,50 @@ class SettingsStore extends Notifier {
     }
     try {
       if (!this.models[providerId]) {
-        this.#putModels(providerId, await getModels(providerId, false));
+        this.#putModels(providerId, await getModels(providerId, false), mode);
       }
       if (live) {
         const catalog = await getModels(providerId, true);
-        this.#putModels(providerId, catalog);
+        this.#putModels(providerId, catalog, mode);
         // `get_models` never fails — it answers with the offline list and says
         // why (ADR-0024). Which is right for a fetch nobody asked for, and
         // silent for the one gesture that *was* a question: pressing Refresh
         // with no key stored left the same list on screen and no answer
         // anywhere. `asked` is how a caller says a person is waiting on it.
-        if (mode === "asked" && catalog.source !== "live" && catalog.fallback) {
+        //
+        // Both arms, not just the failing one: a refresh that succeeds and
+        // returns the list it already had also changes nothing on screen, so it
+        // went unanswered for exactly the same reason. The count is what makes
+        // an unchanged list an answer rather than a shrug.
+        if (mode === "asked") {
           const strings = i18n.strings;
-          toasts.show(
-            "danger",
-            describeFailure(catalog.fallback, strings, strings.settings.connection.listUnavailable),
-          );
+          if (catalog.source !== "live" && catalog.fallback) {
+            toasts.show(
+              "danger",
+              describeFailure(
+                catalog.fallback,
+                strings,
+                strings.settings.connection.listUnavailable,
+              ),
+            );
+          } else if (catalog.source === "live") {
+            toasts.show(
+              "ok",
+              strings.settings.connection.listRefreshed(catalog.options.length),
+            );
+          }
         }
       }
     } catch (error) {
-      // The command is infallible by design; if it ever is not, keep whatever
-      // list is already on screen rather than emptying the dropdowns.
-      this.configSlot.error = describeError(error).message;
+      // The command is infallible by design; if it ever is not, say so as the
+      // outcome of the gesture it was. Not `configSlot.error`: that is where a
+      // failed *write* goes, and the status bar renders it as "Not saved" —
+      // which is the wrong sentence about a list that could not be read.
+      const strings = i18n.strings;
+      toasts.show(
+        "danger",
+        describeFailure(describeError(error), strings, strings.settings.connection.listUnavailable),
+      );
     } finally {
       if (live) {
         const loading = new Set(this.modelsLoading);
@@ -351,10 +373,10 @@ class SettingsStore extends Notifier {
     }
   }
 
-  #putModels(providerId: string, catalog: ModelCatalog) {
+  #putModels(providerId: string, catalog: ModelCatalog, mode: RefreshMode) {
     this.models = { ...this.models, [providerId]: catalog };
     this.notify();
-    this.#adoptOnlyModel(providerId, catalog);
+    this.#adoptOnlyModel(providerId, catalog, mode);
   }
 
   /**
@@ -370,15 +392,27 @@ class SettingsStore extends Notifier {
    * about a row must not depend on whether anyone opened that row's screen, and
    * this is the one place that knows a catalog just arrived — for any row, from
    * any caller.
+   *
+   * Said out loud, because nothing asked for it: this writes `config.toml` with
+   * no gesture behind it, which makes it the one write that has to announce
+   * itself rather than the one that may stay quiet. `prime` is the exception,
+   * and only because of when it runs — `refreshAll` primes every row on reveal,
+   * so a fresh install with several single-model local rows would open onto a
+   * stack of them. The adoption still happens there; only the sentence waits for
+   * a trip somebody was actually watching.
    */
-  #adoptOnlyModel(providerId: string, catalog: ModelCatalog) {
+  #adoptOnlyModel(providerId: string, catalog: ModelCatalog, mode: RefreshMode) {
     if (catalog.source === "none" || catalog.options.length !== 1) return;
     const row = this.config?.api.providers.find((one) => one.id === providerId);
     if (!row || row.model !== "") return;
+    const model = catalog.options[0].id;
     this.editConfig((draft) => {
       const target = draft.api.providers.find((one) => one.id === providerId);
-      if (target) target.model = catalog.options[0].id;
+      if (target) target.model = model;
     }, true);
+    if (mode !== "prime") {
+      toasts.show("ok", i18n.strings.settings.connection.modelAdopted(model));
+    }
   }
 
   /**

@@ -83,6 +83,7 @@ export const ZH: Strings = {
     openSettings: "打开设置",
     copy: "复制",
     copied: "已复制",
+    copyFailed: "无法复制",
 
     captureTooltip: (accelerator: string) => `截取屏幕（${accelerator}）`,
     removeCapture: "移除截图",
@@ -111,6 +112,7 @@ export const ZH: Strings = {
       appearance: "外观",
       attention: "此分区有需要处理的问题",
       openFolder: "打开文件夹",
+      openFolderFailed: "无法打开该文件夹",
     },
 
     status: {
@@ -129,6 +131,7 @@ export const ZH: Strings = {
         " DeepSeek 已配置好，只差一个密钥。也可以改用任何兼容 OpenAI 的端点（直连各家自己的主机）—— 本机端点则完全不需要密钥。",
       setUp: (label: string) => `配置${label}`,
       getKeyFrom: (host: string) => `前往 ${host} 获取密钥`,
+      keyPageFailed: "无法打开密钥页面",
       addPreset: "从预设添加…",
       addBlank: "空白",
       defaultTag: "默认",
@@ -186,6 +189,9 @@ export const ZH: Strings = {
       noModelsYet: "请先为该端点保存密钥，然后点击刷新模型。",
       noModelsYetLocal: "请先启动该端点，然后点击刷新模型。",
       listUnavailable: "无法获取模型列表",
+      listRefreshed: (count: number) => `该端点列出了 ${count} 个模型。`,
+      modelAdopted: (model: string) =>
+        `${model} 是该端点提供的唯一模型，已设为它的模型。`,
 
       reasoning: "思考开关形式",
       reasoningName: {
@@ -223,6 +229,7 @@ export const ZH: Strings = {
       permissionStillWorks:
         "热键仍会触发，需要手动输入的 Action 也照常可用。请在列表中打开 Beckon，然后回到本窗口。",
       openAccessibility: "打开辅助功能设置",
+      openAccessibilityFailed: "无法打开该设置面板",
       summoning: "唤起",
       launcherHotkey: "启动器热键",
       launcherHotkeyHint: "若组合键已被占用，它会变红且不会保存。",
@@ -264,6 +271,11 @@ export const ZH: Strings = {
       deleteTitle: (name: string) => `删除“${name}”？`,
       deleteBody: "文件 {file} 将从磁盘删除。此操作无法撤销。",
       deleteConfirm: "删除文件",
+      deleted: (file: string) => `${file} 已删除。`,
+      deleteFailed: "无法删除该文件",
+      createFailed: "无法创建该 Action",
+      rawOpenFailed: "无法读取该文件",
+      rawSaved: (file: string) => `${file} 已能解析 —— 返回编辑器。`,
 
       hotkeyDeadLead: "此 Action 的专属热键未生效。",
       hotkeyDeadBody: "在热键被清除或改掉之前，对此 Action 的任何改动都无法保存。",

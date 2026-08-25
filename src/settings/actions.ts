@@ -17,8 +17,11 @@ import {
   saveAction,
   writeActionRaw,
 } from "../lib/ipc";
+import { describeFailure } from "../lib/failures";
+import { i18n } from "../lib/i18n";
 import { SaveSlot, textFocusHeld } from "../lib/saveSlot";
 import { Notifier } from "../lib/store";
+import { toasts } from "../lib/toast";
 import type { Action, ActionFile, RegistrySnapshot } from "../lib/types";
 
 /**
@@ -168,7 +171,7 @@ class ActionStore extends Notifier {
       this.draft = null;
       this.notify();
     } catch (error) {
-      this.slot.error = describeError(error).message;
+      this.#report(error, i18n.strings.settings.actions.rawOpenFailed);
     }
   }
 
@@ -176,9 +179,11 @@ class ActionStore extends Notifier {
     try {
       const fileName = await createAction("New Action");
       this.snapshot = await getActions();
+      // No toast: the editor opening *is* the answer, and one on top of it says
+      // the same thing twice.
       this.open(fileName);
     } catch (error) {
-      this.slot.error = describeError(error).message;
+      this.#report(error, i18n.strings.settings.actions.createFailed);
     }
   }
 
@@ -188,9 +193,15 @@ class ActionStore extends Notifier {
     try {
       await writeActionRaw(current.file, current.text);
       this.snapshot = await getActions();
-      // It parses now, so it has become an Action again.
+      // It parses now, so it has become an Action again. The swap from text
+      // back to form is the whole answer, and it reads as the pane changing
+      // under you unless something says which of the two just happened — the
+      // repair landing, not a glitch.
       this.open(current.file);
+      toasts.show("ok", i18n.strings.settings.actions.rawSaved(current.file));
     } catch (error) {
+      // Stays on the field: this one *has* somewhere to sit — the editor the
+      // text is still in — and the user has to act on it (src/lib/toast.ts).
       this.raw = { ...current, error: describeError(error).message };
       this.notify();
     }
@@ -206,12 +217,30 @@ class ActionStore extends Notifier {
       await deleteActionFile(action.file_name);
       this.snapshot = await getActions();
       this.close();
+      // The list shortening and the editor closing are one movement, and
+      // neither of them names the file that went. It cannot be undone, so which
+      // one it was is the part worth saying.
+      toasts.show("ok", i18n.strings.settings.actions.deleted(action.file_name));
     } catch (error) {
-      this.slot.error = describeError(error).message;
+      this.#report(error, i18n.strings.settings.actions.deleteFailed);
     } finally {
       this.pendingDelete = null;
       this.notify();
     }
+  }
+
+  /**
+   * An outcome of a gesture, which is a toast and not the status bar
+   * (src/lib/toast.ts).
+   *
+   * `slot.error` is where a failed *write* goes, and `StatusBar` renders it as
+   * "Not saved" — the wrong sentence about a read, a create or a delete, and in
+   * the delete's case a standing red line about a write that never happened.
+   * The catalog is reached through `i18n` rather than a hook because this is
+   * outside the React tree, exactly as `store.ts` does it.
+   */
+  #report(error: unknown, lead: string) {
+    toasts.show("danger", describeFailure(describeError(error), i18n.strings, lead));
   }
 
   /** Back to the list. Whatever was typed is written first. Called on every

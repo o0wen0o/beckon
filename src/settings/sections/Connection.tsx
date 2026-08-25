@@ -410,7 +410,13 @@ function EndpointScreen({ provider }: { provider: Provider }) {
         t.settings.connection.saved,
       );
       settings.setKeyDraft("");
-      void settings.refreshModels(provider.id, "asked");
+      // `live`, not `asked`: this list is a consequence of saving a key, not the
+      // question that was asked. `asked` was for the no-key fallback, which
+      // cannot be the outcome one line after `set_api_key` returned — and every
+      // other way it can fail, `runTest` below reports verbatim as its own
+      // sentence. Left as `asked` it answered a gesture that already had two
+      // answers, and Save became three reports for one click.
+      void settings.refreshModels(provider.id, "live");
       // A key that does not work is worth knowing now rather than at the first
       // hotkey press, and the test is also what learns the dialect — so the one
       // gesture the user already made settles both. The button stays, for a
@@ -639,10 +645,25 @@ function EndpointScreen({ provider }: { provider: Provider }) {
               ) : null}
 
               {provider.key_page && key?.kind !== "present" ? (
+                // Rust refuses anything but `https` and the OS may refuse the
+                // URL, so this can fail — and it is drawn precisely where there
+                // is no key yet, which is the worst place for a link that opens
+                // nothing and explains nothing.
                 <Button
                   variant="link"
                   className="self-start"
-                  onClick={() => void openKeyPage(provider.id)}
+                  onClick={() =>
+                    void openKeyPage(provider.id).catch((error: unknown) =>
+                      toasts.show(
+                        "danger",
+                        describeFailure(
+                          describeError(error),
+                          t,
+                          t.settings.connection.keyPageFailed,
+                        ),
+                      ),
+                    )
+                  }
                 >
                   {t.settings.connection.getKeyFrom(host(provider.key_page))}
                 </Button>

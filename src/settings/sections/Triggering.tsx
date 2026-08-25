@@ -6,7 +6,9 @@ import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
-import { openInputPermissionSettings } from "@/lib/ipc";
+import { describeFailure } from "@/lib/failures";
+import { describeError, openInputPermissionSettings } from "@/lib/ipc";
+import { toasts } from "@/lib/toast";
 import { useStore } from "@/lib/useStore";
 import { settings } from "../store";
 
@@ -52,9 +54,23 @@ export function Triggering() {
           </p>
           <p>{t.settings.triggering.permissionStillWorks}</p>
           <p>
+            {/* The last step of a repair, so a refusal here strands the whole
+                Callout above it: the pane says what to do and the button that
+                does it has to say when it could not. */}
             <Button
               variant="link"
-              onClick={() => void openInputPermissionSettings()}
+              onClick={() =>
+                void openInputPermissionSettings().catch((error: unknown) =>
+                  toasts.show(
+                    "danger",
+                    describeFailure(
+                      describeError(error),
+                      t,
+                      t.settings.triggering.openAccessibilityFailed,
+                    ),
+                  ),
+                )
+              }
             >
               {t.settings.triggering.openAccessibility}
             </Button>
