@@ -10,6 +10,13 @@
 // an interpolated name where English does, so the *whole* sentence has to be one
 // translatable unit rather than two fragments glued around a component.
 //
+// House style, and the reason most sentences here are one clause: say what the
+// reader can act on and stop. A wire field name, an HTTP header, a path inside
+// the request — those are facts about Beckon's implementation, and a reader who
+// needs them has the ADRs. What stays long is what a reader would be worse off
+// not knowing: the privacy disclosure on a relaying row, and the two "this
+// cannot be undone" sentences.
+//
 // The words that differ per platform live here too (ADR-0015). `platform.ts`
 // keeps `IS_MAC` and the accelerator logic; what it no longer keeps is prose,
 // because prose has two dimensions now — platform *and* language — and a
@@ -47,20 +54,21 @@ export const EN = {
   },
 
   /** One prefix per `Failure.kind`, so a new kind cannot reach one consumer and
-   *  miss the other. `fallback` is the unknown-kind case. */
+   *  miss the other. `fallback` is the unknown-kind case. A prefix names the
+   *  kind in four or five words; the cause quoted after it carries the detail. */
   failure: {
-    auth: "The API rejected this key",
+    auth: "The key was rejected",
     network: "Could not reach the API",
     http: "The API refused the request",
-    "no-credential": "No API key stored",
-    "read-error": `The ${IS_MAC ? "Keychain" : "Windows Credential Manager"} could not be read`,
+    "no-credential": "No API key saved",
+    "read-error": `Could not read the ${IS_MAC ? "Keychain" : "Credential Manager"}`,
     interrupted: "The answer stopped early",
-    empty: "The endpoint listed no models",
-    config: "Beckon is not configured for this",
-    "no-model": "No model is chosen for this endpoint",
-    "capture-too-large": "The screenshot is too big to send",
-    "capture-too-many": "There is no room for another screenshot",
-    "capture-unreadable": "The screenshot could not be read",
+    empty: "No models found",
+    config: "Not set up for this",
+    "no-model": "No model chosen",
+    "capture-too-large": "Screenshot too big to send",
+    "capture-too-many": "Too many screenshots",
+    "capture-unreadable": "Could not read the screenshot",
     fallback: "Failed",
   } as Record<string, string>,
 
@@ -73,7 +81,7 @@ export const EN = {
     addInSettings: "Add one in Settings",
     /** `{query}` is the query, set in mono by the caller. */
     nothingMatches: "Nothing matches {query}.",
-    widen: "Backspace to widen the search.",
+    widen: "Delete a letter to see more.",
     selected: (characters: number) => `${characters} characters selected`,
     noSelection: "No selection",
     move: "move",
@@ -90,20 +98,20 @@ export const EN = {
     nothingToShow: "Nothing to show.",
     /** `{name}` is the Action, set bold by the caller. */
     typeYourInput: "Type what you want to send to {name}.",
-    waiting: "Waiting for the first token",
+    waiting: "Waiting for a reply",
     runningWaiting: "Waiting",
-    runningStreaming: "Streaming",
+    runningStreaming: "Answering",
     stop: "Stop",
     firstInput: "Your input…",
     followUp: "Ask a follow-up…",
     send: "Send",
     showAll: "Show all",
     showLess: "Show less",
-    showThinking: "Show what it thought",
+    showThinking: "Show thinking",
     hideThinking: "Hide",
     failed: "Failed",
     interrupted: "Interrupted",
-    interruptedEmpty: "Interrupted before any output",
+    interruptedEmpty: "Stopped before any answer",
     cancelled: "Cancelled.",
     retry: "Retry",
     openSettings: "Open Settings",
@@ -117,28 +125,28 @@ export const EN = {
 
     /** The Capture (CONTEXT.md) is a screenshot in prose — nobody calls it a
      *  Capture out loud, and the term is for code and comments. */
-    captureTooltip: (accelerator: string) => `Screenshot the screen (${accelerator})`,
-    removeCapture: "Remove the screenshot",
+    captureTooltip: (accelerator: string) => `Take a screenshot (${accelerator})`,
+    removeCapture: "Remove screenshot",
     captureCancelled: "Nothing was captured.",
     captureRetry: (accelerator: string) => `Press ${accelerator} to try again.`,
-    captureNote: "Add a note about the screenshots…",
+    captureNote: "Add a note…",
     /** Beside the thumbnail: what was captured, and how big it is. Takes the
      *  raw byte count, so the two thumbnails cannot round it differently. */
     captureMeta: (width: number, height: number, bytes: number) =>
-      `${width}×${height} · PNG ${kb(bytes)} KB`,
+      `${width}×${height} · ${kb(bytes)} KB`,
     /** Under the rail: what is attached, as a set. The individual sizes are one
      *  tap away in the preview, and four of them side by side read as noise. */
     captureSet: (count: number, bytes: number) =>
       `${count} screenshot${count === 1 ? "" : "s"} · ${kb(bytes)} KB total`,
-    viewCapture: "View this screenshot",
+    viewCapture: "View screenshot",
     /** Said in words for a screen reader; the preview draws it as `2 / 3`. */
     capturePosition: (index: number, total: number) => `Screenshot ${index} of ${total}`,
     previousCapture: "Previous screenshot",
     nextCapture: "Next screenshot",
-    closeCapture: "Close the screenshot",
+    closeCapture: "Close screenshot",
     /** On the image itself, because zoom has no visible control of its own —
      *  the wheel and a click are the whole interface (ADR-0017). */
-    zoomHint: "Click to zoom, scroll to zoom in and out",
+    zoomHint: "Click to zoom, scroll to resize",
     zoomOutHint: "Click to fit, drag to move",
   },
 
@@ -149,19 +157,19 @@ export const EN = {
       actions: "Actions",
       triggering: "Triggering",
       appearance: "Appearance",
-      attention: "Something in this section needs attention",
+      attention: "Something here needs attention",
       openFolder: "Open folder",
       /** A lead for `describeFailure`: `reveal_config_dir` can fail to create
        *  the directory or to hand it to the OS, and a button that opens nothing
        *  and says nothing reads as a dead button. */
-      openFolderFailed: "The folder could not be opened",
+      openFolderFailed: "Could not open the folder",
     },
 
     status: {
       notSaved: (message: string) => `Not saved — ${message}`,
       saving: "Saving…",
-      standing: "Changes are written to disk as you make them.",
-      rawFile: "This file does not parse, so it is written with the button above — not as you type.",
+      standing: "Changes save automatically.",
+      rawFile: "This file has an error. Use Save file above.",
     },
 
     connection: {
@@ -170,24 +178,24 @@ export const EN = {
        *  credential store. Both are in the sentence because both are the answer
        *  to "where does my text go and what does it carry" (ADR-0021). */
       lede: (fallback: string, store: string) =>
-        `The endpoints you keep. Each Action posts to one; an Action that does not say posts to ${fallback}. Keys live in the ${store}, one per endpoint, never in a file.`,
+        `Where your text is sent. Actions use ${fallback} unless they say otherwise. Keys are kept in the ${store}, never in a file.`,
       welcomeLead: "Welcome.",
       welcomeBody:
-        " DeepSeek is set up and waiting for a key. Any OpenAI-compatible endpoint works instead, at its own vendor's host — and a local one needs no key at all.",
+        " DeepSeek is ready — add a key to start. Any OpenAI-compatible endpoint works instead, and a local one needs no key.",
       setUp: (label: string) => `Set up ${label}`,
       getKeyFrom: (host: string) => `Get a key from ${host}`,
       /** A lead for `describeFailure`. The row may carry no `key_page`, the URL
        *  may not be `https`, or the OS may refuse it — and this button is most
        *  often pressed on a first run, where a dead link is the worst moment for
        *  one. */
-      keyPageFailed: "The key page could not be opened",
+      keyPageFailed: "Could not open the key page",
       addPreset: "Add from preset…",
       addBlank: "Blank",
       /** The badge on the default row. Sentence case, not an uppercase eyebrow:
        *  it is a word about the row it sits on, and it says something quiet —
        *  which row an Action inherits, not a state the row is in. */
       defaultTag: "Default",
-      defaultForNew: "default for Actions that do not say",
+      defaultForNew: "used by Actions that do not pick one",
       makeDefault: "Make default",
       usedByNone: "no Actions",
       usedByOne: (name: string) => `1 Action — ${name}`,
@@ -196,86 +204,81 @@ export const EN = {
       missingKey: "no key",
       edit: (label: string) => `Edit ${label}`,
       removeLabel: (label: string) => `Remove ${label}`,
-      removeHint: "Removes the row and its stored key.",
+      removeHint: "Removes this endpoint and its saved key.",
       /** Refused rather than cascaded: which endpoint those Actions should use
        *  instead is not a decision this button gets to make. */
-      removeBlocked: (names: string) =>
-        `${names} would be left without an endpoint. Point them elsewhere first.`,
+      removeBlocked: (names: string) => `${names} use this endpoint. Point them elsewhere first.`,
       removeLast: "The last endpoint cannot be removed.",
       back: "Connection",
       unnamed: "(unnamed)",
 
       endpoint: "Endpoint",
       name: "Name",
-      nameHint:
-        "Display only. The id beside it is what an Action names and what the stored key is filed under — change that in config.toml, and move the key with it.",
+      nameHint: "Display only — safe to change any time.",
+      baseUrlHint: "Any OpenAI-compatible endpoint. A trailing /v1 is fine.",
       baseUrl: "Base URL",
-      baseUrlHint:
-        "Any OpenAI-compatible endpoint, at its own vendor's host. Requests go to /v1/chat/completions; a trailing /v1 is tolerated.",
       apiKey: "API key",
-      apiKeyHint:
-        "A stored key is sent as a Bearer header. Nothing stored means no header — which is what a local endpoint wants.",
+      apiKeyHint: (store: string) => `Kept in the ${store}. Local endpoints need no key.`,
       save: "Save",
       saved: "Saved.",
       remove: "Remove",
       removed: "Removed.",
-      stored: "Stored — ends in",
-      noKeyYet: "No key stored yet.",
-      unauthenticated: "No key — requests go unauthenticated.",
+      stored: "Saved — ends in",
+      noKeyYet: "No key saved yet.",
+      unauthenticated: "No key — requests are sent without one.",
       readError: (store: string, message: string) =>
-        `The ${store} could not be read: ${message}. Save the key again to recreate the credential.`,
-      reachability: "Reachability",
-      reachabilityHint: "Sends one small request to this endpoint, with its own key.",
-      test: "Test connection",
+        `Could not read the ${store}: ${message}. Save the key again.`,
+      reachability: "Connection test",
+      reachabilityHint: "Sends one small test request.",
+      test: "Test",
       testing: "Testing…",
-      testOk: "Reached it — the endpoint answered.",
+      testOk: "Connected.",
       /** The test also settles the dialect on a row no preset filled in, so it
        *  reports what it found rather than making the user check. */
-      testOkDetected: (dialect: string) =>
-        `Reached it — the endpoint answered, and it speaks ${dialect}.`,
+      testOkDetected: (dialect: string) => `Connected — thinking control set to ${dialect}.`,
       /** A relaying row, said on the identity line under the URL it is about
-       *  (ADR-0025). Two sentences, because the second is the part that is
-       *  actually surprising. */
+       *  (ADR-0025). Two sentences, and the length is earned: this is the one
+       *  place a reader learns a second company sees their text. */
       relaysLead: "Relays.",
       relaysBody: (broker: string) =>
-        `Your key stays with ${broker}; your text goes on to whichever company serves the model chosen below. Two companies see it, not one.`,
+        `Your key stays with ${broker}, but your text goes on to whoever runs the model below. Two companies see it, not one.`,
 
       rowDefaults: "Defaults for this endpoint",
-      rowDefaultsNote: "an Action may override either",
+      rowDefaultsNote: "Actions can override these",
       refresh: "Refresh models",
       loading: "Loading models…",
-      live: "Listed by this endpoint.",
+      live: "From this endpoint.",
       /** A list from disk rather than from the endpoint just now (ADR-0024).
        *  Distinct from `live` because `listNotice` may be showing beside it. */
-      cached: "Listed by this endpoint earlier.",
+      cached: "From an earlier check.",
       /** Named for the list, not for a catalog: a provider row carries no
        *  catalog, so the only list is the endpoint's own — whether it answered
        *  just now or last time (CONTEXT.md, one name per thing). */
-      listNotice: (cause: string) => `${cause} — showing what was listed before.`,
+      listNotice: (cause: string) => `${cause} — showing the earlier list.`,
       /** The initial state of every row a user adds: a row ships no model, so
        *  until the endpoint answers there is nothing to pick. Two of them,
        *  because a local endpoint wants no key and telling it to store one names
        *  the single thing ADR-0021 says is not a fault. */
-      noModelsYet: "Store a key for this endpoint, then press Refresh models.",
+      noModelsYet: "Save a key, then press Refresh models.",
       noModelsYetLocal: "Start this endpoint, then press Refresh models.",
-      listUnavailable: "The model list could not be fetched",
+      listUnavailable: "Could not load the model list",
       /** The other half of `listUnavailable`. A refresh that succeeds and
        *  returns the same list it already had changes nothing on screen, so the
        *  gesture goes unanswered exactly as the failed one used to — the count
        *  is what makes an unchanged list still an answer. */
-      listRefreshed: (count: number) =>
-        `The endpoint listed ${count} model${count === 1 ? "" : "s"}.`,
+      listRefreshed: (count: number) => `Found ${count} model${count === 1 ? "" : "s"}.`,
       /** `#adoptOnlyModel` writing the one model on offer onto the row. Said out
        *  loud because nothing asked for it: Beckon changed config.toml, and a
        *  write with no gesture behind it is the one that has to announce
        *  itself. */
-      modelAdopted: (model: string) =>
-        `${model} was the only model on offer, so it is now this endpoint's.`,
+      modelAdopted: (model: string) => `Only ${model} was on offer, so it is now selected.`,
 
-      /** The wire field, on a row the user typed themselves — a preset carries
+      /** The wire dialect, on a row the user typed themselves — a preset carries
        *  the right value already, and showing it there invites breaking it. Not
        *  a control any more: Test connection asks the endpoint and writes the
-       *  answer, so this row states what was found. */
+       *  answer, so this row states what was found. The hint names the vendor it
+       *  is for and nothing about the field itself: the reader picks by whose
+       *  endpoint they typed in, and the JSON is in `llm/request.rs`. */
       reasoning: "Thinking control",
       reasoningName: {
         deepseek: "DeepSeek",
@@ -286,27 +289,21 @@ export const EN = {
         none: "None",
       },
       reasoningHint: {
-        deepseek:
-          'Sends thinking:{type:"enabled"|"disabled"}. DeepSeek V4 reasons unless told not to.',
-        qwen: "Sends chat_template_kwargs.enable_thinking. Qwen3 behind vLLM, SGLang or DashScope.",
-        openai:
-          'Sends reasoning_effort:"none" to turn thinking off, and nothing to turn it on. OpenAI\'s own API, from GPT-5.6 on.',
-        minimax:
-          'Sends thinking:{type:"adaptive"|"disabled"} and reasoning_split. MiniMax\'s own API; its M2 series thinks whatever it is told.',
-        openrouter:
-          'Sends reasoning:{effort:"none"} to turn thinking off, and nothing to turn it on.',
-        none: "Nothing sent either way — the endpoint's own default stands. Right for every endpoint with no such switch, which is most of them.",
+        deepseek: "For DeepSeek. Its models think unless turned off.",
+        qwen: "For Qwen3, on vLLM, SGLang or DashScope.",
+        openai: "For OpenAI's own API, GPT-5.6 and newer.",
+        minimax: "For MiniMax's own API.",
+        openrouter: "For OpenRouter.",
+        none: "This endpoint has no thinking switch, which is true of most.",
       },
-      thinkingHint: (label: string) =>
-        `Off is sent to ${label} explicitly, because its models reason unless told not to.`,
-      thinkingHintNone: (label: string) =>
-        `${label} has no switch Beckon knows how to throw, so nothing is sent either way.`,
+      thinkingHint: (label: string) => `Slower, but better at hard questions. ${label} supports it.`,
+      thinkingHintNone: (label: string) => `${label} has no thinking switch, so this does nothing.`,
 
       /** The web-search wire (ADR-0026). Unlike `reasoning`, this one is *asked*
        *  rather than stated: nothing detects it, because a probe would run a
        *  real search and be billed for it. A preset already carries the answer,
        *  so only a hand-made row is asked. */
-      search: "Web search field",
+      search: "Web search support",
       searchName: {
         xai: "xAI",
         dashscope: "DashScope",
@@ -314,80 +311,74 @@ export const EN = {
         none: "None",
       },
       searchHint: {
-        xai: 'Sends search_parameters:{mode:"auto"|"off"}. xAI searches unless told not to, so off is sent explicitly.',
-        dashscope:
-          "Sends enable_search:true. Alibaba DashScope's compatible mode, on its Qwen Plus and Flash tiers — the Max tiers search through an API Beckon does not post to.",
-        openrouter:
-          'Sends plugins:[{id:"web"}]. OpenRouter runs the search itself and bills per request on top of the tokens.',
-        none: "Nothing sent, so an Action asking to search gets a turn without one. Right for every endpoint with no such field — including those whose search is a tool that takes a second round trip.",
+        xai: "For xAI. It searches unless turned off.",
+        dashscope: "For Alibaba DashScope, on Qwen Plus and Flash — not Max.",
+        openrouter: "For OpenRouter, which runs the search and charges per request.",
+        none: "This endpoint cannot be asked to search, which is true of most.",
       },
-      webSearchHint: (label: string) =>
-        `Costs money and seconds per turn at ${label}. Off unless an Action asks.`,
-      webSearchHintNone: (label: string) =>
-        `${label} has no web search field Beckon can send, so this reaches nothing.`,
+      webSearchHint: (label: string) => `Slower, and ${label} charges extra per answer.`,
+      webSearchHintNone: (label: string) => `${label} cannot search, so this does nothing.`,
       thisEndpoint: "This endpoint",
     },
 
     triggering: {
       title: "Triggering",
-      lede: "How Beckon is summoned, and how it replaces itself. Every hotkey is registered the moment you record it.",
-      hotkeyDeadLead: "A hotkey is not active.",
-      hotkeyDeadBody: "Record a different combination below; it is registered the moment you record it.",
-      permissionLead: "Beckon cannot read the Selection.",
-      permissionBody:
-        " Grabbing it means sending a Cmd+C to whatever is in front, and macOS allows that only for an app you have trusted under Privacy & Security → Accessibility.",
+      lede: "How you call Beckon up.",
+      hotkeyDeadLead: "A hotkey is not working.",
+      hotkeyDeadBody: "Record a different combination below.",
+      permissionLead: "Beckon cannot read your selected text.",
+      permissionBody: " macOS allows this only for apps you trust under Privacy & Security → Accessibility.",
       permissionStillWorks:
-        "Hotkeys still fire and Actions that ask you to type still work. Turn Beckon on in the list, then come back to this window.",
+        "Hotkeys and typed input still work. Turn Beckon on in the list, then come back here.",
       openAccessibility: "Open Accessibility settings",
       /** A lead for `describeFailure`: there is no such pane off macOS, and the
        *  OS can refuse the URL. */
-      openAccessibilityFailed: "That settings pane could not be opened",
+      openAccessibilityFailed: "Could not open that settings pane",
       summoning: "Summoning",
       launcherHotkey: "Launcher hotkey",
-      launcherHotkeyHint: "If the combination is already taken it goes red and is not saved.",
-      autostartHint: (tray: string) => `Beckon lives in the ${tray}; starting with the machine is the point.`,
+      launcherHotkeyHint: "A combination already in use turns red.",
+      autostartHint: (tray: string) => `Beckon sits in the ${tray}, ready when you need it.`,
       updates: "Updates",
       updateCheck: "Check for updates automatically",
       /** Says what the switch does *not* cover: the tray item stays there
        *  either way, and would otherwise read as the switch being ignored
        *  (ADR-0022). */
       updateCheckHint: (tray: string) =>
-        `Once per launch, thirty seconds in, and silent unless there is one. The ${tray} item checks whenever you click it — that is not this switch.`,
+        `Checks quietly at startup. You can also check any time from the ${tray}.`,
     },
 
     appearance: {
       title: "Appearance",
-      lede: "Applies to the Launcher, the Popover and this window at once.",
+      lede: "Applies to every Beckon window at once.",
       theme: "Theme",
       light: "Light",
       dark: "Dark",
       system: "System",
-      themeHint: (appearance: string) =>
-        `Beckon starts light unless you say otherwise. “System” is the only setting that reads the ${appearance}, and it follows it live.`,
+      themeHint: (appearance: string) => `“System” follows your ${appearance}, live.`,
       language: "Language",
       /** Each language names itself, in itself: a reader who cannot read the
        *  current one still has to be able to find their own. */
       english: "English",
       chinese: "中文",
-      languageHint:
-        "Applies to every window at once, and to the tray. Beckon starts in English unless you say otherwise; your Actions are your own words and are never translated.",
+      languageHint: "Applies to every window and the tray. Your own Actions are never translated.",
     },
 
 
     actions: {
       title: "Actions",
-      lede: "One Action is one prompt, stored as its own file. The filename is its identity; the name is only what you see.",
+      lede: "One Action is one saved prompt. Its file name is its identity.",
       create: "New Action",
       count: (count: number) => `${count} ${count === 1 ? "Action" : "Actions"}`,
-      willNotParse: "Will not parse",
-      empty: "No Actions yet. One Action is one prompt, stored as its own file.",
+      willNotParse: "Has an error",
+      empty: "No Actions yet. One Action is one saved prompt.",
       gone: "That Action is gone.",
-      rawUnder: "does not parse — edited as text",
+      rawUnder: "has an error — edit as text",
       back: "Back to Actions",
       backTo: (name: string) => `Back to ${name}`,
       deleteTitle: (name: string) => `Delete “${name}”?`,
-      /** `{file}` is the filename, set in mono by the caller. */
-      deleteBody: "The file {file} is removed from disk. This cannot be undone.",
+      /** `{file}` is the filename, set in mono by the caller. The one sentence
+       *  that keeps its warning: a delete cannot be walked back. */
+      deleteBody: "{file} will be deleted. This cannot be undone.",
       deleteConfirm: "Delete file",
       /** The four outcomes the status bar used to carry. It says "Not saved",
        *  which is the wrong sentence about a read, a create and a delete — and
@@ -395,66 +386,63 @@ export const EN = {
        *  happened. Each names the file, because the editor closing is the only
        *  other sign and it does not say which one went. */
       deleted: (file: string) => `${file} was deleted.`,
-      deleteFailed: "The file could not be deleted",
-      createFailed: "The Action could not be created",
-      rawOpenFailed: "The file could not be read",
+      deleteFailed: "Could not delete the file",
+      createFailed: "Could not create the Action",
+      rawOpenFailed: "Could not read the file",
       /** The raw editor swapping back to the form is the answer already, but
        *  only to someone who knows why — said out loud, it is the repair
        *  landing rather than the pane changing under them. */
-      rawSaved: (file: string) => `${file} parses — back to the editor.`,
+      rawSaved: (file: string) => `${file} is fixed — back to the editor.`,
 
-      hotkeyDeadLead: "This Action’s Direct Hotkey is not active.",
-      hotkeyDeadBody: "No change to this Action can be saved until the hotkey is cleared or changed.",
+      hotkeyDeadLead: "This Action’s hotkey is not working.",
+      hotkeyDeadBody: "Clear or change it to save this Action.",
       clearHotkey: "Clear the Direct Hotkey",
 
       definition: "Definition",
-      definitionHint: "The name, what it is for, and the two prompts it sends.",
+      definitionHint: "Its name and the prompts it sends.",
       trigger: "Trigger",
       inputSource: "Input Source",
       sourceHint: {
-        prompt: "Uses typed input only. Any Selection is ignored.",
-        auto: "Uses the Selection if there is one, otherwise asks for typed input.",
+        prompt: "Always asks you to type.",
+        auto: "Uses your selected text, or asks you to type.",
       },
       directHotkey: "Direct Hotkey",
-      directHotkeyHint: "Optional. Without one, the Action is Launcher-only.",
+      directHotkeyHint: "Optional. Without one, run it from the Launcher.",
 
       overrides: "Model overrides",
       overridesNote: (label: string) => `Unmarked rows follow ${label}`,
       /** The row ADR-0021 added, and the reason there is no global switch. */
       provider: "Endpoint",
-      providerHint:
-        "Where this Action posts. Leave it unmarked and it follows the default; set it and this Action stops following.",
+      providerHint: "Where this Action sends. Unmarked follows the default.",
       providerLocal: (label: string) => `${label} — local`,
       /** A model pinned before the endpoint changed. Kept, never rewritten. */
       strandedModel: (model: string, label: string, fallback: string) =>
-        `${model} is not in ${label}’s list. It is kept, not rewritten — revert to use ${fallback}.`,
+        `${label} does not offer ${model}. It is kept as you set it — revert to use ${fallback}.`,
       needsKey: (label: string) =>
-        `No key is stored for ${label}, so this Action would fail before its request leaves. Every other Action is unaffected.`,
+        `No key saved for ${label}, so this Action will fail. Other Actions still work.`,
       sends: "What this Action sends",
-      thinkingHint:
-        "Adds seconds before the first word. Worth it where the Action needs the model to reason, not where it reformats.",
-      webSearchHint:
-        "Lets the endpoint read the live web before answering. Costs money and seconds per turn, so it is off unless this Action asks for it.",
+      thinkingHint: "Slower, but better at hard questions.",
+      webSearchHint: "Reads the web before answering. Slower, and costs extra.",
 
       thisFile: "This file",
       deleteLabel: "Delete this Action",
-      deleteHint: (file: string) => `Removes ${file} from disk. This cannot be undone.`,
+      /** Keeps its warning, for the same reason `deleteBody` does. */
+      deleteHint: (file: string) => `Deletes ${file}. This cannot be undone.`,
       deleteButton: "Delete Action",
 
       name: "Name",
-      nameWarning: "Without a name this Action shows as its file name in the Launcher.",
+      nameWarning: "Without a name, the Launcher shows the file name.",
       description: "Description",
-      descriptionHint: "Shown under the name in the Launcher, and searched.",
+      descriptionHint: "Shown in the Launcher, and searched.",
       systemPrompt: "System prompt",
-      systemPromptHint: "How the model should behave. Sent ahead of every input.",
+      systemPromptHint: "How the model should behave.",
       userTemplate: "User template",
-      userTemplateHint:
-        "{{input}} is replaced by the Selection or the typed input. Empty means just the input.",
-      templateWarning: "This template never includes the input.",
-      templateWarningShort: "The user template never includes the input.",
+      userTemplateHint: "{{input}} becomes your text. Leave empty to send just your text.",
+      templateWarning: "This template never uses {{input}}.",
+      templateWarningShort: "The user template never uses {{input}}.",
 
       saveFile: "Save file",
-      reloadsWhenItParses: "It reloads the moment it parses.",
+      reloadsWhenItParses: "Saves once the file is valid.",
     },
   },
 
@@ -468,41 +456,37 @@ export const EN = {
       // label a screen reader reads has to name *which* hotkey, and the same
       // sentence on a 12px button would make Clear the widest thing in the row.
       clearShort: "Clear",
-      needsModifier: (advice: string) => `Add ${advice} — a bare key would fire everywhere.`,
+      needsModifier: (advice: string) => `Add ${advice} — one key alone would fire everywhere.`,
     },
     model: {
       /** The two control names, here rather than under a pane: both the endpoint
        *  screen and an Action's overrides draw the same row (ADR-0021). */
       label: "Model",
       thinking: "Think before answering",
-      configuredGroup: "Named by your configuration",
+      configuredGroup: "Added by you",
       noneChosen: "No model chosen",
       /** One sentence, not a two-part composition: there used to be a second
        *  reading — "not one of the models Beckon knows" — for a list that came
        *  from a documented catalog. A row carries no catalog, so every list is
        *  the endpoint's own and there is one thing left to say. */
-      unknown: (model: string) =>
-        `${model} is not in the endpoint's model list. Kept because your configuration names it.`,
+      unknown: (model: string) => `${model} is not in this endpoint's list, but your files name it.`,
       alwaysThinks: (model: string) => `${model} always thinks; it cannot be turned off.`,
-      neverThinks: (model: string) =>
-        `${model} has no thinking mode; nothing is sent about it either way.`,
+      neverThinks: (model: string) => `${model} has no thinking mode.`,
       /** Not a failure and not the model's fault: the *endpoint* has no field
        *  for it, so its own default stands (ADR-0021). */
-      noThinkingSwitch: (label: string) =>
-        `${label} has no thinking switch Beckon can throw; its own default stands.`,
+      noThinkingSwitch: (label: string) => `${label} has no thinking switch.`,
       /** The second switch a turn carries (ADR-0026). Named for what it does to
        *  the answer, not for the field it becomes on any one endpoint. */
       webSearch: "Search the web",
       /** The one thing that can go wrong with it, and it is amber: the Action
        *  still runs, the endpoint just never hears the question. */
-      noSearchSwitch: (label: string) =>
-        `${label} has no web search Beckon can ask for on this endpoint; the turn runs without it.`,
+      noSearchSwitch: (label: string) => `${label} cannot search, so this is ignored.`,
       /** The model's own answer rather than the endpoint's, and the one that
        *  greys the switch: the vendor says this model does not take the field
        *  (ADR-0027). Amber and not an error — an Action file that already says
        *  so still runs, without a search. */
       modelCannotSearch: (model: string) =>
-        `${model} does not take this endpoint's web search; pick another model or leave it off.`,
+        `${model} cannot search here. Pick another model, or leave this off.`,
     },
     field: {
       /** The revert control on an overridden row, which names what it reverts to. */

@@ -602,7 +602,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
 
         {/* Stacked: it is typed, and the two buttons share its line, so there is
             no width at which it could right-align against its own name. */}
-        <Field label={t.settings.connection.apiKey} stacked hint={t.settings.connection.apiKeyHint}>
+        <Field label={t.settings.connection.apiKey} stacked hint={t.settings.connection.apiKeyHint(t.words.credentialStore)}>
           {({ id, describedBy }) => (
             <div className="flex flex-col gap-1.25">
               {/* The line, not the field, takes the wide measure: the buttons

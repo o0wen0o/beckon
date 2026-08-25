@@ -152,7 +152,7 @@ pub fn update_failed_body(language: Language, detail: &str) -> String {
         Language::En => format!(
             "{detail}
 
-Try again from the {} later.",
+Try again later from the {}.",
             TRAY_SURFACE[0]
         ),
         Language::Zh => format!(
@@ -176,9 +176,9 @@ pub fn update_busy_title(language: Language) -> &'static str {
 pub fn update_busy_body(language: Language) -> &'static str {
     match language {
         Language::En => {
-            "Close the Popover first: Beckon restarts to finish updating, and an Exchange is never saved."
+            "Close the Popover first — Beckon restarts to update, and the answer is not saved."
         }
-        Language::Zh => "请先关闭浮窗：Beckon 需要重启以完成更新，而对话不会被保存。",
+        Language::Zh => "请先关闭浮窗 —— Beckon 需要重启才能更新，而回答不会被保存。",
     }
 }
 
@@ -210,8 +210,8 @@ pub fn hotkey_invalid(language: Language, accelerator: &str, detail: &str) -> St
 /// has to change, and Chinese does not put it where English does.
 pub fn hotkey_needs_modifier(language: Language, accelerator: &str) -> String {
     match language {
-        Language::En => format!("\"{accelerator}\" has no modifier; add {}", MODIFIERS[0]),
-        Language::Zh => format!("“{accelerator}”没有修饰键；请加上 {}", MODIFIERS[1]),
+        Language::En => format!("\"{accelerator}\" needs a modifier — add {}", MODIFIERS[0]),
+        Language::Zh => format!("“{accelerator}”需要修饰键 —— 请加上 {}", MODIFIERS[1]),
     }
 }
 
@@ -251,8 +251,8 @@ pub fn hotkey_claimed(language: Language, accelerator: &str, winner: &str) -> St
 
 pub fn actions_dir_unreadable(language: Language, detail: &str) -> String {
     match language {
-        Language::En => format!("actions directory could not be read: {detail}"),
-        Language::Zh => format!("无法读取 actions 目录：{detail}"),
+        Language::En => format!("could not read the actions folder: {detail}"),
+        Language::Zh => format!("无法读取 actions 文件夹：{detail}"),
     }
 }
 
@@ -267,23 +267,23 @@ pub fn action_file_unreadable(language: Language, detail: &str) -> String {
 
 pub fn credential_unreadable(language: Language, detail: &str) -> String {
     match language {
-        Language::En => format!("The Credential Manager could not be read: {detail}"),
+        Language::En => format!("Could not read the Credential Manager: {detail}"),
         Language::Zh => format!("无法读取凭据存储：{detail}"),
     }
 }
 
-/// Why the documented catalog is being shown: no key to ask the endpoint with.
+/// Why the model list is empty: there is no key to ask the endpoint with.
 pub fn models_need_key(language: Language) -> &'static str {
     match language {
-        Language::En => "Store one to list the models your endpoint actually serves.",
-        Language::Zh => "保存密钥后，才能列出此端点实际提供的模型。",
+        Language::En => "Save a key to see this endpoint's models.",
+        Language::Zh => "保存密钥后即可看到此端点的模型。",
     }
 }
 
 pub fn models_empty(language: Language) -> &'static str {
     match language {
-        Language::En => "Its list came back empty.",
-        Language::Zh => "端点返回的模型列表为空。",
+        Language::En => "It listed no models.",
+        Language::Zh => "该端点没有列出任何模型。",
     }
 }
 
@@ -319,12 +319,12 @@ pub fn test_needs_key(language: Language) -> &'static str {
 pub fn provider_missing(language: Language, id: &str) -> String {
     match language {
         Language::En => format!(
-            "No endpoint named \"{id}\" is configured. Open Settings → Connection and add \
-             it, or point this Action at one that is there."
+            "No endpoint named \"{id}\". Add it in Settings → Connection, or point this \
+             Action at an endpoint that is there."
         ),
-        Language::Zh => format!(
-            "配置中没有名为“{id}”的端点。请在“设置 → 连接”中添加，或让此 Action 指向已有的端点。"
-        ),
+        Language::Zh => {
+            format!("没有名为“{id}”的端点。请在“设置 → 连接”中添加，或让此 Action 指向已有的端点。")
+        }
     }
 }
 
@@ -334,9 +334,9 @@ pub fn provider_missing(language: Language, id: &str) -> String {
 pub fn turn_needs_key(language: Language, label: &str) -> String {
     match language {
         Language::En => {
-            format!("No API key is stored for {label}. Open Settings to add one.")
+            format!("No API key saved for {label}. Add one in Settings.")
         }
-        Language::Zh => format!("尚未为 {label} 保存 API 密钥。请打开设置添加。"),
+        Language::Zh => format!("尚未为 {label} 保存 API 密钥。请在设置中添加。"),
     }
 }
 
@@ -347,7 +347,7 @@ pub fn turn_needs_key(language: Language, label: &str) -> String {
 pub fn turn_needs_model(language: Language, label: &str) -> String {
     match language {
         Language::En => {
-            format!("No model is chosen for {label}. Open Settings and press Refresh models.")
+            format!("No model chosen for {label}. Open Settings and press Refresh models.")
         }
         Language::Zh => format!("尚未为 {label} 选择模型。请打开设置并点击刷新模型列表。"),
     }
@@ -366,11 +366,11 @@ pub fn capture_too_large(language: Language, bytes: usize, max: usize) -> String
     let (bytes, max) = (mib(bytes), mib(max));
     match language {
         Language::En => format!(
-            "the screenshot is {bytes:.1} MB, over Beckon's {max:.0} MB limit; \
-             capture a smaller region"
+            "the screenshot is {bytes:.1} MB, over the {max:.0} MB limit; \
+             capture a smaller area"
         ),
         Language::Zh => {
-            format!("这张截图有 {bytes:.1} MB，超过 Beckon 的 {max:.0} MB 上限；请截取更小的范围")
+            format!("这张截图有 {bytes:.1} MB，超过 {max:.0} MB 上限；请截取更小的范围")
         }
     }
 }
@@ -380,9 +380,9 @@ pub fn capture_too_large(language: Language, bytes: usize, max: usize) -> String
 pub fn capture_too_many(language: Language, max: usize) -> String {
     match language {
         Language::En => {
-            format!("a turn carries at most {max} screenshots; remove one before taking another")
+            format!("at most {max} screenshots at a time; remove one first")
         }
-        Language::Zh => format!("一次对话最多附带 {max} 张截图；请先移除一张再截图"),
+        Language::Zh => format!("一次最多 {max} 张截图；请先移除一张"),
     }
 }
 
