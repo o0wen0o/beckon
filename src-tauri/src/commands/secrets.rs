@@ -9,9 +9,9 @@ use std::collections::HashMap;
 
 use tauri::{AppHandle, Manager};
 
-use crate::config::{Language, Provider};
+use crate::config::{Language, Provider, Reasoning};
 use crate::i18n;
-use crate::llm::client;
+use crate::llm::{client, detect};
 use crate::secrets::{self, KeyStatus};
 use crate::state::AppState;
 
@@ -117,10 +117,26 @@ pub(crate) fn require_api_key(
     }
 }
 
+/// What one connection test learned.
+///
+/// A struct rather than `()` so the test can answer the second question a user
+/// would otherwise have to answer themselves — see [`crate::llm::detect::reasoning`].
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ConnectionReport {
+    /// The dialect this endpoint was observed to accept, when exactly one was.
+    /// `None` means "keep whatever the row says": either nothing was learned, or
+    /// there was nothing to learn because the row came from a preset.
+    pub reasoning: Option<Reasoning>,
+}
+
 /// "Test connection": one minimal request to one row, reporting a rejected key
-/// separately from an unreachable API (ADR-0005).
+/// separately from an unreachable API (ADR-0005) — and, on a row no preset
+/// filled in, learning its dialect while it is already talking to the endpoint.
 #[tauri::command]
-pub async fn test_connection(app: AppHandle, provider_id: String) -> Result<(), Failure> {
+pub async fn test_connection(
+    app: AppHandle,
+    provider_id: String,
+) -> Result<ConnectionReport, Failure> {
     let provider = require_provider(&app, &provider_id)?;
     let (http, language) = {
         let state = app.state::<AppState>();
@@ -140,7 +156,13 @@ pub async fn test_connection(app: AppHandle, provider_id: String) -> Result<(), 
 
     client::test_connection(&http, &provider.base_url, key.as_deref(), &provider.model)
         .await
-        .map_err(Failure::from)
+        .map_err(Failure::from)?;
+
+    // Only after the plain request succeeded: until then a `400` cannot be told
+    // apart from the endpoint disliking something else about the body.
+    Ok(ConnectionReport {
+        reasoning: detect::reasoning(&http, &provider, key.as_deref()).await,
+    })
 }
 
 /// Open the page one provider's keys come from.

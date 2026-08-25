@@ -24,17 +24,25 @@ import {
   getStartupErrors,
   saveConfig,
 } from "../lib/ipc";
+import { describeFailure } from "../lib/failures";
+import { i18n } from "../lib/i18n";
 import { keyProblem } from "../lib/providers";
 import { SaveSlot, textFocusHeld } from "../lib/saveSlot";
 import { Notifier } from "../lib/store";
+import { toasts } from "../lib/toast";
 import type { Config, InputPermission, KeyStatus, ModelCatalog, Provider } from "../lib/types";
 
 export type SectionRoute = "connection" | "actions" | "triggering" | "appearance";
 
-export interface TestState {
-  state: "idle" | "running" | "ok" | "failed";
-  message?: string;
-}
+/** Why a model list is being read. See `SettingsStore.refreshModels`. */
+export type RefreshMode = "prime" | "live" | "asked";
+
+/** What the Test connection button is doing. The *outcome* is a toast
+ *  (src/lib/toast.ts), so nothing but the button reads this: a sentence about a
+ *  request that has finished has no field to sit under, and rendering it beside
+ *  the button pushed the button off its own line. `ok`/`failed` are kept apart
+ *  from `idle` all the same — a row already tested is not a row never tried. */
+export type TestState = "idle" | "running" | "ok" | "failed";
 
 class SettingsStore extends Notifier {
   config: Config | null = null;
@@ -107,7 +115,7 @@ class SettingsStore extends Notifier {
   }
 
   testFor(providerId: string): TestState {
-    return this.test[providerId] ?? { state: "idle" };
+    return this.test[providerId] ?? "idle";
   }
 
   /**
@@ -250,7 +258,10 @@ class SettingsStore extends Notifier {
     // unbounded requests and N credential reads to fill dropdowns nobody has
     // opened is what opening this window used to cost.
     for (const provider of config.api.providers) {
-      void this.refreshModels(provider.id, provider.id === config.defaults.provider);
+      void this.refreshModels(
+        provider.id,
+        provider.id === config.defaults.provider ? "live" : "prime",
+      );
     }
   }
 
@@ -282,17 +293,26 @@ class SettingsStore extends Notifier {
   }
 
   /**
-   * One row's model list. `live` is the network trip; the offline answer is
-   * always taken first, because that fetch is deliberately unbounded (no HTTP
-   * timeout, by design) and a dropdown holding only its own current value
-   * meanwhile is the regression this prevents. A refresh keeps the list already
-   * on screen.
+   * One row's model list.
    *
-   * `live = false` touches neither the network nor the credential store, which
-   * is what lets the whole table be primed on reveal while only the row about to
-   * be read is actually asked.
+   * One argument rather than two booleans, because only three of their four
+   * combinations mean anything — announcing a fetch that never went to the
+   * network is not a state:
+   *
+   *  - `prime` takes the offline answer only, touching neither the network nor
+   *    the credential store, which is what lets the whole table be primed on
+   *    reveal while only the row about to be read is actually asked.
+   *  - `live` goes to the network, quietly.
+   *  - `asked` is the same trip made on a gesture, so a fallback gets said out
+   *    loud rather than leaving a person waiting on an answer.
+   *
+   * The offline answer is always taken first, because the live fetch is
+   * deliberately unbounded (no HTTP timeout, by design) and a dropdown holding
+   * only its own current value meanwhile is the regression this prevents. A
+   * refresh keeps the list already on screen.
    */
-  async refreshModels(providerId: string, live = true) {
+  async refreshModels(providerId: string, mode: RefreshMode = "live") {
+    const live = mode !== "prime";
     if (live) {
       this.modelsLoading = new Set(this.modelsLoading).add(providerId);
       this.notify();
@@ -301,7 +321,22 @@ class SettingsStore extends Notifier {
       if (!this.models[providerId]) {
         this.#putModels(providerId, await getModels(providerId, false));
       }
-      if (live) this.#putModels(providerId, await getModels(providerId, true));
+      if (live) {
+        const catalog = await getModels(providerId, true);
+        this.#putModels(providerId, catalog);
+        // `get_models` never fails — it answers with the offline list and says
+        // why (ADR-0024). Which is right for a fetch nobody asked for, and
+        // silent for the one gesture that *was* a question: pressing Refresh
+        // with no key stored left the same list on screen and no answer
+        // anywhere. `asked` is how a caller says a person is waiting on it.
+        if (mode === "asked" && catalog.source !== "live" && catalog.fallback) {
+          const strings = i18n.strings;
+          toasts.show(
+            "danger",
+            describeFailure(catalog.fallback, strings, strings.settings.connection.listUnavailable),
+          );
+        }
+      }
     } catch (error) {
       // The command is infallible by design; if it ever is not, keep whatever
       // list is already on screen rather than emptying the dropdowns.
@@ -319,6 +354,31 @@ class SettingsStore extends Notifier {
   #putModels(providerId: string, catalog: ModelCatalog) {
     this.models = { ...this.models, [providerId]: catalog };
     this.notify();
+    this.#adoptOnlyModel(providerId, catalog);
+  }
+
+  /**
+   * One offer is not a choice.
+   *
+   * A row ships no model, so a local server with a single model loaded would
+   * otherwise sit on "none chosen" until the first hotkey press failed — and
+   * picking the only thing on the list cannot be the wrong pick. Two or more
+   * stays the user's, because which model to spend money on is not a decision
+   * to make on somebody's behalf.
+   *
+   * Here rather than on the endpoint screen, which is where it started: a rule
+   * about a row must not depend on whether anyone opened that row's screen, and
+   * this is the one place that knows a catalog just arrived — for any row, from
+   * any caller.
+   */
+  #adoptOnlyModel(providerId: string, catalog: ModelCatalog) {
+    if (catalog.source === "none" || catalog.options.length !== 1) return;
+    const row = this.config?.api.providers.find((one) => one.id === providerId);
+    if (!row || row.model !== "") return;
+    this.editConfig((draft) => {
+      const target = draft.api.providers.find((one) => one.id === providerId);
+      if (target) target.model = catalog.options[0].id;
+    }, true);
   }
 
   /**
@@ -332,6 +392,7 @@ class SettingsStore extends Notifier {
     this.test = {};
     this.editingProvider = null;
     this.configSlot.error = null;
+    toasts.clear();
     this.notify();
   }
 }

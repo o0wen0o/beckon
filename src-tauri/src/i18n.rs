@@ -289,17 +289,24 @@ pub fn models_empty(language: Language) -> &'static str {
 
 /// The same gap as [`turn_needs_model`], reported from inside Settings — so it
 /// says *this* rather than "open Settings", which is where the reader already is.
+/// What to do about it, and nothing else.
+///
+/// Both of these reach the reader through `describeFailure`, which names the
+/// `kind` first — so a sentence that restated the kind was read twice ("No model
+/// is chosen for this endpoint: No model is chosen yet. …"). The kind is the
+/// diagnosis; this is the instruction.
 pub fn test_needs_model(language: Language) -> &'static str {
     match language {
-        Language::En => "No model is chosen yet. Press Refresh models, then pick one.",
-        Language::Zh => "尚未选择模型。请点击刷新模型，然后选择一个。",
+        Language::En => "Press Refresh models, then pick one.",
+        Language::Zh => "请点击刷新模型，然后选择一个。",
     }
 }
 
+/// See [`test_needs_model`]: the instruction only.
 pub fn test_needs_key(language: Language) -> &'static str {
     match language {
-        Language::En => "No API key is stored yet. Enter one above, then test again.",
-        Language::Zh => "尚未保存 API 密钥。请在上方输入后再测试。",
+        Language::En => "Enter one above, then test again.",
+        Language::Zh => "请在上方输入后再测试。",
     }
 }
 

@@ -32,6 +32,8 @@ export const EN = {
     modifierAdvice: IS_MAC ? "Cmd, Control, Option or Shift" : "Ctrl, Alt or Shift",
     settings: "Settings",
     cancel: "Cancel",
+    /** The one control a toast carries (src/components/Toaster.tsx). */
+    dismiss: "Dismiss",
   },
 
   /** How an Input Source reads. The value itself stays the CONTEXT.md term. */
@@ -210,6 +212,16 @@ export const EN = {
       test: "Test connection",
       testing: "Testing…",
       testOk: "Reached it — the endpoint answered.",
+      /** The test also settles the dialect on a row no preset filled in, so it
+       *  reports what it found rather than making the user check. */
+      testOkDetected: (dialect: string) =>
+        `Reached it — the endpoint answered, and it speaks ${dialect}.`,
+      /** A relaying row, said on the identity line under the URL it is about
+       *  (ADR-0025). Two sentences, because the second is the part that is
+       *  actually surprising. */
+      relaysLead: "Relays.",
+      relaysBody: (broker: string) =>
+        `Your key stays with ${broker}; your text goes on to whichever company serves the model chosen below. Two companies see it, not one.`,
 
       rowDefaults: "Defaults for this endpoint",
       rowDefaultsNote: "an Action may override either",
@@ -231,13 +243,17 @@ export const EN = {
       noModelsYetLocal: "Start this endpoint, then press Refresh models.",
       listUnavailable: "The model list could not be fetched",
 
-      /** The wire field, on a row the user typed themselves. A preset carries
-       *  the right value already, and showing it there invites breaking it. */
+      /** The wire field, on a row the user typed themselves — a preset carries
+       *  the right value already, and showing it there invites breaking it. Not
+       *  a control any more: Test connection asks the endpoint and writes the
+       *  answer, so this row states what was found. */
       reasoning: "Thinking control",
       reasoningName: {
         deepseek: "DeepSeek",
         qwen: "Qwen",
         openai: "OpenAI",
+        minimax: "MiniMax",
+        openrouter: "OpenRouter",
         none: "None",
       },
       reasoningHint: {
@@ -246,6 +262,10 @@ export const EN = {
         qwen: "Sends chat_template_kwargs.enable_thinking. Qwen3 behind vLLM, SGLang or DashScope.",
         openai:
           'Sends reasoning_effort:"none" to turn thinking off, and nothing to turn it on. OpenAI\'s own API, from GPT-5.6 on.',
+        minimax:
+          'Sends thinking:{type:"adaptive"|"disabled"} and reasoning_split. MiniMax\'s own API; its M2 series thinks whatever it is told.',
+        openrouter:
+          'Sends reasoning:{effort:"none"} to turn thinking off, and nothing to turn it on.',
         none: "Nothing sent either way — the endpoint's own default stands. Right for every endpoint with no such switch, which is most of them.",
       },
       thinkingHint: (label: string) =>

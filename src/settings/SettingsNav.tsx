@@ -63,7 +63,7 @@ export function SettingsNav() {
     // works, which is why it shares this dot rather than its own section — Model
     // defaults was the pane that used to carry it.
     connection:
-      problems.includes("unreadable") || tests.some((test) => test.state === "failed")
+      problems.includes("unreadable") || tests.some((test) => test === "failed")
         ? "bad"
         : problems.includes("missing") ||
             // Degraded because a fetch *failed*, not because none was attempted:

@@ -20,6 +20,16 @@ import {
  */
 const INHERIT = "__inherit__";
 
+/**
+ * The one item an otherwise empty list carries.
+ *
+ * Radix opens on an empty `SelectContent` all the same, so a row whose endpoint
+ * has never answered used to offer a dropdown that opened onto nothing — which
+ * reads as a list still loading rather than as a list with no entries. Disabled,
+ * so it is a statement and not a choice, and `choose` can never see it.
+ */
+const NONE = "__none__";
+
 interface ModelSelectProps {
   /**
    * "" means inherit where `inheritLabel` is given, and "nothing chosen"
@@ -105,6 +115,11 @@ export function ModelSelect({
       </SelectTrigger>
       <SelectContent>
         {inheritLabel !== undefined ? <SelectItem value={INHERIT}>{inheritLabel}</SelectItem> : null}
+        {options.length === 0 && inheritLabel === undefined ? (
+          <SelectItem value={NONE} disabled>
+            {placeholder ?? t.controls.model.noneChosen}
+          </SelectItem>
+        ) : null}
         {known.map((option) => (
           <SelectItem key={option.id} value={option.id}>
             {option.label}

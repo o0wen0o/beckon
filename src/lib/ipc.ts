@@ -8,6 +8,7 @@ import type {
   ActionFile,
   CapturePayload,
   Config,
+  ConnectionReport,
   DeltaPayload,
   ErrorPayload,
   ExchangeIdPayload,
@@ -56,7 +57,7 @@ export const setApiKey = (providerId: string, key: string) =>
 export const deleteApiKey = (providerId: string) =>
   invoke<KeyStatus>("delete_api_key", { providerId });
 export const testConnection = (providerId: string) =>
-  invoke<void>("test_connection", { providerId });
+  invoke<ConnectionReport>("test_connection", { providerId });
 /** Opens the row's own `key_page`; Rust refuses anything but `https`. */
 export const openKeyPage = (providerId: string) =>
   invoke<void>("open_key_page", { providerId });

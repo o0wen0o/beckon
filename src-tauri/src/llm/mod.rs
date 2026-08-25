@@ -2,11 +2,13 @@
 //!
 //! `sse` is a pure frame parser, `wire` the response shapes and the pure
 //! functions over them, `error` the one error type, `request` the one place a
-//! divergence between endpoints lives, `models` the catalog both `request` and
-//! the Settings dropdown read, and `client` does the request. Nothing here knows
-//! about windows.
+//! divergence between endpoints lives, `detect` asks an endpoint which of those
+//! divergences it speaks, `models` the catalog both `request` and the Settings
+//! dropdown read, and `client` does the request. Nothing here knows about
+//! windows.
 
 pub mod client;
+pub mod detect;
 mod error;
 pub mod models;
 pub mod request;

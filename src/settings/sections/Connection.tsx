@@ -26,6 +26,7 @@ import {
   CheckIcon,
   PencilIcon,
   PlusIcon,
+  SplitIcon,
   Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -45,7 +46,6 @@ import { FieldGroup } from "@/components/FieldGroup";
 import { ModelSelect } from "@/components/ModelSelect";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { PaneHeader } from "@/components/PaneHeader";
-import { Segmented } from "@/components/Segmented";
 import { describeFailure } from "@/lib/failures";
 import { useT, type Strings } from "@/lib/i18n";
 import {
@@ -64,8 +64,10 @@ import {
   host,
   isLocal,
   keyProblem,
+  relaysThrough,
 } from "@/lib/providers";
-import type { Provider, Reasoning } from "@/lib/types";
+import { toasts } from "@/lib/toast";
+import type { Provider } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../actions";
 import { settings } from "../store";
@@ -78,9 +80,6 @@ export function Connection() {
   // open — falls back to the inventory rather than to an empty screen.
   return row ? <EndpointScreen provider={row} /> : <Inventory />;
 }
-
-/** Every arm of `config::Reasoning`, in the dropdown's order, stated once. */
-const REASONINGS: Reasoning[] = ["deepseek", "qwen", "openai", "none"];
 
 /** How many Actions a row carries, as its one line of prose. */
 function usedBy(names: string[], t: Strings): string {
@@ -385,6 +384,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
       ]
     : null;
   const thinkingHint = thinkingWarning(provider, provider.model, provider.thinking, catalog, t);
+  const relay = relaysThrough(provider);
   const listNotice =
     !catalog || catalog.source === "live" || !catalog.fallback
       ? null
@@ -410,7 +410,12 @@ function EndpointScreen({ provider }: { provider: Provider }) {
         t.settings.connection.saved,
       );
       settings.setKeyDraft("");
-      void settings.refreshModels(provider.id);
+      void settings.refreshModels(provider.id, "asked");
+      // A key that does not work is worth knowing now rather than at the first
+      // hotkey press, and the test is also what learns the dialect — so the one
+      // gesture the user already made settles both. The button stays, for a
+      // retry after something else changed.
+      void runTest();
     } catch (error) {
       settings.setKeyResult(provider.id, null, describeError(error).message);
     }
@@ -430,15 +435,30 @@ function EndpointScreen({ provider }: { provider: Provider }) {
   }
 
   async function runTest() {
-    settings.setTest(provider.id, { state: "running" });
+    settings.setTest(provider.id, "running");
     try {
-      await testConnection(provider.id);
-      settings.setTest(provider.id, { state: "ok", message: t.settings.connection.testOk });
+      const report = await testConnection(provider.id);
+      // The endpoint answered a question the pane used to ask. Written straight
+      // to the row: a dialect the user was never able to look up is not worth a
+      // confirmation step, and `null` — nothing learned, or a preset already
+      // knew — leaves the row exactly as it was.
+      if (report.reasoning && report.reasoning !== provider.reasoning) {
+        edit({ reasoning: report.reasoning }, true);
+      }
+      settings.setTest(provider.id, "ok");
+      toasts.show(
+        "ok",
+        report.reasoning
+          ? t.settings.connection.testOkDetected(
+              t.settings.connection.reasoningName[report.reasoning],
+            )
+          : t.settings.connection.testOk,
+      );
     } catch (error) {
-      settings.setTest(provider.id, {
-        state: "failed",
-        message: describeFailure(describeError(error), t),
-      });
+      settings.setTest(provider.id, "failed");
+      // Verbatim, as everywhere: a rejected key, a missing credential and an
+      // unreachable API stay three different sentences (ADR-0005).
+      toasts.show("danger", describeFailure(describeError(error), t));
     }
     // A test that failed on the credential may have found it changed. This
     // row's status only: the other N were not touched.
@@ -479,6 +499,21 @@ function EndpointScreen({ provider }: { provider: Provider }) {
           t,
         )}
       </PaneHeader>
+
+      {/* A relaying row says so before a key is stored, and says it on the
+          identity line rather than in a banner: this is a property of the URL
+          directly above it, and a Callout is the shape a reader learns to skip
+          (ADR-0025). Derived from the host, so a hand-typed broker URL discloses
+          as loudly as the preset does. */}
+      {relay ? (
+        <div className="mb-6.5 -mt-3 flex items-start gap-2 text-note">
+          <SplitIcon aria-hidden className="text-warning mt-0.5 size-3.5 flex-none" />
+          <p className="text-muted-foreground m-0 max-w-measure">
+            <span className="text-foreground font-medium">{t.settings.connection.relaysLead}</span>{" "}
+            {t.settings.connection.relaysBody(relay)}
+          </p>
+        </div>
+      ) : null}
 
       {listNotice ? (
         <Callout tone="warn">
@@ -623,33 +658,22 @@ function EndpointScreen({ provider }: { provider: Provider }) {
           {() => (
             <div className="flex items-center gap-2">
               {/* One register down, like Refresh models below it: this is a
-                  check, not a commit, and the readout beside it is already 12px.
-                  `font-medium` over `outline`'s own 400 — at 12px the light
-                  weight goes thinner than the label. */}
+                  check, not a commit. `font-medium` over `outline`'s own 400 —
+                  at 12px the light weight goes thinner than the label.
+                  The outcome is a toast: a rejected key quotes the endpoint
+                  verbatim, and that sentence beside the button turned this row
+                  into three lines of red with the button wedged at its left. */}
               <Button
                 variant="outline"
                 size="sm"
                 className="text-note font-medium"
                 onClick={() => void runTest()}
-                disabled={test.state === "running"}
+                disabled={test === "running"}
               >
-                {test.state === "running"
+                {test === "running"
                   ? t.settings.connection.testing
                   : t.settings.connection.test}
               </Button>
-              {test.message ? (
-                <span
-                  className={`text-note ${
-                    test.state === "failed"
-                      ? "text-destructive"
-                      : test.state === "ok"
-                        ? "text-success"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {test.message}
-                </span>
-              ) : null}
             </div>
           )}
         </Field>
@@ -681,7 +705,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
                 variant="ghost"
                 size="sm-note"
                 disabled={loading}
-                onClick={() => void settings.refreshModels(provider.id)}
+                onClick={() => void settings.refreshModels(provider.id, "asked")}
               >
                 {loading ? t.settings.connection.loading : t.settings.connection.refresh}
               </Button>
@@ -715,24 +739,20 @@ function EndpointScreen({ provider }: { provider: Provider }) {
           )}
         </Field>
 
+        {/* Read, not chosen. A wrong dialect is a 400 on every turn and it is
+            the one field on this row nobody can look up — so Test connection
+            asks the endpoint and writes the answer here, and what is left is a
+            statement of what it found. A preset row never shows it: the vendor's
+            own docs already answered, and detection is the weaker source. */}
         {handMade ? (
           <Field
             label={t.settings.connection.reasoning}
-            stacked
             hint={t.settings.connection.reasoningHint[provider.reasoning]}
           >
-            {({ id, describedBy }) => (
-              <Segmented<Reasoning>
-                id={id}
-                describedBy={describedBy}
-                label={t.settings.connection.reasoning}
-                value={provider.reasoning}
-                options={REASONINGS.map((value) => ({
-                  value,
-                  label: t.settings.connection.reasoningName[value],
-                }))}
-                onChange={(reasoning) => edit({ reasoning }, true)}
-              />
+            {() => (
+              <span className="text-muted-foreground text-note">
+                {t.settings.connection.reasoningName[provider.reasoning]}
+              </span>
             )}
           </Field>
         ) : null}

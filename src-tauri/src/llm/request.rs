@@ -17,11 +17,12 @@
 //! `400` on a strict endpoint, not a field politely ignored.
 //!
 //! A dialect being the endpoint's property does not mean every model behind that
-//! endpoint takes the field. Two of the three arms consult the model as well —
+//! endpoint takes the field. Three of the five arms consult the model as well —
 //! [`models::find`] for DeepSeek's catalog, [`EFFORT_NONE_FAMILIES`] for
-//! OpenAI's — because both hosts serve models that disagree with their own
-//! sibling about the switch. The row still decides *which* field could be sent;
-//! the model decides whether it is.
+//! OpenAI's, [`ALWAYS_THINKING_MINIMAX`] for MiniMax's — because each of those
+//! hosts serves models that disagree with their own sibling about the switch.
+//! The row still decides *which* field could be sent; the model decides whether
+//! it is.
 //!
 //! ## Thinking mode
 //!
@@ -69,6 +70,14 @@ enum ThinkingWire {
     /// `reasoning_effort: "none"` — OpenAI's own API. No payload: the field is
     /// only ever sent to suppress, so the variant carries no direction.
     OpenAi,
+    /// `thinking: {"type": "adaptive"|"disabled"}` plus `reasoning_split: true`
+    /// — MiniMax's own API. Both directions are expressible, unlike
+    /// [`ThinkingWire::OpenAi`], because `adaptive` is a documented value.
+    Minimax(bool),
+    /// `reasoning: {"effort": "none"}` — OpenRouter. Suppression only, for the
+    /// same reason as [`ThinkingWire::OpenAi`]: asking *for* thinking would mean
+    /// naming an effort level the user never chose.
+    Openrouter,
     /// Send nothing: this endpoint has no switch, or the model has none.
     Omit,
 }
@@ -89,7 +98,21 @@ pub fn build_body(
         body["temperature"] = json!(temperature);
     }
 
-    match thinking_wire(provider.reasoning, &params.model, params.thinking)? {
+    apply_thinking(
+        &mut body,
+        thinking_wire(provider.reasoning, &params.model, params.thinking)?,
+    );
+
+    Ok(body)
+}
+
+/// Write one dialect's thinking field onto a body.
+///
+/// The single home for what each dialect *looks like* on the wire, so a turn and
+/// the probe that certified the row (see [`build_dialect_probe`]) cannot drift
+/// into asking about one shape and sending another.
+fn apply_thinking(body: &mut Value, wire: ThinkingWire) {
+    match wire {
         ThinkingWire::Deepseek(enabled) => {
             let type_ = if enabled { "enabled" } else { "disabled" };
             body["thinking"] = json!({ "type": type_ });
@@ -100,10 +123,21 @@ pub fn build_body(
         ThinkingWire::OpenAi => {
             body["reasoning_effort"] = json!("none");
         }
+        ThinkingWire::Minimax(enabled) => {
+            let type_ = if enabled { "adaptive" } else { "disabled" };
+            body["thinking"] = json!({ "type": type_ });
+            // Sent in both directions, because it says *where* thinking goes
+            // rather than whether to do any: without it MiniMax returns its
+            // reasoning inside `content` wrapped in `<think>` tags, and
+            // `llm/wire.rs` reads reasoning only from a field of its own — so
+            // the Popover would render the tags as answer text.
+            body["reasoning_split"] = json!(true);
+        }
+        ThinkingWire::Openrouter => {
+            body["reasoning"] = json!({ "effort": "none" });
+        }
         ThinkingWire::Omit => {}
     }
-
-    Ok(body)
 }
 
 /// A minimal body for "Test connection": one token, no streaming, no thinking
@@ -117,6 +151,59 @@ pub fn build_probe_body(model: &str) -> Value {
         "stream": false,
         "max_tokens": 1,
     })
+}
+
+/// A body carrying a field no endpoint can possibly know.
+///
+/// The guard on [`build_dialect_probe`]: an endpoint that accepts *this* accepts
+/// anything, so nothing can be learned by asking it about dialects and the five
+/// requests that would follow are wasted. Detection reports
+/// [`Reasoning::None`] and says nothing it cannot support.
+pub(super) fn build_permissiveness_probe(model: &str) -> Value {
+    let mut body = build_probe_body(model);
+    // Namespaced so that if it ever *is* recognised, the log says whose fault
+    // that is.
+    body["beckon_probe_unrecognised_field"] = json!(true);
+    body
+}
+
+/// Every dialect worth asking an endpoint about, in the order asked.
+///
+/// [`Reasoning::None`] is deliberately absent: it is the answer when nothing
+/// else fits, not a thing that can be tested for.
+pub(super) const DETECTABLE: &[Reasoning] = &[
+    Reasoning::Deepseek,
+    Reasoning::Qwen,
+    Reasoning::OpenAi,
+    Reasoning::Minimax,
+    Reasoning::Openrouter,
+];
+
+/// The probe body for one dialect: [`build_probe_body`] plus the field that
+/// dialect uses to turn thinking **off**.
+///
+/// Suppression rather than the on-direction, because it is the direction every
+/// named arm can express — and because a probe that asked an endpoint to think
+/// would pay for the thinking.
+///
+/// This deliberately does not go through [`thinking_wire`]: that consults the
+/// model, and the question here is what the *endpoint* accepts. A model that
+/// rejects a field its host understands makes this answer conservative, which is
+/// the safe direction — the fallback is `None`, which sends nothing. The
+/// *serialisation* is shared with a real turn via [`apply_thinking`], so the
+/// shape probed is by construction the shape that will be sent.
+pub(super) fn build_dialect_probe(reasoning: Reasoning, model: &str) -> Option<Value> {
+    let wire = match reasoning {
+        Reasoning::Deepseek => ThinkingWire::Deepseek(false),
+        Reasoning::Qwen => ThinkingWire::Qwen(false),
+        Reasoning::OpenAi => ThinkingWire::OpenAi,
+        Reasoning::Minimax => ThinkingWire::Minimax(false),
+        Reasoning::Openrouter => ThinkingWire::Openrouter,
+        Reasoning::None => return None,
+    };
+    let mut body = build_probe_body(model);
+    apply_thinking(&mut body, wire);
+    Some(body)
 }
 
 /// The OpenAI model families whose `reasoning_effort` accepts `"none"`.
@@ -143,12 +230,45 @@ pub fn build_probe_body(model: &str) -> Value {
 /// family the docs state, never by loosening the rule.
 const EFFORT_NONE_FAMILIES: &[&str] = &["gpt-5.6", "gpt-5.5"];
 
+/// Whether a model id falls in one of the listed families.
+///
+/// The normalisation both family lists document — prefixes, matched
+/// case-insensitively — stated once, so the two cannot drift apart on the rule
+/// while disagreeing only about polarity, which is the part that differs.
+fn matches_family(model: &str, families: &[&str]) -> bool {
+    let model = model.trim().to_ascii_lowercase();
+    families.iter().any(|family| model.starts_with(family))
+}
+
 /// Whether OpenAI documents `reasoning_effort: "none"` for this model.
 fn accepts_effort_none(model: &str) -> bool {
-    let model = model.trim().to_ascii_lowercase();
-    EFFORT_NONE_FAMILIES
-        .iter()
-        .any(|family| model.starts_with(family))
+    matches_family(model, EFFORT_NONE_FAMILIES)
+}
+
+/// The MiniMax families that keep thinking whatever they are told.
+///
+/// **Checked 2026-08-25.** Prefixes, matched case-insensitively; `minimax-m2`
+/// covers M2, M2.1, M2.5 and M2.7 along with their `-highspeed` variants.
+///
+/// **A deny-list, where [`EFFORT_NONE_FAMILIES`] is an allow-list**, and the
+/// polarity is the point. Sending `reasoning_effort` to the wrong OpenAI model
+/// is a `400`, so being absent from that list has to mean "do not send". Sending
+/// `thinking: {"type": "disabled"}` to an M2.x model is *accepted* — MiniMax
+/// documents that for M2.x thinking cannot be disabled — and then ignored, so
+/// the field never fails and being absent from this list can safely mean "send
+/// it".
+///
+/// Which makes the unmatched case the safe one in both places, by opposite
+/// routes: a new MiniMax model this list has not heard of gets the field and
+/// either honours it or ignores it, while a new *always-on* one that arrives
+/// before this list is updated costs a turn of invisible latency — the same
+/// wager [`EFFORT_NONE_FAMILIES`] makes, and the reason a match here is a
+/// refusal rather than an [`ThinkingWire::Omit`].
+const ALWAYS_THINKING_MINIMAX: &[&str] = &["minimax-m2"];
+
+/// Whether MiniMax documents this model as unable to stop thinking.
+fn minimax_always_thinks(model: &str) -> bool {
+    matches_family(model, ALWAYS_THINKING_MINIMAX)
 }
 
 fn thinking_wire(
@@ -172,6 +292,30 @@ fn thinking_wire(
         } else {
             ThinkingWire::Omit
         }),
+        // Same one-directional shape as OpenAI's: `thinking = true` would mean
+        // naming an effort the user never chose, so it sends nothing and the
+        // endpoint's own default stands.
+        Reasoning::Openrouter => Ok(if thinking {
+            ThinkingWire::Omit
+        } else {
+            ThinkingWire::Openrouter
+        }),
+        // Both directions are real values here, so the only question is the
+        // model — and M2.x is the case where the honest answer is a refusal
+        // rather than a field that will be accepted and ignored.
+        Reasoning::Minimax => {
+            if !thinking && minimax_always_thinks(model) {
+                // The second refusal in this module, and it is the first one's
+                // argument exactly: MiniMax accepts `disabled` for these and
+                // keeps thinking, so sending it would buy silence and seconds
+                // of latency on every turn.
+                return Err(format!(
+                    "{model} always thinks; set thinking = true for it, or choose a MiniMax model \
+                     outside the M2 series to turn thinking off"
+                ));
+            }
+            Ok(ThinkingWire::Minimax(thinking))
+        }
         Reasoning::Deepseek => match models::find(model) {
             // A catalogued DeepSeek model: the one table decides, because the
             // legacy ids picked the mode through the id itself.
@@ -269,10 +413,73 @@ mod tests {
         }
     }
 
-    /// The only one-directional arm. OpenAI's `reasoning_effort` has a real
-    /// `none`, so `false` is expressible — but there is no value that means
-    /// "reason as you normally would", and inventing a level the user never
-    /// chose would be worse than silence.
+    /// MiniMax's own shape, and why it could not reuse [`Reasoning::Deepseek`]:
+    /// `disabled` matches, but the *on* value is `adaptive`, and `enabled` is
+    /// not a word MiniMax documents.
+    #[test]
+    fn a_minimax_row_sends_adaptive_rather_than_enabled() {
+        for (thinking, expected) in [(true, "adaptive"), (false, "disabled")] {
+            let body = build_body(
+                &provider(Reasoning::Minimax, None),
+                &params("MiniMax-M3", thinking),
+                &[Message::user("hi")],
+            )
+            .unwrap();
+            assert_eq!(body["thinking"], json!({ "type": expected }));
+            // Both directions: it says where thinking goes, not whether to do
+            // any, and without it the reasoning arrives inside `content`.
+            assert_eq!(body["reasoning_split"], json!(true));
+        }
+    }
+
+    /// The second refusal in this module. MiniMax *accepts* `disabled` for M2.x
+    /// and keeps thinking anyway, so sending it would buy silence and seconds of
+    /// latency per turn — the same trade `Thinking::AlwaysOn` refuses.
+    #[test]
+    fn an_m2_minimax_model_refuses_to_be_told_not_to_think() {
+        for model in ["MiniMax-M2.7", "minimax-m2", "MiniMax-M2.5-highspeed"] {
+            let refused = build_body(
+                &provider(Reasoning::Minimax, None),
+                &params(model, false),
+                &[Message::user("hi")],
+            );
+            assert!(refused.is_err(), "{model} should refuse");
+
+            // Asking for thinking it already does is no error at all.
+            let allowed = build_body(
+                &provider(Reasoning::Minimax, None),
+                &params(model, true),
+                &[Message::user("hi")],
+            )
+            .unwrap();
+            assert_eq!(allowed["thinking"], json!({ "type": "adaptive" }));
+        }
+    }
+
+    /// OpenRouter's parameter, one-directional for the same reason OpenAI's is.
+    #[test]
+    fn an_openrouter_row_sends_the_effort_object_only_to_suppress() {
+        let off = build_body(
+            &provider(Reasoning::Openrouter, None),
+            &params("anthropic/claude-opus-5", false),
+            &[Message::user("hi")],
+        )
+        .unwrap();
+        assert_eq!(off["reasoning"], json!({ "effort": "none" }));
+
+        let on = build_body(
+            &provider(Reasoning::Openrouter, None),
+            &params("anthropic/claude-opus-5", true),
+            &[Message::user("hi")],
+        )
+        .unwrap();
+        assert!(on.get("reasoning").is_none());
+    }
+
+    /// One of the two one-directional arms (OpenRouter is the other). OpenAI's
+    /// `reasoning_effort` has a real `none`, so `false` is expressible — but
+    /// there is no value that means "reason as you normally would", and
+    /// inventing a level the user never chose would be worse than silence.
     #[test]
     fn an_openai_row_sends_the_effort_floor_only_to_suppress() {
         let off = build_body(

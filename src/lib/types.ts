@@ -11,7 +11,23 @@ export type InputSource = "prompt" | "auto";
  * derived from a model id. `none` is every endpoint with no such control, which
  * is most of them.
  */
-export type Reasoning = "deepseek" | "qwen" | "openai" | "none";
+export type Reasoning =
+  | "deepseek"
+  | "qwen"
+  | "openai"
+  | "minimax"
+  | "openrouter"
+  | "none";
+
+/** What one "Test connection" learned. Mirrors `commands::ConnectionReport`. */
+export interface ConnectionReport {
+  /**
+   * The dialect the endpoint was observed to accept, when exactly one was.
+   * `null` means keep whatever the row says — either nothing was learned, or a
+   * preset had already filled it in.
+   */
+  reasoning: Reasoning | null;
+}
 
 /** One endpoint the user keeps. Mirrors `config::Provider`. */
 export interface Provider {
