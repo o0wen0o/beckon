@@ -278,6 +278,17 @@ impl Search {
             // of a hundred ids is built one option at a time.
             Search::Dashscope => {
                 let id = id.to_ascii_lowercase();
+                // TODO(register): the `plus`/`flash` arm over-offers by two
+                // families. Alibaba's web-search page marks Qwen3.6-Plus and
+                // Qwen3.6-Flash "Supported only by the Responses API", so those
+                // get an offered switch whose field reaches nothing. Left wide
+                // on purpose: over-offering costs the feature silently
+                // (ADR-0026), while a wrong `Some(false)` greys a working model
+                // and tells the user, on Beckon's word, that it cannot search —
+                // the expensive half ADR-0027 exists for. Third-party lists
+                // contradict the vendor page here, so a real DashScope key is
+                // what settles it (`docs/register-audit-2026-08-25.md`).
+                //
                 // Both tiers under the same `qwen` guard. DashScope's
                 // compatible endpoint serves other vendors' models too, and a
                 // bare `contains("max")` would grey one of those on a claim
@@ -501,7 +512,7 @@ const BROKERS: [&str; 6] = [
 /// dialect does a pre-provider file speak" cannot disagree about what they are
 /// reading. There used to be a third — `is_deepseek_host`, which decided whether
 /// the documented catalog described this endpoint. A row carries no catalog now
-/// (`docs/register-audit-2026-08-24.md`), so nothing asks.
+/// (`docs/register-audit-2026-08-25.md`), so nothing asks.
 fn host_of(base_url: &str) -> String {
     // Lowercased before the scheme is stripped, not after: a scheme is
     // case-insensitive, and `HTTP://` is a URL a person types.
@@ -623,6 +634,12 @@ pub fn presets() -> Vec<Provider> {
         // Their docs now brand the company SpaceXAI while every host stays on
         // `x.ai`; the label follows the hosts until the rename settles.
         Provider {
+            // `reasoning` is `None` on xAI's own word rather than for want of a
+            // dialect: their guide states reasoning cannot be disabled, and
+            // `reasoning_effort` takes `low`/`medium`/`high`/`xhigh` with no
+            // `none` — so there is no off-switch to express, and the arm would
+            // be claiming one (checked 2026-08-25).
+            //
             // Live Search is a request field here rather than a tool, and it is
             // on the chat endpoint's own schema — the Responses API their docs
             // now lead with is where the *tool* form lives, and Beckon posts to
@@ -630,16 +647,34 @@ pub fn presets() -> Vec<Provider> {
             search: Search::Xai,
             ..row("xai", "xAI", "https://api.x.ai/v1", "https://console.x.ai")
         },
-        // `search` is `None` for a reason that is not "they have none": Kimi's
-        // `$web_search` is declared as a `builtin_function` tool and answered
-        // with a `tool_calls` frame the caller has to echo back before the
-        // answer arrives. That is two round trips, and `exchange/turn.rs`
-        // streams one (ADR-0026, checked 2026-08-25).
+        // `search` is `None`, and the conclusion outlived the argument for it.
+        // The reason on record was that Kimi's `$web_search` is a
+        // `builtin_function` tool answered with a `tool_calls` frame the caller
+        // must echo back — two round trips, where `exchange/turn.rs` streams one
+        // (ADR-0026). Their current chat API page documents no web search at
+        // all, so `None` is right either way and the mechanism above is no
+        // longer verifiable on the page it was read from (re-checked
+        // 2026-08-25).
+        //
+        // TODO(register): `reasoning` is stale, and silently. Kimi now documents
+        // a thinking switch this row predates, so `None` sends nothing and every
+        // Action asking for `thinking = false` gets a thinking turn anyway — no
+        // `400`, no gate, just latency. It cannot be `Reasoning::Deepseek`
+        // despite the shape matching, because this one host serves three models
+        // that disagree: `kimi-k2.6` and `kimi-k2.5` take
+        // `thinking: {"type": "enabled"|"disabled"}`; `kimi-k2.7-code` documents
+        // `enabled` only; `kimi-k3` carries no `thinking` field and always
+        // reasons, taking `reasoning_effort` of `low`/`high`/`max` with no
+        // `none`. So the arm needs a per-model list and a *refusal* the way
+        // `ALWAYS_THINKING_MINIMAX` refuses — which narrows ADR-0021 and wants
+        // its footnote before the arm lands
+        // (`docs/register-audit-2026-08-25.md`).
         //
         // Mainland China's host. `api.moonshot.ai` is the international one —
         // same API, different account, so it is an edit to `base_url` rather
         // than a second row. The key page moved: `platform.moonshot.cn` `301`s
-        // to `platform.kimi.com`.
+        // to `platform.kimi.com`. The *docs* host moved further, to
+        // `platform.kimi.ai`; neither is what this row carries.
         row(
             "moonshot",
             "Moonshot (Kimi)",
@@ -654,15 +689,25 @@ pub fn presets() -> Vec<Provider> {
         // page moved to `bigmodel.cn/usercenter/proj-mgmt/apikeys`.
         //
         // TODO(register): Zhipu runs a server-side `web_search` tool in one
-        // round trip, which is the shape this row could carry — but its
-        // `search_engine` field is required and the two houses of their docs
-        // name disjoint values for it: the mainland reference lists `search_std`,
+        // round trip, which is half the shape this row could carry — but its
+        // `search_engine` field and the two houses of their docs name disjoint
+        // values for it: the mainland reference lists `search_std`,
         // `search_pro`, `search_pro_sogou` and `search_pro_quark`, while z.ai
         // documents `search_pro_jina` as the only supported one. A wrong engine
         // id is a 400 on every searching turn, and this row's `base_url` is the
         // mainland host while a user may edit it to z.ai — so settle it against
-        // a real key on whichever host before adding a `Search::Zhipu` arm
-        // (re-checked 2026-08-25).
+        // a real key on whichever host before adding a `Search::Zhipu` arm.
+        //
+        // Two things the 2026-08-25 re-check adds. The mainland reference
+        // documents `search_std` as the **default** when `search_engine` is
+        // unspecified, so "required" overstates it on that host — but the
+        // international half, whose value set is the disjoint one, is where the
+        // 400 lives. And the whole thing is an entry in the `tools` array rather
+        // than a top-level field, so it is not the shape [`Search`] carries:
+        // ADR-0026's arms are the endpoints whose search is *one field and one
+        // round trip*, and this satisfies only the second half. That makes it a
+        // question about `Search`'s definition, not about this row
+        // (`docs/register-audit-2026-08-25.md`).
         row(
             "zhipu",
             "Zhipu (GLM)",

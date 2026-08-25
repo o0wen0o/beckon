@@ -146,7 +146,7 @@ pub async fn test_connection(
     let key = require_api_key(&provider, i18n::test_needs_key(language), language)?;
 
     // The probe needs a model like any other request, and a row ships none
-    // (`docs/register-audit-2026-08-24.md`) — so on a fresh row this button is
+    // (`docs/register-audit-2026-08-25.md`) — so on a fresh row this button is
     // reachable *before* one is chosen, and it sits above the model field on the
     // pane. The predicate and the kind live in `commands::require_model`, so
     // this refusal and `exchange/turn.rs`'s cannot come apart; only the sentence

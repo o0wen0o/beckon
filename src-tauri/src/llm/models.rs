@@ -6,7 +6,7 @@
 //! in [`super::request`]. It no longer does. A provider row carries where to
 //! fetch and how to connect, never what to run, so what an endpoint serves is
 //! the endpoint's own answer and there is no documented list to stand in for it
-//! (`docs/register-audit-2026-08-24.md`). What went with that change is
+//! (`docs/register-audit-2026-08-25.md`). What went with that change is
 //! `Origin::Documented` and [`options`]'s `documented` parameter.
 //!
 //! What remains is the half that was never about a dropdown: `Thinking`. A
@@ -19,7 +19,7 @@
 //!
 //! ## Where the ids come from
 //!
-//! DeepSeek's official API reference, checked 2026-08-24:
+//! DeepSeek's official API reference, checked 2026-08-25:
 //!
 //! - `GET https://api.deepseek.com/models` documents exactly `deepseek-v4-flash`
 //!   and `deepseek-v4-pro` in its example response
@@ -113,7 +113,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         description_zh: "DeepSeek 的图片阅读模型，100 万上下文。思考模式可关闭。",
         // Was `Never` while the launch note was silent about the `thinking`
         // object; the pricing table documents the same switch as the other two
-        // rows, so it takes the object both directions (checked 2026-08-24).
+        // rows, so it takes the object both directions (re-checked 2026-08-25).
         thinking: Thinking::Switchable,
         retired: false,
     },

@@ -20,7 +20,7 @@ of 0021 stands, including the table itself as the single source the request laye
 
 A provider row used to ship a `model`, and `CATALOG` in `llm/models.rs` used to stand in as a
 documented list when no fetch had happened. Both are gone
-([docs/register-audit-2026-08-24.md](../register-audit-2026-08-24.md)): a row carries where to fetch
+([docs/register-audit-2026-08-25.md](../register-audit-2026-08-25.md)): a row carries where to fetch
 and how to connect, never what to run, because a hand-kept model id rots silently and no gate in this
 repository can see it happen — `glm-5.1` sat two generations behind GLM-5.3, resolving happily, on
 green gates.

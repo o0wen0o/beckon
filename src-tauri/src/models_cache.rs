@@ -1,7 +1,7 @@
 //! The last model list each endpoint gave us, kept beside the config (ADR-0024).
 //!
 //! A provider row carries where to fetch and how to connect, never what to run
-//! (`docs/register-audit-2026-08-24.md`), so the list a user picks from comes
+//! (`docs/register-audit-2026-08-25.md`), so the list a user picks from comes
 //! from the endpoint and nowhere else. Without somewhere to keep it, every fresh
 //! process starts with an empty dropdown on every row but the default one — and
 //! the fetch is deliberately unbounded (`llm/client.rs` has no timeout), so

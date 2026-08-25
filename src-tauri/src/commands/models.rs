@@ -3,7 +3,7 @@
 //!
 //! It used to be "never leave the dropdown empty", by falling back to a
 //! documented catalog. A provider row carries no catalog any more
-//! (`docs/register-audit-2026-08-24.md`), so an empty answer is now a real
+//! (`docs/register-audit-2026-08-25.md`), so an empty answer is now a real
 //! answer — the state of a row whose endpoint has never spoken — and the pane
 //! renders it rather than a select rendering a blank box.
 //!

@@ -272,7 +272,7 @@ pub(super) fn build_dialect_probe(reasoning: Reasoning, model: &str) -> Option<V
 
 /// The OpenAI model families whose `reasoning_effort` accepts `"none"`.
 ///
-/// **Checked 2026-08-24.** Prefixes, matched case-insensitively: a family's dated
+/// **Checked 2026-08-25.** Prefixes, matched case-insensitively: a family's dated
 /// snapshots take the same parameter set as the alias that names them.
 ///
 /// This is per-*model* knowledge inside a per-endpoint dialect, which ADR-0021
@@ -608,7 +608,7 @@ mod tests {
     /// This used to read the OpenAI preset's own `model` and assert it was on the
     /// list — a preset whose starting model had silently lost suppression was the
     /// failure this arm was added to fix. That row carries no model now
-    /// (`docs/register-audit-2026-08-24.md`), so there is nothing to read: the
+    /// (`docs/register-audit-2026-08-25.md`), so there is nothing to read: the
     /// ids come from OpenAI's own docs instead, which is where the constant's
     /// authority was all along.
     #[test]
