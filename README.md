@@ -9,7 +9,8 @@ Beckon lives in the tray, starts with the machine, and stores nothing. The name 
 "beckoning" — you wave, it comes.
 
 **Windows and macOS.** Bring your own key: any OpenAI-compatible endpoint works, DeepSeek by
-default, always the vendor's own host and never an aggregator.
+default. Every endpoint in the list is the vendor's own host, except one broker that says so on its
+own row before you store a key.
 
 <!-- screenshot: the Popover mid-stream, over a browser -->
 
@@ -112,10 +113,12 @@ label = "DeepSeek"              # display only
 base_url = "https://api.deepseek.com"
 model = "deepseek-v4-flash"
 thinking = false                # DeepSeek thinks by default; off saves seconds
-reasoning = "deepseek"          # deepseek | qwen | openai | none — how this
-                                # endpoint is told *not* to think. A property of
-                                # the endpoint, not the model; prefilled by its
-                                # preset.
+reasoning = "deepseek"          # deepseek | qwen | openai | minimax |
+                                # openrouter | none — how this endpoint is told
+                                # *not* to think. A property of the endpoint, not
+                                # the model; prefilled by its preset, and on a
+                                # row you made yourself, worked out by Test
+                                # connection rather than asked for.
 temperature = 1.3               # optional; omitted means let the endpoint decide
 key_page = "https://platform.deepseek.com/api_keys"
 

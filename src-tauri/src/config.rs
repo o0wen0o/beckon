@@ -147,28 +147,35 @@ pub enum Reasoning {
     /// that reject the field, so `llm/request.rs` sends it only for the families
     /// documented there and stays silent for the rest.
     OpenAi,
+    /// `thinking: {"type": "adaptive"|"disabled"}` plus `reasoning_split: true`
+    /// — MiniMax's own API.
+    ///
+    /// Not a reuse of [`Reasoning::Deepseek`], which sends
+    /// `{"type": "enabled"|"disabled"}`: `disabled` matches, but `enabled` is
+    /// not a value MiniMax documents — `adaptive` is — so sharing the arm would
+    /// be the exact failure this enum exists to prevent.
+    ///
+    /// `reasoning_split` rides along because without it MiniMax returns its
+    /// thinking *inside* `content`, wrapped in `<think>` tags, and
+    /// [`crate::llm::wire`] reads reasoning only from `reasoning_content` — so
+    /// the Popover would render the tags as answer text. It is sent in both
+    /// directions, because it says where thinking goes rather than whether to do
+    /// any.
+    ///
+    /// A mixed host: M2.x accepts `disabled` and keeps thinking anyway, so
+    /// `llm/request.rs` keeps a deny-list and *refuses* rather than sending it.
+    Minimax,
+    /// `reasoning: {"effort": "none"}` — OpenRouter's own parameter, which it
+    /// translates into whatever the model behind it speaks.
+    ///
+    /// `enabled: false` is not documented (only `enabled: true`), and
+    /// `exclude: true` hides the thinking rather than stopping it — the tokens
+    /// are still paid for and the latency is still spent, which is the opposite
+    /// of what `thinking = false` asks for.
+    Openrouter,
     /// Nothing on the wire either way. The endpoint's own default stands.
     #[default]
     None,
-    // TODO(register): MiniMax needs an arm of its own and it is the first one
-    // since ADR-0021. It documents `thinking: {"type": "disabled"}` and
-    // `{"type": "adaptive"}` — a real off-switch, which is the only thing that
-    // justifies departing from `None`. It cannot reuse `Deepseek`: that arm
-    // sends `{"type": "enabled"|"disabled"}`, and while `disabled` matches,
-    // `enabled` is not a value MiniMax documents — `adaptive` is, so sending
-    // `enabled` would be the exact failure this enum exists to prevent. It is
-    // also a mixed host ("for M2.x models, thinking cannot be disabled"), so the
-    // arm needs a per-model list beside it, with the unmatched case `Omit` for
-    // the reason `EFFORT_NONE_FAMILIES` gives. Held because that is the
-    // six-edit dialect procedure plus a new hand-kept id list, not a field.
-    //
-    // TODO(register): Anthropic is held on a different problem — its `/v1/models`
-    // is a native endpoint wanting `x-api-key` and `anthropic-version`, and
-    // per-provider auth headers do not exist: `llm/client::signed` has exactly
-    // two branches, bearer or nothing. A row whose list cannot be fetched is a
-    // row where no model can ever be chosen, so it needs a new field on
-    // `Provider` — a decision, not a patch. Its dialect is settled either way:
-    // their compatibility table lists `reasoning_effort` as *Ignored*.
 }
 
 impl Reasoning {
@@ -254,18 +261,125 @@ impl Provider {
     /// treated as remote, because sending nothing to something that wanted a key
     /// fails as a 401 the user then has to decode.
     pub fn is_local(&self) -> bool {
+        host_is_local(&host_of(&self.base_url))
+    }
+
+    /// The broker this row relays through, if it does (ADR-0025).
+    ///
+    /// Derived rather than stored: a field would have to be filled in by whoever
+    /// added the row, which means a hand-typed OpenRouter URL would disclose
+    /// nothing — the one row where the user is least likely to already know.
+    ///
+    /// The binary never calls this. What the pane draws from is the mirror in
+    /// `src/lib/providers.ts`, beside the other four rules that answer what a
+    /// row *says* rather than what goes on its wire — and the Rust half is what
+    /// `every_relaying_preset_says_so` reads, so the rule and the preset list it
+    /// polices stay in one file.
+    #[allow(dead_code)]
+    pub fn relays(&self) -> Option<&'static str> {
         let host = host_of(&self.base_url);
-        const LOCAL: [&str; 6] = ["localhost", "127.", "0.0.0.0", "[::1]", "192.168.", "10."];
-        if LOCAL.iter().any(|prefix| host.starts_with(prefix)) {
-            return true;
-        }
-        // 172.16.0.0/12 — the one private range whose prefix is not a literal.
-        host.strip_prefix("172.")
-            .and_then(|rest| rest.split('.').next())
-            .and_then(|octet| octet.parse::<u8>().ok())
-            .is_some_and(|octet| (16..=31).contains(&octet))
+        BROKERS.into_iter().find(|name| host.contains(name))
     }
 }
+
+/// Loopback and the three private ranges only: a host we cannot place is
+/// treated as remote, because sending nothing to something that wanted a key
+/// fails as a 401 the user then has to decode.
+///
+/// Free-standing rather than a method, because [`normalise_base_url`] has to ask
+/// it about a string before there is a `Provider` to ask about — and the scheme
+/// it picks for a user who typed no scheme depends on the answer.
+fn host_is_local(host: &str) -> bool {
+    const LOCAL: [&str; 6] = ["localhost", "127.", "0.0.0.0", "[::1]", "192.168.", "10."];
+    if LOCAL.iter().any(|prefix| host.starts_with(prefix)) {
+        return true;
+    }
+    // 172.16.0.0/12 — the one private range whose prefix is not a literal.
+    host.strip_prefix("172.")
+        .and_then(|rest| rest.split('.').next())
+        .and_then(|octet| octet.parse::<u8>().ok())
+        .is_some_and(|octet| (16..=31).contains(&octet))
+}
+
+/// The three ways a hand-typed `base_url` goes wrong, fixed rather than
+/// reported.
+///
+/// This is the only field on the row a preset cannot fill in, so it is the only
+/// one a user has to type — which makes it the one place a typo costs a turn.
+/// Every rule here is *lossless*: it removes something that cannot belong in a
+/// compatibility root, or supplies something that has exactly one right answer.
+///
+///  1. **A missing scheme.** `api.example.com` is what a person types. `https`,
+///     unless the authority is loopback or private, where a local server
+///     answers on `http` and `https` is the failure the user would have to
+///     decode from a TLS error.
+///  2. **A pasted request path.** Copying the URL out of a vendor's quickstart
+///     yields `…/v1/chat/completions`, and [`crate::llm::client`] then posts to
+///     `…/chat/completions/chat/completions`. `models` is deliberately *not*
+///     stripped: `chat/completions` and `completions` are POST routes that can
+///     never be a compatibility root, and a path segment called `models` might
+///     legitimately be one.
+///  3. **Trailing slashes**, which `api_url` tolerates anyway — normalised here
+///     so the value the pane shows back is the value that goes on the wire.
+///
+/// Runs inside [`Config::fold_legacy`], so it holds for a file the user
+/// hand-edited exactly as it does for a value a pane sent (ADR-0003, ADR-0021).
+fn normalise_base_url(base_url: &str) -> String {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    // Nothing to fix and nothing to invent: an empty row is the blank a pane
+    // just created, and giving it a scheme would make it look configured.
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    // Case-insensitively, and lowercased where it is there: a scheme is
+    // case-insensitive and `HTTP://` is a URL a person types. `host_of` already
+    // lowercases before it strips, so a case-sensitive test here would disagree
+    // with it — `HTTP://localhost:1234/v1` would read as scheme-less, be given a
+    // second one, and be written back by `fold_legacy` as an address no request
+    // can reach.
+    let with_scheme = match trimmed.split_once("://") {
+        Some((scheme, rest))
+            if scheme.eq_ignore_ascii_case("https") || scheme.eq_ignore_ascii_case("http") =>
+        {
+            format!("{}://{rest}", scheme.to_ascii_lowercase())
+        }
+        _ if host_is_local(&host_of(trimmed)) => format!("http://{trimmed}"),
+        _ => format!("https://{trimmed}"),
+    };
+
+    // Longest first: `chat/completions` would otherwise leave a dangling `chat`.
+    let stripped = ["/chat/completions", "/completions"]
+        .iter()
+        .find_map(|tail| with_scheme.strip_suffix(tail))
+        .unwrap_or(&with_scheme);
+    stripped.trim_end_matches('/').to_string()
+}
+
+/// Hosts that hold keys to *other* APIs and relay a request to one of them
+/// (ADR-0025).
+///
+/// This was a ban list — no row was allowed to name one — and is now a
+/// **disclosure** list: a row may point at a broker, and the pane says so before
+/// the user stores a key. What changed is not the risk but who decides. A broker
+/// is still a third party inside a relationship that was between the user and a
+/// vendor, and Beckon still cannot say what it does with the text; the answer is
+/// to state that plainly rather than to make the choice for someone.
+///
+/// A host match, deliberately, where [`Reasoning`] refuses one: being wrong here
+/// costs a warning nobody needed, and being wrong there costs a `400` on every
+/// turn. It also reaches a row the user typed by hand, which a field on the
+/// preset never would — and that is the row most likely to have arrived at a
+/// broker without meaning to.
+#[allow(dead_code)]
+const BROKERS: [&str; 6] = [
+    "openrouter",
+    "litellm",
+    "requesty",
+    "helicone",
+    "portkey",
+    "unify.ai",
+];
 
 /// The authority of a `base_url`: trimmed, scheme dropped, path dropped,
 /// lowercased.
@@ -310,22 +424,20 @@ pub struct ApiConfig {
 ///
 /// ## What may be in this list
 ///
-/// **The request has to terminate at the company whose key it carries.** No
-/// aggregator, no gateway, no OpenRouter.
+/// Until ADR-0025 the rule was that the request had to **terminate** at the
+/// company whose key it carries — no aggregator, no gateway, no OpenRouter. That
+/// rule is now a disclosure instead of a ban: a row may relay, and
+/// [`Provider::relays`] is what makes it say so before a key is stored.
 ///
-/// That is the line, and it is not "does this company own the model". A hosted
-/// vLLM serves somebody else's open weights on its own GPUs — your key is theirs,
-/// the inference is theirs, and nothing is forwarded. A broker is different in
-/// kind: it holds keys to *other* APIs and relays your request to one, so a third
-/// party ends up inside a relationship that was between you and a vendor.
-/// `every_preset_goes_direct_to_its_own_vendor` is what keeps that true, because
-/// a broker would satisfy the type and nothing else in the codebase would notice.
-///
-/// TODO(register): OpenRouter was selected for this list deliberately, knowing it
-/// is a broker. Admitting it needs an ADR that narrows ADR-0021 rather than
-/// contradicting it, turning `BROKERS` from a ban list into a *disclosure* list,
-/// plus a string in both i18n catalogs saying the row relays — and its own
-/// dialect read off their docs. Three decisions, so the row is held, not guessed.
+/// The distinction the old rule drew is still the right one and still worth
+/// stating. It is not "does this company own the model": a hosted vLLM serves
+/// somebody else's open weights on its own GPUs — your key is theirs, the
+/// inference is theirs, and nothing is forwarded. A broker is different in kind,
+/// because it holds keys to *other* APIs and relays your request to one, so a
+/// third party ends up inside a relationship that was between you and a vendor.
+/// What changed is who gets to decide that is acceptable.
+/// `every_relaying_preset_says_so` is what keeps the disclosure attached, because
+/// a broker satisfies the type and nothing else in the codebase would notice.
 ///
 /// ## A row carries no model
 ///
@@ -438,6 +550,45 @@ pub fn presets() -> Vec<Provider> {
                 "https://bailian.console.aliyun.com",
             )
         },
+        // Anthropic's OpenAI compatibility layer. `reasoning` is `None` on their
+        // own word: the compatibility table lists `reasoning_effort` as
+        // *Ignored*, so there is no off-switch to express and sending one would
+        // claim something untrue.
+        //
+        // The row that used to be impossible. Its `/v1/models` is native, not
+        // compatible, and reads an `Authorization: Bearer` as an OAuth token —
+        // so the list came back `401` and no model could ever be chosen. Fixed
+        // in `llm/client::signed`, which now sends `x-api-key` beside the
+        // bearer on every keyed request; that is a header, so the endpoints
+        // that do not know it ignore it (probed 2026-08-25).
+        row(
+            "anthropic",
+            "Anthropic (Claude)",
+            "https://api.anthropic.com/v1",
+            "https://platform.claude.com/settings/keys",
+        ),
+        Provider {
+            // `api.minimaxi.com` is the mainland host — same API, different
+            // account, so it is an edit to `base_url` rather than a second row.
+            reasoning: Reasoning::Minimax,
+            ..row(
+                "minimax",
+                "MiniMax",
+                "https://api.minimax.io/v1",
+                "https://platform.minimax.io/console/access",
+            )
+        },
+        Provider {
+            // A broker, admitted knowingly (ADR-0025). `Provider::relays` is
+            // what makes the row say so; nothing here has to.
+            reasoning: Reasoning::Openrouter,
+            ..row(
+                "openrouter",
+                "OpenRouter",
+                "https://openrouter.ai/api/v1",
+                "https://openrouter.ai/keys",
+            )
+        },
         row("ollama", "Ollama (local)", "http://localhost:11434/v1", ""),
         row(
             "lmstudio",
@@ -452,6 +603,18 @@ pub fn presets() -> Vec<Provider> {
             ..row("vllm", "vLLM (Qwen3)", "http://localhost:8000/v1", "")
         },
     ]
+}
+
+/// Whether this id names a row [`presets`] ships.
+///
+/// Stated once because two unrelated things ask it and must agree: dialect
+/// detection skips a preset (its answer came off the vendor's own docs, and
+/// detection is the weaker source), and the pane shows the read-only dialect
+/// row only where detection can fill it. If the two definitions drifted, a
+/// preset would get a value nothing displays or a hand-made row would show a
+/// field nothing ever fills.
+pub fn is_preset(id: &str) -> bool {
+    presets().iter().any(|one| one.id == id)
 }
 
 /// What an Action that overrides nothing gets.
@@ -624,6 +787,14 @@ impl Config {
         self.api
             .providers
             .retain(|one| !one.id.trim().is_empty() && seen.insert(one.id.clone()));
+
+        // The one field no preset can fill in is the one field a person types,
+        // so it is the one that gets typed wrong. Fixed here rather than
+        // refused, and here rather than in a pane, so a hand-edited file and a
+        // saved form cannot end up meaning different things.
+        for provider in &mut self.api.providers {
+            provider.base_url = normalise_base_url(&provider.base_url);
+        }
         if self.api.providers.is_empty() {
             self.api.providers.push(Provider::deepseek());
         }
@@ -875,24 +1046,21 @@ mod tests {
         );
     }
 
-    /// The product decision, as a test: every hosted preset is a host that
-    /// **terminates** the request, reached over TLS (ADR-0021).
+    /// The product decision, as a test: a preset that relays is *disclosed*,
+    /// and every hosted one is reached over TLS (ADR-0021, ADR-0025).
     ///
-    /// The names below are brokers — they hold keys to other APIs and relay to
-    /// one of them. An inference provider serving somebody else's open weights
-    /// on its own GPUs is not one of these and is welcome in the list: a hosted
-    /// vLLM is the shape, and Groq and SiliconFlow were both in this list until
-    /// they were dropped on scope rather than on this rule.
+    /// This used to assert that no preset named a broker at all. It now asserts
+    /// the weaker, still load-bearing thing — that a broker in the list is one
+    /// [`Provider::relays`] recognises — because the disclosure is what makes
+    /// admitting one acceptable, and a row that relayed *silently* is the
+    /// failure the old ban was really guarding against.
+    ///
+    /// An inference provider serving somebody else's open weights on its own
+    /// GPUs is not a broker and needs no disclosure: a hosted vLLM is the shape,
+    /// and Groq and SiliconFlow were both in this list until they were dropped
+    /// on scope rather than on this rule.
     #[test]
-    fn every_preset_goes_direct_to_its_own_vendor() {
-        const BROKERS: [&str; 6] = [
-            "openrouter",
-            "litellm",
-            "requesty",
-            "helicone",
-            "portkey",
-            "unify.ai",
-        ];
+    fn every_relaying_preset_says_so() {
         let presets = presets();
         assert!(presets.len() > 1);
         for row in &presets {
@@ -900,22 +1068,96 @@ mod tests {
             assert!(!row.label.trim().is_empty(), "{}", row.id);
             let host = row.base_url.to_ascii_lowercase();
             for name in BROKERS {
-                assert!(!host.contains(name), "{} relays through {name}", row.id);
+                // Naming a broker is allowed; naming one the row does not admit
+                // to is not.
+                assert!(
+                    !host.contains(name) || row.relays() == Some(name),
+                    "{} reaches {name} without disclosing it",
+                    row.id
+                );
             }
             if row.is_local() {
                 // A local server is plain HTTP and needs no key page.
                 assert!(row.key_page.is_none(), "{}", row.id);
+                assert!(row.relays().is_none(), "{} is local and relays", row.id);
             } else {
                 assert!(host.starts_with("https://"), "{} is not TLS", row.id);
                 assert!(row.key_page.is_some(), "{} has no key page", row.id);
             }
         }
+        // The one relaying row we ship, named rather than merely permitted: if
+        // it is ever dropped this assertion is the reminder to drop the
+        // disclosure machinery with it.
+        let openrouter = presets.iter().find(|one| one.id == "openrouter");
+        assert_eq!(openrouter.and_then(Provider::relays), Some("openrouter"));
         // Ids are the credential account, so a duplicate would share a key.
         let mut ids: Vec<&str> = presets.iter().map(|one| one.id.as_str()).collect();
         ids.sort_unstable();
         let count = ids.len();
         ids.dedup();
         assert_eq!(ids.len(), count, "duplicate preset id");
+    }
+
+    /// The three ways a hand-typed URL goes wrong, each fixed rather than
+    /// reported. Every case here is one a user would otherwise debug from a
+    /// `404`, a TLS error, or a `401` that names none of them.
+    #[test]
+    fn a_hand_typed_base_url_is_fixed_rather_than_refused() {
+        for (typed, expected) in [
+            // A scheme nobody types.
+            ("api.example.com/v1", "https://api.example.com/v1"),
+            // …except for a local server, where https is the failure.
+            ("localhost:11434/v1", "http://localhost:11434/v1"),
+            ("127.0.0.1:8000", "http://127.0.0.1:8000"),
+            // The URL as it appears in a vendor's quickstart. Without this the
+            // request goes to `/chat/completions/chat/completions`.
+            (
+                "https://api.example.com/v1/chat/completions",
+                "https://api.example.com/v1",
+            ),
+            (
+                "https://api.example.com/v1/completions",
+                "https://api.example.com/v1",
+            ),
+            // Trailing slashes and stray whitespace.
+            (
+                "  https://api.example.com/v1/  ",
+                "https://api.example.com/v1",
+            ),
+            // Already right: normalising is not rewriting.
+            ("https://api.deepseek.com", "https://api.deepseek.com"),
+            // A scheme is case-insensitive. Read case-sensitively this is a
+            // scheme-less URL, gets a second scheme glued on, and `fold_legacy`
+            // writes the result back — a row that can no longer reach anything.
+            ("HTTP://localhost:1234/v1", "http://localhost:1234/v1"),
+            ("HTTPS://Api.Example.com/v1", "https://Api.Example.com/v1"),
+            // `models` is deliberately left alone — it could be a compat root.
+            (
+                "https://gateway.example.com/models",
+                "https://gateway.example.com/models",
+            ),
+            // A blank row is a blank row; a scheme would make it look set up.
+            ("", ""),
+            ("   ", ""),
+        ] {
+            assert_eq!(normalise_base_url(typed), expected, "typed {typed:?}");
+        }
+    }
+
+    /// The fix has to reach a file the user edited by hand, not just a value a
+    /// pane sent — which is the whole reason it lives in `fold_legacy`.
+    #[test]
+    fn folding_normalises_every_row_url() {
+        let mut config = Config::default();
+        config.api.providers = vec![Provider {
+            base_url: "api.example.com/v1/chat/completions".into(),
+            ..Provider::deepseek()
+        }];
+        config.fold_legacy();
+        assert_eq!(
+            config.api.providers[0].base_url,
+            "https://api.example.com/v1"
+        );
     }
 
     /// The default row and the preset of the same id must not disagree: the

@@ -17,7 +17,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 24 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 25 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -178,9 +178,9 @@ Three rules the whole layer leans on:
   dropdown. Overriding an Action's provider strands its pinned model; the editor says so in red with
   the revert control beside it.
 
-`src/lib/providers.ts` mirrors five small rules from Rust — `isLocal`, `chatUrl`, the Action count,
-the stranded model, and `keyProblem` (the four-outcome credential split `commands::require_api_key`
-owns) — because they answer what a pane *says* while drawing a list, not what goes on the wire. Add a
+`src/lib/providers.ts` mirrors six small rules from Rust — `isLocal`, `chatUrl`, the Action count,
+the stranded model, `relaysThrough` (`config::BROKERS`, ADR-0025), and `keyProblem` (the four-outcome
+credential split `commands::require_api_key` owns) — because they answer what a pane *says* while drawing a list, not what goes on the wire. Add a
 rule there only if it can be stated twice without drifting; otherwise it belongs in Rust and reaches
 the window as a field. What is *not* there is any invariant: those are `fold_legacy`'s.
 
@@ -226,6 +226,13 @@ never translated in either direction.
   `llm/models.rs` as the single table the request layer reads for `thinking`, stands. 0003 is the
   reason the sidecar is *not* config: the user did not write it, so it is neither watched nor
   broadcast, and a fetched list on the reload path would echo back at the window that caused it.
+  ADR-0025 supersedes 0021 **in part** and in one direction only: its preset rule stops being "the
+  request must terminate at the company whose key it carries" and becomes "a row that relays says
+  so". Everything else 0021 argues is untouched — no active row, the dialect stated rather than
+  guessed, `fold_legacy` owning the invariants — and the ban's own reasoning survives inside the
+  disclosure, because the risk it named did not change, only who decides to accept it. The host match
+  `Provider::relays` performs is not a hole in 0021's "no host guess": that rule exists because a
+  wrong dialect is a `400` on every turn, and a wrong broker match costs a warning nobody needed.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each
@@ -235,7 +242,7 @@ never translated in either direction.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (2099 symbols, 5246 relationships, 175 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (2233 symbols, 5642 relationships, 187 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

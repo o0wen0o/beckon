@@ -13,9 +13,14 @@
 // window as a field.
 import type { KeyStatus, Provider } from "./types";
 
-/** The host, for a row that has no room for the whole URL. */
+/**
+ * The host, for a row that has no room for the whole URL.
+ *
+ * Case-insensitive on the scheme, like `config::host_of`: `HTTP://` is a URL a
+ * person types, and this runs while they are still typing it.
+ */
 export function host(url: string): string {
-  return url.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  return url.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
 /**
@@ -134,16 +139,45 @@ export function strandedModel(
   return options.some((one) => one.id === model) ? null : model;
 }
 
-/** A blank row: no reasoning wire, no key, which is a working local endpoint. */
+/**
+ * Hosts that hold keys to *other* APIs and relay a request to one of them.
+ * Mirrors `config::BROKERS` — **the two halves move together or a relaying row
+ * stops disclosing** (ADR-0025).
+ *
+ * Duplicated for the same reason `isLocal` duplicates its own host list: this
+ * answers what a pane *says* while drawing a row, not what goes on the wire.
+ */
+const BROKERS = ["openrouter", "litellm", "requesty", "helicone", "portkey", "unify.ai"];
+
+/**
+ * The broker this row relays through, if it does. Mirrors `Provider::relays`.
+ *
+ * Derived rather than a field, so a hand-typed OpenRouter URL discloses as
+ * loudly as the preset does — that being the row whose owner is least likely to
+ * already know.
+ */
+export function relaysThrough(provider: Provider): string | null {
+  const where = host(provider.base_url).toLowerCase();
+  return BROKERS.find((name) => where.includes(name)) ?? null;
+}
+
+/**
+ * A blank row: no reasoning wire, no key, which is a working local endpoint.
+ *
+ * The label is the host rather than "Endpoint 3", so the one field a user must
+ * fill in also names the row and there is no second blank to notice. It is
+ * `label` — display only — so nothing downstream depends on it.
+ */
 export function blankProvider(existing: Provider[]): Provider {
   let n = existing.length + 1;
   // The id is the credential account, so it has to be unique — a collision
   // would hand a fresh row somebody else's key.
   while (existing.some((one) => one.id === `endpoint-${n}`)) n += 1;
+  const base_url = "http://localhost:8000/v1";
   return {
     id: `endpoint-${n}`,
-    label: `Endpoint ${n}`,
-    base_url: "http://localhost:8000/v1",
+    label: host(base_url),
+    base_url,
     model: "",
     thinking: false,
     reasoning: "none",

@@ -17,6 +17,7 @@ export const ZH: Strings = {
     modifierAdvice: IS_MAC ? "Cmd、Control、Option 或 Shift" : "Ctrl、Alt 或 Shift",
     settings: "设置",
     cancel: "取消",
+    dismiss: "关闭",
   },
 
   inputSource: {
@@ -170,6 +171,10 @@ export const ZH: Strings = {
       test: "测试连接",
       testing: "测试中…",
       testOk: "已连通 —— 端点有响应。",
+      testOkDetected: (dialect: string) => `已连通 —— 端点有响应，使用的是 ${dialect} 形式。`,
+      relaysLead: "会转发。",
+      relaysBody: (broker: string) =>
+        `你的密钥留在 ${broker}；你的文本会继续转发给实际提供下方所选模型的公司。看到这段文本的是两家公司，不是一家。`,
 
       rowDefaults: "此端点的默认值",
       rowDefaultsNote: "Action 可覆盖其中任一项",
@@ -187,6 +192,8 @@ export const ZH: Strings = {
         deepseek: "DeepSeek",
         qwen: "Qwen",
         openai: "OpenAI",
+        minimax: "MiniMax",
+        openrouter: "OpenRouter",
         none: "无",
       },
       reasoningHint: {
@@ -194,6 +201,9 @@ export const ZH: Strings = {
         qwen: "发送 chat_template_kwargs.enable_thinking。适用于 vLLM、SGLang 或 DashScope 上的 Qwen3。",
         openai:
           '关闭思考时发送 reasoning_effort:"none"，开启时什么都不发送。适用于 OpenAI 自己的接口，自 GPT-5.6 起。',
+        minimax:
+          '发送 thinking:{type:"adaptive"|"disabled"} 和 reasoning_split。适用于 MiniMax 自己的接口；其 M2 系列无论如何都会思考。',
+        openrouter: '关闭思考时发送 reasoning:{effort:"none"}，开启时什么都不发送。',
         none: "两个方向都不发送 —— 由端点自己的默认行为决定。绝大多数端点没有这类开关，都属于这一项。",
       },
       thinkingHint: (label: string) => `关闭会显式发给 ${label}，因为它的模型不特别说明就会思考。`,

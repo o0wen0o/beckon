@@ -49,7 +49,13 @@ pub(super) fn handle_event(
 
     for choice in chunk.choices {
         let Some(delta) = choice.delta else { continue };
-        if let Some(text) = delta.reasoning_content.filter(|t| !t.is_empty()) {
+        // Whichever field this host names its thinking with; never both, and no
+        // host sends both.
+        if let Some(text) = delta
+            .reasoning_content
+            .or(delta.reasoning)
+            .filter(|t| !t.is_empty())
+        {
             on_event(StreamEvent::Reasoning(text));
         }
         if let Some(text) = delta.content.filter(|t| !t.is_empty()) {
@@ -95,6 +101,16 @@ struct Delta {
     content: Option<String>,
     /// DeepSeek streams thinking text in its own field.
     reasoning_content: Option<String>,
+    /// OpenRouter streams the same thing under a shorter name, and reads
+    /// `reasoning_content` on the way *in* without echoing it on the way out —
+    /// so a row pointed there would stream thinking that rendered as nothing.
+    ///
+    /// An alias rather than a second event: which field a host chose is not a
+    /// distinction the Popover has any use for. `reasoning_details` is
+    /// deliberately not read — it is a structured array carrying signatures and
+    /// redacted blocks for replay, not display text, and the plain field is
+    /// present alongside it.
+    reasoning: Option<String>,
 }
 
 /// `GET /models`: `{"object":"list","data":[{"id":…,"object":"model",…}]}`
@@ -157,6 +173,15 @@ mod tests {
         let mut events = Vec::new();
         let result = handle_event(SseEvent::Data(payload.to_string()), &mut |e| events.push(e));
         (events, result)
+    }
+
+    /// OpenRouter's spelling of the same thing. Without this arm a row pointed
+    /// there streams thinking that renders as nothing at all.
+    #[test]
+    fn reads_thinking_under_either_field_name() {
+        let (events, result) = drain(r#"{"choices":[{"delta":{"reasoning":"hm"}}]}"#);
+        assert!(result.is_ok());
+        assert_eq!(events, vec![StreamEvent::Reasoning("hm".into())]);
     }
 
     #[test]

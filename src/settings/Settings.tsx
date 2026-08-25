@@ -10,6 +10,7 @@ import { useStore } from "@/lib/useStore";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PaneEnter } from "@/components/PaneEnter";
 import { StatusBar } from "@/components/StatusBar";
+import { Toaster } from "@/components/Toaster";
 import { SettingsNav } from "./SettingsNav";
 import { actionStore } from "./actions";
 import { Actions } from "./sections/actions/Actions";
@@ -142,6 +143,11 @@ export function Settings() {
             </PaneEnter>
           </main>
         </div>
+
+        {/* Outside the pane and after it in the tree: what a toast reports is
+            an outcome of a gesture the pane made, and it must not scroll with
+            the form or be clipped by it. */}
+        <Toaster />
 
         <StatusBar
           busy={store.configSlot.busy || actions.slot.busy}
