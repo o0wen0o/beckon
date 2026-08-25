@@ -56,7 +56,7 @@
 
 use serde::Serialize;
 
-use crate::config::Language;
+use crate::config::{Language, Search};
 
 /// What a model does with thinking mode — the property [`super::request`] needs
 /// in order to put the right `thinking` object on the wire.
@@ -191,6 +191,11 @@ pub struct ModelOption {
     /// `None` for a model that is not in the catalog: we do not know, and
     /// guessing is the failure `deepseek` exists to prevent.
     pub thinking: Option<Thinking>,
+    /// Whether this endpoint's search field reaches this model (ADR-0027), from
+    /// [`Search::supports_model`] — so the pane can grey a switch the vendor
+    /// says would do nothing. `None` is "not documented either way", and the
+    /// switch stays offered on it.
+    pub search: Option<bool>,
     pub origin: Origin,
 }
 
@@ -212,6 +217,7 @@ pub fn options(
     live: Option<&[String]>,
     selected: &[String],
     language: Language,
+    search: Search,
 ) -> Vec<ModelOption> {
     let mut out: Vec<ModelOption> = Vec::new();
 
@@ -219,7 +225,7 @@ pub fn options(
     // `base_url` happens to point at.
     if let Some(ids) = live {
         for id in ids {
-            push_unique(&mut out, id, Origin::Live, language);
+            push_unique(&mut out, id, Origin::Live, language, search);
         }
         // The provider's order is arbitrary; catalog order is meaningful. A
         // stable sort keeps the provider's order among the ids we do not
@@ -228,28 +234,39 @@ pub fn options(
     }
 
     for id in selected {
-        push_unique(&mut out, id, Origin::Configured, language);
+        push_unique(&mut out, id, Origin::Configured, language, search);
     }
 
     out
 }
 
-fn push_unique(out: &mut Vec<ModelOption>, id: &str, origin: Origin, language: Language) {
+fn push_unique(
+    out: &mut Vec<ModelOption>,
+    id: &str,
+    origin: Origin,
+    language: Language,
+    search: Search,
+) {
     let id = id.trim();
     if id.is_empty() || out.iter().any(|option| option.id.eq_ignore_ascii_case(id)) {
         return;
     }
-    out.push(describe(id, origin, language));
+    out.push(describe(id, origin, language, search));
 }
 
-fn describe(id: &str, origin: Origin, language: Language) -> ModelOption {
+fn describe(id: &str, origin: Origin, language: Language, search: Search) -> ModelOption {
     let id = id.trim();
+    // The endpoint's arm answers this, not the catalog: which models take the
+    // search field is a fact about the host, and the catalog is DeepSeek's
+    // (ADR-0027).
+    let searches = search.supports_model(id);
     match find(id) {
         Some(entry) => ModelOption {
             id: entry.id.to_string(),
             label: entry.label.to_string(),
             description: entry.description(language).to_string(),
             thinking: Some(entry.thinking),
+            search: searches,
             origin,
         },
         None => ModelOption {
@@ -257,6 +274,7 @@ fn describe(id: &str, origin: Origin, language: Language) -> ModelOption {
             label: id.to_string(),
             description: String::new(),
             thinking: None,
+            search: searches,
             origin,
         },
     }
@@ -284,7 +302,7 @@ mod tests {
     /// The option *set* is what these tests are about, and it is the same in
     /// both languages; `describes_a_model_in_both_languages` covers the rest.
     fn options(live: Option<&[String]>, selected: &[String]) -> Vec<ModelOption> {
-        super::options(live, selected, Language::En)
+        super::options(live, selected, Language::En, Search::None)
     }
 
     /// Driven through a *live* list, because that is the only thing that sources
@@ -298,7 +316,7 @@ mod tests {
             entry.description(Language::Zh)
         );
         let live = strings(&[crate::config::DEFAULT_MODEL]);
-        let zh = super::options(Some(&live), &[], Language::Zh);
+        let zh = super::options(Some(&live), &[], Language::Zh, Search::None);
         let flash = zh
             .iter()
             .find(|o| o.id == crate::config::DEFAULT_MODEL)
@@ -442,6 +460,24 @@ mod tests {
     fn duplicate_ids_from_the_endpoint_collapse() {
         let live = strings(&["deepseek-v4-flash", "deepseek-v4-flash"]);
         assert_eq!(ids(&options(Some(&live), &[])), vec!["deepseek-v4-flash"]);
+    }
+
+    /// The dropdown carries the endpoint's answer about each model, so the pane
+    /// can grey a switch rather than offer one the vendor says does nothing
+    /// (ADR-0027). The arm answers, the catalog does not: these ids are not in
+    /// it at all.
+    #[test]
+    fn each_option_says_whether_this_endpoint_can_search_with_it() {
+        let live = strings(&["qwen3.7-max", "qwen3.5-plus", "some-preview"]);
+        let offered = super::options(Some(&live), &[], Language::En, Search::Dashscope);
+        let by_id = |id: &str| offered.iter().find(|o| o.id == id).unwrap().search;
+        assert_eq!(by_id("qwen3.5-plus"), Some(true));
+        assert_eq!(by_id("qwen3.7-max"), Some(false));
+        // Not documented either way: offered, not ruled out.
+        assert_eq!(by_id("some-preview"), None);
+        // An endpoint with no field at all answers for every model it serves.
+        let offered = super::options(Some(&live), &[], Language::En, Search::None);
+        assert!(offered.iter().all(|o| o.search == Some(false)));
     }
 
     #[test]

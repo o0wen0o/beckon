@@ -59,6 +59,11 @@ pub struct ModelOverrides {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub thinking: Option<bool>,
+    /// Whether this Action's turns ask the endpoint to search the web
+    /// (ADR-0026). Absent means inherit, like the two above — and what it
+    /// inherits is `false` on every preset row, because a search is paid for
+    /// per request and an Action that summarises a Selection wants none.
+    pub web_search: Option<bool>,
 }
 
 /// Effective per-request model parameters: the Action's `[model]` table laid
@@ -73,6 +78,7 @@ pub struct ModelParams {
     pub provider: String,
     pub model: String,
     pub thinking: bool,
+    pub web_search: bool,
 }
 
 impl ModelOverrides {
@@ -102,6 +108,13 @@ impl ModelOverrides {
             thinking: self
                 .thinking
                 .or_else(|| row.map(|one| one.thinking))
+                .unwrap_or(false),
+            // The same chain, and the same `false` when no row answers: an
+            // Action pointed at a provider id that names nothing must not start
+            // paying for searches on the strength of a typo (ADR-0026).
+            web_search: self
+                .web_search
+                .or_else(|| row.map(|one| one.web_search))
                 .unwrap_or(false),
         }
     }
@@ -344,6 +357,7 @@ thinking = true
             provider: None,
             model: None,
             thinking: Some(true),
+            web_search: None,
         }
         .merge_over(&config());
         assert_eq!(merged.provider, "deepseek");
@@ -365,6 +379,7 @@ thinking = true
             provider: Some("ollama".into()),
             model: None,
             thinking: None,
+            web_search: None,
         }
         .merge_over(&config());
         assert_eq!(merged.provider, "ollama");
@@ -381,6 +396,7 @@ thinking = true
             provider: Some("ollama".into()),
             model: Some("deepseek-v4-pro".into()),
             thinking: None,
+            web_search: None,
         }
         .merge_over(&config());
         assert_eq!(merged.provider, "ollama");
@@ -395,6 +411,7 @@ thinking = true
             provider: Some("deleted".into()),
             model: None,
             thinking: None,
+            web_search: None,
         }
         .merge_over(&config());
         assert_eq!(merged.provider, "deleted");

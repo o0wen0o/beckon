@@ -333,6 +333,7 @@ mod tests {
                 provider: "p".into(),
                 model: "m".into(),
                 thinking: false,
+                web_search: false,
             },
             phase: PopoverPhase::NeedsInput,
             input: None,

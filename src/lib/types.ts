@@ -19,6 +19,19 @@ export type Reasoning =
   | "openrouter"
   | "none";
 
+/**
+ * How an endpoint is asked to **search the web** (ADR-0026).
+ *
+ * `Reasoning` with the polarity reversed: these are on-switches, because no
+ * endpoint searches unless asked. `none` is every endpoint with no such field
+ * on `/chat/completions` — including hosts whose search is a built-in tool the
+ * caller has to answer, which is a second round trip rather than a field.
+ *
+ * Nothing detects these: a probe would run a real search and be billed for it,
+ * so a preset states the arm and a hand-made row is asked.
+ */
+export type Search = "xai" | "dashscope" | "openrouter" | "none";
+
 /** What one "Test connection" learned. Mirrors `commands::ConnectionReport`. */
 export interface ConnectionReport {
   /**
@@ -39,6 +52,9 @@ export interface Provider {
   model: string;
   thinking: boolean;
   reasoning: Reasoning;
+  /** What an Action that says nothing inherits. `false` on every preset. */
+  web_search: boolean;
+  search: Search;
   /** Absent means send none and let the endpoint decide. */
   temperature?: number | null;
   key_page?: string | null;
@@ -49,6 +65,7 @@ export interface ModelParams {
   provider: string;
   model: string;
   thinking: boolean;
+  web_search: boolean;
 }
 
 /** An Action's `[model]` table; `null` everywhere means "inherit". */
@@ -56,6 +73,7 @@ export interface ModelOverrides {
   provider: string | null;
   model: string | null;
   thinking: boolean | null;
+  web_search: boolean | null;
 }
 
 export interface PromptSpec {
@@ -150,6 +168,12 @@ export interface ModelOption {
   label: string;
   description: string;
   thinking: ThinkingSupport | null;
+  /**
+   * Whether this endpoint's search field reaches this model (ADR-0027).
+   * `null` is "the vendor documents neither", and the switch stays offered on
+   * it; `false` is the vendor's own word, and the only thing that greys one.
+   */
+  search: boolean | null;
   origin: ModelOrigin;
 }
 

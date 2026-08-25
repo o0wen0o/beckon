@@ -18,6 +18,11 @@ import type { ModelParams } from "@/lib/types";
  *  underneath it while the two bars are the same height and padding. */
 export const TITLE_BAR = "flex h-8.5 flex-none items-center gap-2 border-b pr-1 pl-3";
 
+/** A capability this turn carries. Outlined rather than a warning colour: it is
+ *  something in use, not a condition to act on — and stated once, because the
+ *  chips only read as one row while they are the same chip. */
+const CAPABILITY_CHIP = "text-muted-foreground text-meta font-normal";
+
 interface PopoverHeaderProps {
   actionName: string;
   model: ModelParams | null;
@@ -51,11 +56,16 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
           {model.provider} · {model.model}
         </span>
       ) : null}
-      {/* Thinking being on is a capability in use, not a condition to act on,
-          so it is an outlined chip rather than a warning colour. */}
       {model?.thinking ? (
-        <Badge variant="outline" className="text-muted-foreground text-meta font-normal">
+        <Badge variant="outline" className={CAPABILITY_CHIP}>
           {t.popover.thinking}
+        </Badge>
+      ) : null}
+      {/* The same chip for the same reason, and it earns its place twice over:
+          this is the switch a turn is billed per request for (ADR-0026). */}
+      {model?.web_search ? (
+        <Badge variant="outline" className={CAPABILITY_CHIP}>
+          {t.popover.webSearch}
         </Badge>
       ) : null}
       {/* `icon-xs`, not `icon-sm`: a 32px hit target in a 34px bar leaves one

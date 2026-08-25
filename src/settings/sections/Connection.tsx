@@ -55,7 +55,14 @@ import {
   setApiKey,
   testConnection,
 } from "@/lib/ipc";
-import { canSuppressThinking, modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
+import {
+  canSuppressThinking,
+  canWebSearch,
+  modelOptions,
+  thinkingWarning,
+  unknownModelHint,
+  webSearchState,
+} from "@/lib/models";
 import {
   actionsByProvider,
   actionsUsing,
@@ -67,10 +74,22 @@ import {
   relaysThrough,
 } from "@/lib/providers";
 import { toasts } from "@/lib/toast";
-import type { Provider } from "@/lib/types";
+import type { Provider, Search } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
 import { actionStore } from "../actions";
 import { settings } from "../store";
+
+/** The arms a hand-made row may be given, in the order offered. `none` last,
+ *  because it is the answer for most endpoints and the one a row already has.
+ *
+ *  Mirrors `config::Search`, and the ordering is what makes it a list rather
+ *  than a plain array of the union: the `Record` makes `tsc` name any arm added
+ *  to `Search` that nobody placed here, so a new dialect cannot ship unselectable
+ *  (ADR-0026). */
+const SEARCH_ORDER: Record<Search, number> = { xai: 0, dashscope: 1, openrouter: 2, none: 3 };
+const SEARCH_WIRES = (Object.keys(SEARCH_ORDER) as Search[]).sort(
+  (a, b) => SEARCH_ORDER[a] - SEARCH_ORDER[b],
+);
 
 export function Connection() {
   const store = useStore(settings);
@@ -384,6 +403,15 @@ function EndpointScreen({ provider }: { provider: Provider }) {
       ]
     : null;
   const thinkingHint = thinkingWarning(provider, provider.model, provider.thinking, catalog, t);
+  // The row's default, read against the row's own model (ADR-0027). What an
+  // Action pointed at another model does is that Action's editor.
+  const { warning: searchHint, offOnly: searchOffOnly } = webSearchState(
+    provider,
+    provider.model,
+    provider.web_search,
+    catalog,
+    t,
+  );
   const relay = relaysThrough(provider);
   const listNotice =
     !catalog || catalog.source === "live" || !catalog.fallback
@@ -760,6 +788,27 @@ function EndpointScreen({ provider }: { provider: Provider }) {
           )}
         </Field>
 
+        <Field
+          label={t.controls.model.webSearch}
+          warning={searchHint}
+          hint={
+            canWebSearch(provider)
+              ? t.settings.connection.webSearchHint(label)
+              : t.settings.connection.webSearchHintNone(label)
+          }
+        >
+          {({ id, describedBy }) => (
+            <OnOffSwitch
+              id={id}
+              describedBy={describedBy}
+              label={t.controls.model.webSearch}
+              disabled={searchOffOnly}
+              checked={provider.web_search}
+              onChange={(web_search) => edit({ web_search }, true)}
+            />
+          )}
+        </Field>
+
         {/* Read, not chosen. A wrong dialect is a 400 on every turn and it is
             the one field on this row nobody can look up — so Test connection
             asks the endpoint and writes the answer here, and what is left is a
@@ -774,6 +823,37 @@ function EndpointScreen({ provider }: { provider: Provider }) {
               <span className="text-muted-foreground text-note">
                 {t.settings.connection.reasoningName[provider.reasoning]}
               </span>
+            )}
+          </Field>
+        ) : null}
+
+        {/* Chosen, where the field above is read. Nothing probes a search
+            dialect — a probe would run a real search and be billed for it
+            (ADR-0026) — so a row nobody presets has to be asked, and the wrong
+            answer costs a 400 only on the turns that asked to search. A preset
+            row is left alone for the same reason as above: the vendor's own
+            docs already answered. */}
+        {handMade ? (
+          <Field
+            label={t.settings.connection.search}
+            hint={t.settings.connection.searchHint[provider.search]}
+          >
+            {({ id, describedBy }) => (
+              <Select
+                value={provider.search}
+                onValueChange={(search) => edit({ search: search as Provider["search"] }, true)}
+              >
+                <SelectTrigger id={id} aria-describedby={describedBy} className="w-fit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEARCH_WIRES.map((wire) => (
+                    <SelectItem key={wire} value={wire}>
+                      {t.settings.connection.searchName[wire]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </Field>
         ) : null}

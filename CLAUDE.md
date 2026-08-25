@@ -17,7 +17,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 25 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 27 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -170,9 +170,14 @@ Three rules the whole layer leans on:
   thing on disk that breaks them. No pane re-checks any of it. `ApiConfig::default` is therefore
   **empty** — an empty table means "the file said nothing", which is the signal to migrate.
 - **The wire dialect is a property of the endpoint, never of the model.** `Reasoning` says how an
-  endpoint is told *not* to think, and `Reasoning::guess` is the only host guess in the codebase — it
-  runs once, on a file written before the table existed. Anywhere else, the row states it and
-  `llm/request.rs` sends nothing it was not told to: an unknown field is a `400`, not a courtesy.
+  endpoint is told *not* to think, `Search` how it is *asked* to search the web (ADR-0026), and
+  `Reasoning::guess` is the only host guess in the codebase — it runs once, on a file written before
+  the table existed. Anywhere else, the row states it and `llm/request.rs` sends nothing it was not
+  told to: an unknown field is a `400`, not a courtesy. The two enums are twins with opposite
+  polarity: thinking happens unless stopped, so `Reasoning` names off-switches; searching happens only
+  when asked, so `Search` names on-switches, `None` means "cannot be asked", and off is silence
+  everywhere but xAI. Nothing detects a `Search` arm — a probe would run a real search and be billed
+  for it — so a preset states it and a hand-made row is asked.
 - **A configured model is surfaced, never rewritten**, and `get_models` gathers `configured` *per
   provider* so a model an Action pinned before its endpoint changed still appears in that endpoint's
   dropdown. Overriding an Action's provider strands its pinned model; the editor says so in red with
@@ -226,6 +231,19 @@ never translated in either direction.
   `llm/models.rs` as the single table the request layer reads for `thinking`, stands. 0003 is the
   reason the sidecar is *not* config: the user did not write it, so it is neither watched nor
   broadcast, and a fetched list on the reload path would echo back at the window that caused it.
+  ADR-0026 supersedes nothing and *reuses* two: 0021's override chain carries `web_search` with no new
+  mechanism — a fourth row that inherits from whichever provider the first one resolves to — and
+  0021's own "the dialect is the row's" is what makes `Search` a field rather than a model rule. Its
+  one narrowing is deliberate and recorded there: a host whose search is a tool call needing a second
+  round trip stays `Search::None`, because 0004's Exchange streams one request per turn.
+  ADR-0027 supersedes 0026 **in part**, and only for what a control offers: a model the vendor
+  documents as excluded from its endpoint's search field — DashScope's Max tiers — greys the switch
+  rather than taking a `true` that reaches nothing, so `Search::supports_model` answers per arm and
+  by family and each `ModelOption` carries the answer beside its `thinking` one. Every wire claim
+  0026 makes stands: `search_wire` still reads only the row, still sends the field for any model, and
+  still never fails. The "no per-model list" it argued survives as "no list of ids" — an id no arm
+  recognises is `None`, which is offered rather than greyed, because an arm that said no to what it
+  had not heard of would grey each new model on the day it shipped.
   ADR-0025 supersedes 0021 **in part** and in one direction only: its preset rule stops being "the
   request must terminate at the company whose key it carries" and becomes "a row that relays says
   so". Everything else 0021 argues is untouched — no active row, the dialect stated rather than
@@ -242,7 +260,7 @@ never translated in either direction.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **beckon** (2233 symbols, 5642 relationships, 187 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **beckon** (2293 symbols, 5794 relationships, 192 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

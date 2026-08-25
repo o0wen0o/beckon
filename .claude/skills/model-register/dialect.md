@@ -1,7 +1,10 @@
 # Adding a reasoning dialect
 
+For the web-search half of the same idea, read [search.md](search.md) instead.
+
 A `Reasoning` arm says how an endpoint is told **not** to think. Eight edits, and only the first is
-compiler-checked. Finish at *Not done until* in [SKILL.md](SKILL.md).
+compiler-checked. Take every fact from the vendor per *Checking a vendor's facts* in
+[SKILL.md](SKILL.md), and finish at *Not done until* there.
 
 1. The `Reasoning` arm in [config.rs](../../../src-tauri/src/config.rs), plus its match in
    `thinking_wire` and, if the dialect puts a new field on the wire, a `ThinkingWire` variant and its
@@ -57,10 +60,7 @@ list also narrows ADR-0021 and gets recorded (its footnote, or a new ADR).
   `none`, so a new arm is treated as throwable without an edit. Check that this is still true rather
   than assuming it.
 - `Reasoning::guess`. It runs on exactly one thing — a config file written before the provider table
-  existed (ADR-0021) — and a new dialect has no legacy files to migrate. It is one of only two host
-  matches in the codebase; `Provider::relays` is the other, and ADR-0025 states why that one may guess
-  where this one may not: a wrong dialect is a `400` on every turn, a wrong broker match is a warning
-  nobody needed.
+  existed (ADR-0021) — and a new dialect has no legacy files to migrate.
 
 A dialect only ever sent in one direction is normal — express the asymmetry in `thinking_wire`, where
 it can carry a comment, rather than in `build_body`, which stays a dumb translation of the wire

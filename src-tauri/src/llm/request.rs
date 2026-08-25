@@ -38,6 +38,20 @@
 //! error: the endpoint's own default stands, Settings says so in amber, and an
 //! Action repointed at Ollama keeps working rather than refusing to run.
 //!
+//! ## Web search (ADR-0026)
+//!
+//! The same idea with the polarity reversed. Thinking is what endpoints do
+//! unless stopped, so [`Reasoning`] names off-switches and the interesting
+//! direction is `false`; nobody searches the web unless asked, so
+//! [`Search`](crate::config::Search) names on-switches and the interesting
+//! direction is `true`. Off is silence — on every endpoint but xAI, whose
+//! `search_parameters` object documents `on` as its default and therefore has
+//! to be told `off` in as many words.
+//!
+//! Nothing here consults the model, and no arm can fail: a host serving a model
+//! that ignores its own search field costs the feature, not the turn, and a
+//! per-model list would rot in exchange for a wrong nothing.
+//!
 //! ## Temperature
 //!
 //! A per-row `Option`, absent meaning send nothing and let the endpoint decide.
@@ -55,7 +69,7 @@
 use serde_json::{json, Value};
 
 use crate::action::ModelParams;
-use crate::config::{Provider, Reasoning};
+use crate::config::{Provider, Reasoning, Search};
 
 use super::models::{self, Thinking};
 use super::Message;
@@ -102,8 +116,58 @@ pub fn build_body(
         &mut body,
         thinking_wire(provider.reasoning, &params.model, params.thinking)?,
     );
+    apply_search(&mut body, provider.search, params.web_search);
 
     Ok(body)
+}
+
+/// Write one endpoint's web-search field onto a body (ADR-0026).
+///
+/// The twin of [`apply_thinking`], and deliberately not folded into it: the two
+/// switches share no field on any endpoint, and one host takes one of them and
+/// not the other often enough that a combined mapping would be a table of holes.
+///
+/// Where thinking splits into a `ThinkingWire` first, this does not: that enum
+/// earns itself by having a second producer — [`build_dialect_probe`] must
+/// serialise exactly as a real turn does — and this half is never probed, so an
+/// arm per vendor stated twice would only be two places to forget.
+///
+/// Nothing here consults the model, unlike [`thinking_wire`]: where a host serves
+/// models that disagree about searching, the disagreement is that the field is
+/// ignored — DashScope's older tiers read `enable_search` and do nothing — which
+/// costs the feature and not the turn. A per-model list would rot for a wrong
+/// nothing (ADR-0021's footnote, ADR-0026), and since ADR-0027 the vendor's own
+/// exclusions grey the *control* rather than changing what goes out here.
+///
+/// Asking a [`Search::None`] endpoint to search is therefore not an error
+/// either. It is the same trade [`thinking_wire`] makes in the on-direction: the
+/// Action still runs, Settings says in amber that the switch reaches nothing,
+/// and an Action repointed at Ollama keeps working.
+fn apply_search(body: &mut Value, search: Search, web_search: bool) {
+    match search {
+        // The only endpoint told *not* to search: xAI documents `on` as the
+        // default of the object, so silence there is not off — which is why this
+        // arm is matched before the off-direction falls out below.
+        //
+        // `auto` rather than `on`: `on` searches every source on every turn
+        // whether the question needs one or not, which is not what a switch
+        // reading "search the web" promises to cost.
+        Search::Xai => {
+            let mode = if web_search { "auto" } else { "off" };
+            body["search_parameters"] = json!({ "mode": mode });
+        }
+        // Everywhere else the documented default is off, so omission says it.
+        _ if !web_search => {}
+        Search::Dashscope => {
+            body["enable_search"] = json!(true);
+        }
+        Search::Openrouter => {
+            body["plugins"] = json!([{ "id": "web" }]);
+        }
+        // No switch here at all: the ask reaches nothing, and that is amber in
+        // Settings rather than an error on the turn.
+        Search::None => {}
+    }
 }
 
 /// Write one dialect's thinking field onto a body.
@@ -368,6 +432,15 @@ mod tests {
             provider: "p".into(),
             model: model.to_string(),
             thinking,
+            web_search: false,
+        }
+    }
+
+    /// The same, with the web-search switch thrown (ADR-0026).
+    fn searching(model: &str) -> ModelParams {
+        ModelParams {
+            web_search: true,
+            ..params(model, false)
         }
     }
 
@@ -735,6 +808,80 @@ mod tests {
                 assert!(build_body(&row, &params(model, false), &[Message::user(content)]).is_ok());
             }
         }
+    }
+
+    /// A row that can search, asked to (ADR-0026). One field, on the same body,
+    /// in the shape that endpoint documents — and nothing about thinking, which
+    /// this row does not speak.
+    #[test]
+    fn a_searching_row_sends_its_endpoints_own_field() {
+        let dashscope = Provider {
+            search: Search::Dashscope,
+            ..provider(Reasoning::None, None)
+        };
+        let body = build_body(
+            &dashscope,
+            &searching("qwen3.7-plus"),
+            &[Message::user("hi")],
+        )
+        .unwrap();
+        assert_eq!(body["enable_search"], json!(true));
+
+        let openrouter = Provider {
+            search: Search::Openrouter,
+            ..provider(Reasoning::None, None)
+        };
+        let body = build_body(
+            &openrouter,
+            &searching("openai/gpt-5.6"),
+            &[Message::user("hi")],
+        )
+        .unwrap();
+        assert_eq!(body["plugins"], json!([{ "id": "web" }]));
+    }
+
+    /// The default is off, and off is *silence* on every endpoint but one: a
+    /// body that says nothing about searching is the one a user who never asked
+    /// for the feature pays nothing for.
+    #[test]
+    fn a_row_that_can_search_says_nothing_until_asked() {
+        for search in [Search::Dashscope, Search::Openrouter, Search::None] {
+            let row = Provider {
+                search,
+                ..provider(Reasoning::None, None)
+            };
+            let body = build_body(&row, &params("m", false), &[Message::user("hi")]).unwrap();
+            assert!(body.get("enable_search").is_none());
+            assert!(body.get("plugins").is_none());
+            assert!(body.get("search_parameters").is_none());
+        }
+    }
+
+    /// xAI is the exception, and the reason [`apply_search`] matches its arm
+    /// ahead of the off-direction: their object defaults to `on`, so omitting it
+    /// is not "do not search" — the off-direction has to be sent, exactly as
+    /// DeepSeek's thinking switch has to be.
+    #[test]
+    fn an_xai_row_is_told_not_to_search_rather_than_left_silent() {
+        let xai = Provider {
+            search: Search::Xai,
+            ..provider(Reasoning::None, None)
+        };
+        let off = build_body(&xai, &params("grok-4.6", false), &[Message::user("hi")]).unwrap();
+        assert_eq!(off["search_parameters"], json!({ "mode": "off" }));
+
+        let on = build_body(&xai, &searching("grok-4.6"), &[Message::user("hi")]).unwrap();
+        assert_eq!(on["search_parameters"], json!({ "mode": "auto" }));
+    }
+
+    /// Asking an endpoint with no switch to search is amber, never an error: the
+    /// turn runs, and nothing unrecognised reaches a strict endpoint. The mirror
+    /// of `thinking_that_cannot_be_expressed_is_omitted_rather_than_refused`.
+    #[test]
+    fn search_that_cannot_be_expressed_is_omitted_rather_than_refused() {
+        let plain = provider(Reasoning::None, None);
+        let body = build_body(&plain, &searching("llama3"), &[Message::user("hi")]).unwrap();
+        assert_eq!(body.as_object().unwrap().len(), 3);
     }
 
     #[test]

@@ -162,7 +162,8 @@ export function relaysThrough(provider: Provider): string | null {
 }
 
 /**
- * A blank row: no reasoning wire, no key, which is a working local endpoint.
+ * A blank row: no reasoning wire, no search wire, no key, which is a working
+ * local endpoint.
  *
  * The label is the host rather than "Endpoint 3", so the one field a user must
  * fill in also names the row and there is no second blank to notice. It is
@@ -181,5 +182,7 @@ export function blankProvider(existing: Provider[]): Provider {
     model: "",
     thinking: false,
     reasoning: "none",
+    web_search: false,
+    search: "none",
   };
 }

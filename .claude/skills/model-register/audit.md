@@ -21,13 +21,22 @@ report of a preset that `400`s.
 3. Re-read each row's `reasoning` against what the vendor now documents. This check finds the most: a
    vendor adding an off-switch makes a previously correct `None` wrong and no gate can see it. Each
    arm's comment states why it was chosen — if that sentence is no longer true, neither is the arm.
-   Then re-read any **per-model list an arm consults** — today `CATALOG` for the DeepSeek arm,
-   `EFFORT_NONE_FAMILIES` for the OpenAI one, `ALWAYS_THINKING_MINIMAX` for the MiniMax one. Read each
-   with its polarity in hand, because they fail from opposite directions to the same place: a family
-   missing from the **allow**-list `EFFORT_NONE_FAMILIES` silently drops suppression, while a family
-   missing from the **deny**-list `ALWAYS_THINKING_MINIMAX` is sent `disabled` by a host that accepts
-   it and thinks anyway. Neither is a `400`; both are invisible latency on every turn.
-4. Bump the checked date in every doc comment carrying one — today `CATALOG`, `presets()`,
+   Then re-read every **per-model list an arm consults** — today `CATALOG` for the DeepSeek arm,
+   `EFFORT_NONE_FAMILIES` for the OpenAI one, `ALWAYS_THINKING_MINIMAX` for the MiniMax one — each
+   with its polarity in hand, the allow-list and the deny-list failing from opposite directions to the
+   same invisible latency on every turn.
+4. Re-read each row's `search` the same way, and ask the one question that has no gate: **does this
+   endpoint document a one-field web search on `/chat/completions` today?** The polarity is the
+   opposite of `reasoning`'s, so the drift is too — a vendor *adding* a search field leaves a correct
+   `None` merely stale, costing the feature, while a vendor changing a field's name or its required
+   values turns a working arm into a `400` on every searching turn. Both survive the gates; only the
+   second is loud, and only for the users who turned it on. Read any `TODO(register)` about a search
+   field while you are there — one is open on `zhipu` (see [search.md](search.md)).
+5. Re-read `Search::supports_model` against the same pages: which tiers the vendor documents the field
+   for, and which it excludes (ADR-0027). A family name that aged out fails silently *and* visibly —
+   the switch is greyed and Settings tells the user their model cannot search, on Beckon's word
+   rather than the vendor's — so a stale `Some(false)` is the worse half of this row to leave.
+6. Bump the checked date in every doc comment carrying one — today `CATALOG`, `presets()`,
    `EFFORT_NONE_FAMILIES` and `ALWAYS_THINKING_MINIMAX` — whatever you changed.
 
 **Not done until** the audit has written **one line per row, carrying that row's verdict**, into a

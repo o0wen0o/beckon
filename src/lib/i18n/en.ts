@@ -84,6 +84,9 @@ export const EN = {
   popover: {
     close: "Close",
     thinking: "thinking",
+    /** Beside it, and the same kind of thing: a capability this turn is using,
+     *  and the one that is billed per request (ADR-0026). */
+    webSearch: "web search",
     nothingToShow: "Nothing to show.",
     /** `{name}` is the Action, set bold by the caller. */
     typeYourInput: "Type what you want to send to {name}.",
@@ -298,6 +301,30 @@ export const EN = {
         `Off is sent to ${label} explicitly, because its models reason unless told not to.`,
       thinkingHintNone: (label: string) =>
         `${label} has no switch Beckon knows how to throw, so nothing is sent either way.`,
+
+      /** The web-search wire (ADR-0026). Unlike `reasoning`, this one is *asked*
+       *  rather than stated: nothing detects it, because a probe would run a
+       *  real search and be billed for it. A preset already carries the answer,
+       *  so only a hand-made row is asked. */
+      search: "Web search field",
+      searchName: {
+        xai: "xAI",
+        dashscope: "DashScope",
+        openrouter: "OpenRouter",
+        none: "None",
+      },
+      searchHint: {
+        xai: 'Sends search_parameters:{mode:"auto"|"off"}. xAI searches unless told not to, so off is sent explicitly.',
+        dashscope:
+          "Sends enable_search:true. Alibaba DashScope's compatible mode, on its Qwen Plus and Flash tiers — the Max tiers search through an API Beckon does not post to.",
+        openrouter:
+          'Sends plugins:[{id:"web"}]. OpenRouter runs the search itself and bills per request on top of the tokens.',
+        none: "Nothing sent, so an Action asking to search gets a turn without one. Right for every endpoint with no such field — including those whose search is a tool that takes a second round trip.",
+      },
+      webSearchHint: (label: string) =>
+        `Costs money and seconds per turn at ${label}. Off unless an Action asks.`,
+      webSearchHintNone: (label: string) =>
+        `${label} has no web search field Beckon can send, so this reaches nothing.`,
       thisEndpoint: "This endpoint",
     },
 
@@ -406,6 +433,8 @@ export const EN = {
       sends: "What this Action sends",
       thinkingHint:
         "Adds seconds before the first word. Worth it where the Action needs the model to reason, not where it reformats.",
+      webSearchHint:
+        "Lets the endpoint read the live web before answering. Costs money and seconds per turn, so it is off unless this Action asks for it.",
 
       thisFile: "This file",
       deleteLabel: "Delete this Action",
@@ -461,6 +490,19 @@ export const EN = {
        *  for it, so its own default stands (ADR-0021). */
       noThinkingSwitch: (label: string) =>
         `${label} has no thinking switch Beckon can throw; its own default stands.`,
+      /** The second switch a turn carries (ADR-0026). Named for what it does to
+       *  the answer, not for the field it becomes on any one endpoint. */
+      webSearch: "Search the web",
+      /** The one thing that can go wrong with it, and it is amber: the Action
+       *  still runs, the endpoint just never hears the question. */
+      noSearchSwitch: (label: string) =>
+        `${label} has no web search Beckon can ask for on this endpoint; the turn runs without it.`,
+      /** The model's own answer rather than the endpoint's, and the one that
+       *  greys the switch: the vendor says this model does not take the field
+       *  (ADR-0027). Amber and not an error — an Action file that already says
+       *  so still runs, without a search. */
+      modelCannotSearch: (model: string) =>
+        `${model} does not take this endpoint's web search; pick another model or leave it off.`,
     },
     field: {
       /** The revert control on an overridden row, which names what it reverts to. */

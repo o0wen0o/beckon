@@ -14,10 +14,20 @@ interface OnOffSwitchProps {
   label: string;
   id?: string;
   describedBy?: string;
+  /** Set where throwing it on could not work — never where it traps a value
+   *  the user already has (ADR-0027). */
+  disabled?: boolean;
   onChange: (on: boolean) => void;
 }
 
-export function OnOffSwitch({ checked, label, id, describedBy, onChange }: OnOffSwitchProps) {
+export function OnOffSwitch({
+  checked,
+  label,
+  id,
+  describedBy,
+  disabled,
+  onChange,
+}: OnOffSwitchProps) {
   const t = useT();
 
   return (
@@ -26,6 +36,7 @@ export function OnOffSwitch({ checked, label, id, describedBy, onChange }: OnOff
         id={id}
         aria-describedby={describedBy}
         aria-label={label}
+        disabled={disabled}
         checked={checked}
         onCheckedChange={onChange}
       />

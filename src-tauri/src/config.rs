@@ -196,6 +196,109 @@ impl Reasoning {
     }
 }
 
+/// How an endpoint is asked to **search the web** (ADR-0026).
+///
+/// The same shape as [`Reasoning`] and for the same reason: a property of the
+/// *endpoint*, never of the model. What differs is the direction. Thinking is
+/// something endpoints do unless stopped, so `Reasoning` names off-switches;
+/// searching is something no endpoint does unless asked, so these name
+/// on-switches — and [`Search::None`], the default, is every endpoint with no
+/// switch Beckon can throw on a `/chat/completions` request.
+///
+/// The named arms are exactly the endpoints whose search is **one field and one
+/// round trip**. A built-in tool the client has to answer — Moonshot's
+/// `$web_search`, which replies with a `tool_calls` frame the caller must echo
+/// back — is a second turn, and `exchange/turn.rs` streams one; those hosts stay
+/// `None` until that is a feature rather than a field (ADR-0026).
+///
+/// Nothing detects these. `llm/detect.rs` probes a thinking dialect with a
+/// one-token request; a search probe would run a real search and bill for it, so
+/// a hand-made row states its arm and a preset states it for the user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Search {
+    /// `search_parameters: {"mode": "auto"|"off"}` — xAI's own API, on
+    /// `/chat/completions` (checked 2026-08-25).
+    ///
+    /// The one arm that sends the **off** direction too: xAI documents `on` as
+    /// the default for the object, and `auto` rather than `on` for the enabled
+    /// direction because `on` searches every source on every turn whether the
+    /// question needs it or not. Sending `off` explicitly is the same insurance
+    /// `Reasoning::Deepseek` buys against a vendor default nobody chose.
+    Xai,
+    /// `enable_search: true` — Alibaba DashScope's compatible mode (checked
+    /// 2026-08-25). Documented on this endpoint for the Qwen3.5-and-later Plus
+    /// and Flash tiers and the `qwen-plus` alias; the Max tiers take web search
+    /// through their Responses API instead, and a model this endpoint does not
+    /// list is simply not documented as searching.
+    ///
+    /// The compatible mode does not return the search sources — that is
+    /// DashScope's native protocol only — so the answer cites what it read and
+    /// Beckon has nothing further to render.
+    Dashscope,
+    /// `plugins: [{"id": "web"}]` — OpenRouter, which runs the search itself and
+    /// folds the results into the same completion (checked 2026-08-25). A
+    /// broker, so this is a search *about* the request rather than by the model
+    /// behind it, and it is billed per request on top of the tokens (ADR-0025,
+    /// ADR-0026).
+    Openrouter,
+    /// Nothing on the wire either way. This endpoint has no one-field switch, so
+    /// `web_search = true` reaches it as nothing and its own behaviour stands.
+    #[default]
+    None,
+}
+
+impl Search {
+    /// Whether this endpoint's search field reaches a given model (ADR-0027).
+    ///
+    /// `None` is "the vendor documents neither", and the switch stays offered on
+    /// it: an arm that answered `false` for every id it had not heard of would
+    /// grey out each new model the day it shipped. `Some(false)` is the vendor's
+    /// own word that this model does not take the field — the reason ADR-0027
+    /// exists, and the only thing that disables a switch.
+    ///
+    /// Families rather than ids, deliberately. A list of exact model names is
+    /// the thing ADR-0026 refused to keep, and the vendor documents these by
+    /// tier; matching the tier ages at the speed the tier does.
+    pub fn supports_model(self, model: &str) -> Option<bool> {
+        let id = model.trim();
+        if id.is_empty() {
+            return None;
+        }
+        match self {
+            // The field is the endpoint's own and every model behind it reads
+            // it: xAI runs Live Search before the model sees the turn, and
+            // OpenRouter is a broker running the search itself (ADR-0025).
+            Search::Xai | Search::Openrouter => Some(true),
+            // The one host with a documented split. Web search on the
+            // OpenAI-compatible endpoint is the Qwen Plus and Flash tiers; the
+            // Max tiers take it through a Responses API Beckon does not post to
+            // (checked 2026-08-25). The only arm that reads the id, which is
+            // why it is also the only one that pays for lowercasing it — a list
+            // of a hundred ids is built one option at a time.
+            Search::Dashscope => {
+                let id = id.to_ascii_lowercase();
+                // Both tiers under the same `qwen` guard. DashScope's
+                // compatible endpoint serves other vendors' models too, and a
+                // bare `contains("max")` would grey one of those on a claim
+                // Alibaba never made about it.
+                if !id.starts_with("qwen") {
+                    None
+                } else if id.contains("max") {
+                    Some(false)
+                } else if id.contains("plus") || id.contains("flash") {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            // Not a fact about the model: there is no field here for any of
+            // them, which is what `Provider::search` already says.
+            Search::None => Some(false),
+        }
+    }
+}
+
 /// One endpoint the user keeps: where requests go, what they carry, and which
 /// credential account they are signed with (ADR-0021).
 ///
@@ -228,6 +331,11 @@ pub struct Provider {
     /// honoured at all is a fact about the endpoint. Actions still override it.
     pub thinking: bool,
     pub reasoning: Reasoning,
+    /// What this row inherits to an Action that says nothing about searching
+    /// (ADR-0026). `false` on every preset, because a search costs money and
+    /// seconds on top of the turn and nobody asked for it by installing Beckon.
+    pub web_search: bool,
+    pub search: Search,
     /// Omitted means send no `temperature` and let the endpoint decide — which
     /// is the only honest answer for an endpoint we know nothing about.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -250,6 +358,11 @@ impl Provider {
             // translation-shaped Actions — hence `false`, sent explicitly.
             thinking: false,
             reasoning: Reasoning::Deepseek,
+            // DeepSeek documents no search field on `/chat/completions`: the
+            // web search their own products do rides their Anthropic-compatible
+            // endpoint, which is a different protocol (checked 2026-08-25).
+            web_search: false,
+            search: Search::None,
             temperature: Some(DEEPSEEK_TEMPERATURE),
             key_page: Some(DEFAULT_KEY_PAGE.to_string()),
         }
@@ -477,6 +590,9 @@ pub fn presets() -> Vec<Provider> {
         model: String::new(),
         thinking: false,
         reasoning: Reasoning::None,
+        // Off on every row, arm named per row below (ADR-0026).
+        web_search: false,
+        search: Search::None,
         temperature: None,
         key_page: (!key_page.is_empty()).then(|| key_page.to_string()),
     };
@@ -489,6 +605,12 @@ pub fn presets() -> Vec<Provider> {
         // says so — and `EFFORT_NONE_FAMILIES` in `llm/request.rs` is why it is
         // sent only for the families that document it, since this one host also
         // serves models the field is a 400 on.
+        // `search` stays `None` on their own word: OpenAI documents web search
+        // on `/chat/completions` for the search-specialised models only, and
+        // those search on every turn with no field to ask them to — the switch
+        // is the model id, which is a choice the model dropdown already offers.
+        // Their general models take web search through the Responses API, which
+        // is not the endpoint Beckon posts to (checked 2026-08-25).
         Provider {
             reasoning: Reasoning::OpenAi,
             ..row(
@@ -500,7 +622,20 @@ pub fn presets() -> Vec<Provider> {
         },
         // Their docs now brand the company SpaceXAI while every host stays on
         // `x.ai`; the label follows the hosts until the rename settles.
-        row("xai", "xAI", "https://api.x.ai/v1", "https://console.x.ai"),
+        Provider {
+            // Live Search is a request field here rather than a tool, and it is
+            // on the chat endpoint's own schema — the Responses API their docs
+            // now lead with is where the *tool* form lives, and Beckon posts to
+            // neither of those (checked 2026-08-25).
+            search: Search::Xai,
+            ..row("xai", "xAI", "https://api.x.ai/v1", "https://console.x.ai")
+        },
+        // `search` is `None` for a reason that is not "they have none": Kimi's
+        // `$web_search` is declared as a `builtin_function` tool and answered
+        // with a `tool_calls` frame the caller has to echo back before the
+        // answer arrives. That is two round trips, and `exchange/turn.rs`
+        // streams one (ADR-0026, checked 2026-08-25).
+        //
         // Mainland China's host. `api.moonshot.ai` is the international one —
         // same API, different account, so it is an edit to `base_url` rather
         // than a second row. The key page moved: `platform.moonshot.cn` `301`s
@@ -517,6 +652,17 @@ pub fn presets() -> Vec<Provider> {
         // `/api/paas/v4/v1/chat/completions`. `thinking` is documented as opt-in
         // and nothing documents turning it off, so the row says nothing. The key
         // page moved to `bigmodel.cn/usercenter/proj-mgmt/apikeys`.
+        //
+        // TODO(register): Zhipu runs a server-side `web_search` tool in one
+        // round trip, which is the shape this row could carry — but its
+        // `search_engine` field is required and the two houses of their docs
+        // name disjoint values for it: the mainland reference lists `search_std`,
+        // `search_pro`, `search_pro_sogou` and `search_pro_quark`, while z.ai
+        // documents `search_pro_jina` as the only supported one. A wrong engine
+        // id is a 400 on every searching turn, and this row's `base_url` is the
+        // mainland host while a user may edit it to z.ai — so settle it against
+        // a real key on whichever host before adding a `Search::Zhipu` arm
+        // (re-checked 2026-08-25).
         row(
             "zhipu",
             "Zhipu (GLM)",
@@ -531,6 +677,12 @@ pub fn presets() -> Vec<Provider> {
         // off-switch to express for anything a user would pick. If Google ever
         // documents `none` for a shipping tier, that is one family added to
         // `EFFORT_NONE_FAMILIES`, not a new arm.
+        //
+        // `search` is `None` for the same kind of reason: Grounding with Google
+        // Search is reachable through this layer, but their compatibility page
+        // documents it under image generation rather than chat completions, and
+        // a parameter the layer does not list is silently ignored — so a switch
+        // here would claim a search that may never run (checked 2026-08-25).
         row(
             "gemini",
             "Google Gemini",
@@ -543,6 +695,14 @@ pub fn presets() -> Vec<Provider> {
             // `dashscope-intl.aliyuncs.com` is the international host, again an
             // edit to `base_url` rather than a row of its own.
             reasoning: Reasoning::Qwen,
+            // And the one hosted endpoint whose web search is a single boolean
+            // on the same body — a top-level field on the wire, whatever the
+            // Python SDK's `extra_body` makes it look like. Documented here for
+            // the Qwen3.5-and-later Plus and Flash tiers and `qwen-plus`; the
+            // Max tiers search through their Responses API, which Beckon does
+            // not post to, so the field reaches those as nothing rather than as
+            // a search (checked 2026-08-25).
+            search: Search::Dashscope,
             ..row(
                 "dashscope",
                 "Alibaba DashScope",
@@ -553,7 +713,9 @@ pub fn presets() -> Vec<Provider> {
         // Anthropic's OpenAI compatibility layer. `reasoning` is `None` on their
         // own word: the compatibility table lists `reasoning_effort` as
         // *Ignored*, so there is no off-switch to express and sending one would
-        // claim something untrue.
+        // claim something untrue. `search` is `None` for the neighbouring
+        // reason: their web search is a server tool of the Messages API, and
+        // this layer carries no field for it (checked 2026-08-25).
         //
         // The row that used to be impossible. Its `/v1/models` is native, not
         // compatible, and reads an `Authorization: Bearer` as an OAuth token —
@@ -568,6 +730,10 @@ pub fn presets() -> Vec<Provider> {
             "https://platform.claude.com/settings/keys",
         ),
         Provider {
+            // No `search` arm: MiniMax's chat completions take user-defined
+            // function tools and no built-in search of their own, so there is
+            // nothing to switch on (checked 2026-08-25).
+            //
             // `api.minimaxi.com` is the mainland host — same API, different
             // account, so it is an edit to `base_url` rather than a second row.
             reasoning: Reasoning::Minimax,
@@ -582,6 +748,12 @@ pub fn presets() -> Vec<Provider> {
             // A broker, admitted knowingly (ADR-0025). `Provider::relays` is
             // what makes the row say so; nothing here has to.
             reasoning: Reasoning::Openrouter,
+            // The web plugin, which OpenRouter runs itself and folds into the
+            // same completion. Their server-tool form is the newer one and lets
+            // the model decide when to search; it is a tool the caller declares
+            // and is not needed for a switch that means "search this turn"
+            // (checked 2026-08-25).
+            search: Search::Openrouter,
             ..row(
                 "openrouter",
                 "OpenRouter",
@@ -1023,6 +1195,54 @@ mod tests {
         assert!(config.provider(Some("nope")).is_none());
     }
 
+    /// Every preset ships with searching off (ADR-0026). A row whose arm can
+    /// reach the wire is exactly a row that would start billing per request the
+    /// moment a user chose it, so the arm is the capability and this is the
+    /// consent.
+    #[test]
+    fn no_preset_searches_until_it_is_asked_to() {
+        for row in presets() {
+            assert!(!row.web_search, "{} ships searching", row.id);
+        }
+    }
+
+    /// The model gate is the vendor's word or silence, never a guess (ADR-0027).
+    #[test]
+    fn a_model_the_arm_has_not_heard_of_is_not_ruled_out() {
+        // The whole endpoint reads the field, so every model behind it does.
+        assert_eq!(Search::Xai.supports_model("grok-4.5"), Some(true));
+        assert_eq!(
+            Search::Openrouter.supports_model("anything/at-all"),
+            Some(true)
+        );
+
+        // The one documented split: Plus and Flash take the field, Max does not.
+        assert_eq!(Search::Dashscope.supports_model("qwen-plus"), Some(true));
+        assert_eq!(
+            Search::Dashscope.supports_model("qwen3.5-flash"),
+            Some(true)
+        );
+        assert_eq!(
+            Search::Dashscope.supports_model("qwen-flash-character"),
+            Some(true)
+        );
+        assert_eq!(Search::Dashscope.supports_model("qwen3.7-max"), Some(false));
+        // Something else behind the same host: not documented either way, so
+        // the switch stays offered rather than greyed on a guess.
+        assert_eq!(Search::Dashscope.supports_model("deepseek-r1"), None);
+        assert_eq!(Search::Dashscope.supports_model(""), None);
+        // The Max tier is Alibaba's, so the exclusion is too: another vendor's
+        // model that happens to carry the word is not something they ruled out.
+        assert_eq!(Search::Dashscope.supports_model("minimax-m2"), None);
+
+        // Not a fact about the model — the row already says the endpoint has
+        // no field at all.
+        assert_eq!(
+            Search::None.supports_model("deepseek-v4-flash"),
+            Some(false)
+        );
+    }
+
     #[test]
     fn a_provider_table_survives_a_toml_round_trip() {
         let mut config = Config::default();
@@ -1033,6 +1253,8 @@ mod tests {
             model: "qwen3:8b".into(),
             thinking: true,
             reasoning: Reasoning::Qwen,
+            web_search: true,
+            search: Search::Dashscope,
             temperature: None,
             key_page: None,
         });

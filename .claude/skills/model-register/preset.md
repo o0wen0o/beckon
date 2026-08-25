@@ -40,10 +40,15 @@ and write the comment naming which switch and why, as the departing rows do. "Of
 that still reasons is not one, and claiming it would send a value meaning something the user did not
 ask for. A dialect the register has no arm for is [dialect.md](dialect.md).
 
-Do not expect Test connection to settle it. That button reports a detected dialect, but
+`search` defaults to `None` in the `row` helper too, and the bar for departing from it — one field on
+the same body, one round trip, the endpoint runs the search, and `web_search` still `false` — is in
+[search.md](search.md).
+
+Do not expect Test connection to settle either field. It reports a detected dialect, but
 `detect::reasoning` returns early on `is_preset`: detection is strictly the weaker source and could
 only ever talk the register out of something read off the vendor's own docs. It answers for a row a
-user typed; it never audits this table.
+user typed; it never audits this table. For `search` it says nothing at all — nothing probes for one,
+so the vendor's docs are the only source there is.
 
 ## Before the row ships
 

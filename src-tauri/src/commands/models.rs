@@ -144,7 +144,10 @@ pub async fn get_models(app: AppHandle, provider_id: String, live: bool) -> Mode
         // the best thing that can be vouched for, and `fallback` above still
         // carries why it is not a fresh one.
         let ids = cache.get(&provider_id, &models_url);
-        (models::options(ids, &configured, language), ids.is_some())
+        (
+            models::options(ids, &configured, language, provider.search),
+            ids.is_some(),
+        )
     };
 
     ModelCatalog {

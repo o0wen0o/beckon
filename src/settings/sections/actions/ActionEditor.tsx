@@ -31,7 +31,13 @@ import { OnOffSwitch } from "@/components/OnOffSwitch";
 import { Segmented } from "@/components/Segmented";
 import { useT } from "@/lib/i18n";
 import { SOURCES as SOURCE_ORDER, sourceLabel } from "@/lib/inputSource";
-import { modelOptions, thinkingWarning, unknownModelHint } from "@/lib/models";
+import {
+  canWebSearch,
+  modelOptions,
+  thinkingWarning,
+  unknownModelHint,
+  webSearchState,
+} from "@/lib/models";
 import { chatUrl, isLocal, keyProblem, strandedModel } from "@/lib/providers";
 import type { Action } from "@/lib/types";
 import { useStore } from "@/lib/useStore";
@@ -112,6 +118,19 @@ export function ActionEditor({ action }: ActionEditorProps) {
     modelOverrideOptions.find((option) => option.id === effectiveModel)?.description ?? "";
   const effectiveThinking = draft.model.thinking ?? provider?.thinking ?? false;
   const thinkingHint = thinkingWarning(provider, effectiveModel, effectiveThinking, catalog, t);
+  // The same shape one row down (ADR-0026), and since ADR-0027 it reads the
+  // model too: an endpoint with no search field, or a model the vendor says
+  // does not take that field, greys the switch instead of accepting a `true`
+  // that reaches nothing. Both stay amber rather than errors — a search that
+  // cannot be expressed costs the feature, not the turn.
+  const effectiveWebSearch = draft.model.web_search ?? provider?.web_search ?? false;
+  const { warning: webSearchHint, offOnly: webSearchOffOnly } = webSearchState(
+    provider,
+    effectiveModel,
+    effectiveWebSearch,
+    catalog,
+    t,
+  );
   /**
    * A model this Action pinned that its own endpoint does not serve — the case
    * that appears the moment you override the row above while a model is pinned.
@@ -303,6 +322,28 @@ export function ActionEditor({ action }: ActionEditorProps) {
             />
           )}
         </Field>
+
+        <Field
+          label={t.controls.model.webSearch}
+          warning={webSearchHint}
+          hint={t.settings.actions.webSearchHint}
+          override={{
+            overridden: draft.model.web_search !== null,
+            defaultReading: provider?.web_search ? t.controls.field.on : t.controls.field.off,
+            onRevert: () => store.editDraft((next) => (next.model.web_search = null), true),
+          }}
+        >
+          {({ id, describedBy }) => (
+            <OnOffSwitch
+              id={id}
+              describedBy={describedBy}
+              label={t.controls.model.webSearch}
+              disabled={webSearchOffOnly}
+              checked={effectiveWebSearch}
+              onChange={(value) => store.editDraft((next) => (next.model.web_search = value), true)}
+            />
+          )}
+        </Field>
       </FieldGroup>
 
       {/* What a turn would actually carry, in one place. With an endpoint per
@@ -315,6 +356,16 @@ export function ActionEditor({ action }: ActionEditorProps) {
             <span className="text-foreground [overflow-wrap:anywhere]">{chatUrl(provider)}</span>
             <span>model</span>
             <span className="text-foreground">{effectiveModel || "—"}</span>
+            {/* Only when it is on, and only where it reaches a field: a row
+                reading "web search off" on every Action is noise, and one
+                reading "on" at an endpoint that has none would be a lie
+                (ADR-0026). */}
+            {effectiveWebSearch && canWebSearch(provider) ? (
+              <>
+                <span>search</span>
+                <span className="text-foreground">{t.controls.field.on}</span>
+              </>
+            ) : null}
           </div>
         </FieldGroup>
       ) : null}

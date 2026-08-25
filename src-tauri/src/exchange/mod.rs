@@ -141,6 +141,7 @@ mod tests {
             provider: "deepseek".into(),
             model: "deepseek-v4-flash".into(),
             thinking: false,
+            web_search: false,
         }
     }
 

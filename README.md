@@ -53,6 +53,13 @@ from the Launcher, or bind it to its own hotkey and skip the Launcher entirely.
 - **Screenshot** — the button in the Popover runs your OS snip tool and attaches the result, up to
   four per turn. It is attached, then sent — never captured-and-sent. Whether the model reads
   images is between you and your endpoint.
+- **Web search** — off, per Action, until you turn it on. An answer otherwise comes out of what the
+  model was trained on, which is right for a translation and wrong for "what changed in this API".
+  It reaches the wire only where the endpoint takes a search field: xAI, Alibaba DashScope and
+  OpenRouter today, and Settings says so in amber where it does not. Where the vendor documents a
+  model as excluded from its own search field — DashScope's Max tiers — the switch is greyed out
+  rather than left to do nothing. A search is billed by your endpoint per request, on top of the
+  tokens.
 
 Beckon is one process. Launching it again while it is already resident opens Settings instead of
 starting a second copy. On macOS it lives in the menu bar with no Dock tile, so there is nothing to
@@ -119,6 +126,14 @@ reasoning = "deepseek"          # deepseek | qwen | openai | minimax |
                                 # the model; prefilled by its preset, and on a
                                 # row you made yourself, worked out by Test
                                 # connection rather than asked for.
+web_search = false              # what an Action that says nothing inherits.
+                                # Off on every endpoint Beckon ships: a search
+                                # is billed per request on top of the tokens
+search = "none"                 # xai | dashscope | openrouter | none — how this
+                                # endpoint is *asked* to search the web. Also a
+                                # property of the endpoint; `none` is most of
+                                # them, and an Action asking one of those to
+                                # search gets a turn without a search
 temperature = 1.3               # optional; omitted means let the endpoint decide
 key_page = "https://platform.deepseek.com/api_keys"
 
@@ -157,13 +172,15 @@ Translate only anything after "Input:".
 user = "Input: {{input}}"        # may be omitted; it defaults to "{{input}}"
 
 # [model] may be omitted entirely. Each key absent means "inherit":
-#   provider  the [defaults] provider row
-#   model     that row's model
-#   thinking  that row's thinking
-# Overriding `provider` therefore moves what the other two inherit.
+#   provider    the [defaults] provider row
+#   model       that row's model
+#   thinking    that row's thinking
+#   web_search  that row's web_search
+# Overriding `provider` therefore moves what the other three inherit.
 [model]
 provider = "ollama"
 thinking = true
+web_search = false              # off unless this Action needs the live web
 ```
 
 ## Updates
@@ -185,6 +202,8 @@ Exchange is never on disk to come back to.
 | Replacing the selected text in place | [ADR-0002](./docs/adr/0002-selection-via-simulated-ctrl-c.md) |
 | A floating icon after you select text | Needs global selection polling — power-hungry, easy to misfire, and it fights the copy-shortcut grab |
 | Token usage display | A flash translation costs a fraction of a cent; the number changes nothing |
+| Web search where the endpoint makes it a tool call | Kimi's `$web_search` and its kind need a second round trip to answer; a turn here is one request ([ADR-0026](./docs/adr/0026-web-search-is-a-per-action-switch-the-row-can-express.md)) |
+| Citing the pages a search read | The endpoints Beckon can ask fold the results into the answer; the sources some of them stream alongside are not rendered yet |
 | Linux | The stubs in `platform/fallback.rs` keep the crate compiling, and are not a promise |
 | Code signing and notarization | Not set up on either platform ([ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md)) |
 

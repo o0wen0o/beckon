@@ -23,6 +23,14 @@ Rust enum of vendors, and never an aggregator standing in for one.
 _Avoid_: active provider, current provider, backend, vendor, API (the API is the protocol, a Provider
 is one host that speaks it), model (a Provider serves models; it is not one)
 
+**Web Search**:
+An Action asking its endpoint to read the live web before answering, off unless the Action says
+otherwise (ADR-0026). A switch on a turn, never a step Beckon performs: Beckon issues no search of
+its own and reads no page — it sets the field that endpoint documents, and the endpoint searches.
+Where a row has no such field, the switch reaches nothing and the pane says so.
+_Avoid_: browsing, grounding, online mode, RAG, retrieval, live search (xAI's name for their own
+field, not the name of the switch)
+
 **Selection**:
 The text the user has highlighted in a program outside Beckon, obtained by simulating Ctrl+C.
 _Avoid_: highlighted text, selected region, text grab
@@ -71,4 +79,5 @@ the same failure as a synonym in English.
 | Direct Hotkey | 专属热键 | _Avoid_: 快捷键 alone, which is any hotkey |
 | Popover | 浮窗 | _Avoid_: 弹窗, which is a dialog |
 | Exchange | 对话 | Only ever the one a Popover holds |
+| Web Search | 联网搜索 | The switch on an Action. _Avoid_: 网络搜索, 联网, 搜索 alone |
 | Provider | 端点 | The row, and what Settings calls the section. _Avoid_: 服务商 (a company, not a row — two rows can point at one company), 后端, 供应商 |

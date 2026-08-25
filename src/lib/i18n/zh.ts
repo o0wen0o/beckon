@@ -62,6 +62,7 @@ export const ZH: Strings = {
   popover: {
     close: "关闭",
     thinking: "思考",
+    webSearch: "联网搜索",
     nothingToShow: "没有可显示的内容。",
     typeYourInput: "输入要发送给 {name} 的内容。",
     waiting: "正在等待第一个 token",
@@ -215,6 +216,25 @@ export const ZH: Strings = {
       thinkingHint: (label: string) => `关闭会显式发给 ${label}，因为它的模型不特别说明就会思考。`,
       thinkingHintNone: (label: string) =>
         `${label} 没有 Beckon 会用的开关，因此两个方向都不发送任何东西。`,
+
+      search: "联网搜索字段",
+      searchName: {
+        xai: "xAI",
+        dashscope: "DashScope",
+        openrouter: "OpenRouter",
+        none: "无",
+      },
+      searchHint: {
+        xai: '发送 search_parameters:{mode:"auto"|"off"}。xAI 不特别说明就会搜索，因此关闭要显式发送。',
+        dashscope:
+          "发送 enable_search:true。适用于阿里云 DashScope 兼容模式的 Qwen Plus 与 Flash 档位 —— Max 档位走的是 Beckon 不请求的另一套 API。",
+        openrouter:
+          '发送 plugins:[{id:"web"}]。OpenRouter 自己执行搜索，并在词元之外按请求计费。',
+        none: "什么都不发送，因此要求联网搜索的 Action 得到的是一次没有搜索的回答。没有此字段的端点都属于这一项 —— 包括那些把搜索做成需要第二次往返的工具的端点。",
+      },
+      webSearchHint: (label: string) => `在${label}上每轮都要多花钱和时间。除非 Action 要求，否则保持关闭。`,
+      webSearchHintNone: (label: string) =>
+        `${label} 没有 Beckon 能发送的联网搜索字段，因此这一项不会到达任何地方。`,
       thisEndpoint: "此端点",
     },
 
@@ -303,6 +323,8 @@ export const ZH: Strings = {
         `尚未为${label}保存密钥，此 Action 的请求还没发出就会失败。其他 Action 不受影响。`,
       sends: "此 Action 会发送什么",
       thinkingHint: "会在第一个字出现前多花几秒。需要模型推理时值得，只是改写格式时不值得。",
+      webSearchHint:
+        "让端点在回答前读取实时网页。每轮都要多花钱和时间，因此除非此 Action 要求，否则保持关闭。",
 
       thisFile: "此文件",
       deleteLabel: "删除此 Action",
@@ -344,6 +366,11 @@ export const ZH: Strings = {
       neverThinks: (model: string) => `${model} 没有思考模式；两个方向都不会发送任何东西。`,
       noThinkingSwitch: (label: string) =>
         `${label} 没有 Beckon 能使用的思考开关；由它自己的默认行为决定。`,
+      webSearch: "联网搜索",
+      noSearchSwitch: (label: string) =>
+        `${label} 在此端点上没有 Beckon 能要求的联网搜索；这一轮不带搜索照常运行。`,
+      modelCannotSearch: (model: string) =>
+        `${model} 不接受此端点的联网搜索；请换一个模型，或保持关闭。`,
     },
     field: {
       useDefault: (reading: string) => `使用默认值（${reading}）`,
