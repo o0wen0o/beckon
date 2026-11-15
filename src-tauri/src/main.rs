@@ -30,13 +30,62 @@ use crate::hotkey::Target;
 use crate::secrets::KeyStatus;
 use crate::state::{AppState, Paths};
 
+/// Where `log::` goes: standard error, and nowhere else.
+///
+/// There was no logger at all, so every failure a comment in this crate says
+/// "is logged" — a paste that could not be sent, a watcher that did not start,
+/// a copy shortcut the OS refused — was a macro expanding to nothing. Under
+/// `tauri dev` they are now on the terminal, which is where the next person
+/// to chase one of them will be looking.
+///
+/// Not a file. Beckon keeps nothing of what passes through it, and a log
+/// beside the config is a place a Selection could end up by one careless
+/// `format!`. For the same reason the level stops at `Info`: the one `debug!`
+/// in the crate quotes a stream frame, which is a piece of an answer.
+struct StderrLog;
+
+impl log::Log for StderrLog {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::Level::Info
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            use std::io::Write;
+            // A release build on Windows has no console; a write to a handle
+            // that is not there must not be a panic, which `eprintln!` makes it.
+            let _ = writeln!(
+                std::io::stderr(),
+                "[{}] {}: {}",
+                record.level(),
+                record.target(),
+                record.args()
+            );
+        }
+    }
+
+    fn flush(&self) {}
+}
+
 fn main() {
+    // First, so that what `load_state` has to say about the config is heard.
+    if log::set_logger(&StderrLog).is_ok() {
+        log::set_max_level(log::LevelFilter::Info);
+    }
+
     // Everything the windows can ask for is prepared *before* the builder runs.
     // Tauri creates the configured windows during `build()`, and a webview
     // starts loading — and can invoke a command — before `setup` is reached, so
     // state managed inside `setup` would be managed too late.
     let state = load_state();
-    let autostart_wanted = state.config_snapshot().autostart;
+    // `None` when the file did not load: the config in force is then the
+    // defaults, and a default is not something the user asked for. Applying it
+    // would switch autostart *on* for someone whose file says `false` beside a
+    // typo — and fixing the typo would not switch it back off.
+    let autostart_wanted = state
+        .config_fault()
+        .is_none()
+        .then(|| state.config_snapshot().autostart);
 
     let app = tauri::Builder::default()
         .manage(state)
@@ -86,6 +135,7 @@ fn main() {
             commands::reveal_config_dir,
             commands::get_provider_presets,
             commands::get_startup_errors,
+            commands::get_config_fault,
             commands::get_actions,
             commands::save_action,
             commands::create_action,
@@ -187,10 +237,17 @@ fn load_state() -> AppState {
         log::warn!("{error}");
     }
     let registry = Registry::load(&paths.actions_dir, loaded.config.language);
-    AppState::new(paths, loaded.config, registry)
+    let state = AppState::new(paths, loaded.config, registry);
+    // Kept, not only logged: `reload::report_faults` puts it on the tray and
+    // Settings draws it above every pane.
+    *state.config_fault.lock().expect("config fault lock") = loaded.error;
+    state
 }
 
-fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn setup(
+    app: &mut tauri::App,
+    autostart_wanted: Option<bool>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Beckon lives in the menu bar, so it is an accessory: no Dock tile, no
     // Cmd+Tab entry, and — the part that matters — the Launcher can take focus
     // without a Dock icon bouncing into view first. This is the macOS half of
@@ -232,8 +289,10 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
     // its error state and fires the one-time balloon (README).
     reload::apply_hotkeys(&handle);
 
-    if let Err(err) = reload::sync_autostart(&handle, autostart_wanted) {
-        log::warn!("could not apply the autostart setting: {err}");
+    if let Some(wanted) = autostart_wanted {
+        if let Err(err) = reload::sync_autostart(&handle, wanted) {
+            log::warn!("could not apply the autostart setting: {err}");
+        }
     }
 
     // The pre-provider credential moves onto the default row before anything

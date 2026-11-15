@@ -28,6 +28,12 @@ class I18nStore extends Notifier {
   strings: Strings = EN;
 
   apply(language: Language) {
+    // Before the guard: the three html files say `lang="en"`, and the first
+    // call for an English user returns below without ever reaching a place to
+    // confirm it — while for a Chinese one the attribute is what tells a
+    // screen reader which voice to read 浮窗 in, and the browser which font
+    // fallback and line-breaking rules the text gets.
+    document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
     // `config-changed` fires for every setting; re-rendering every window
     // because the Popover was dragged is exactly what this guard is for.
     if (language === this.language) return;

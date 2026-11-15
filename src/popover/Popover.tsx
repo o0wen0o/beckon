@@ -11,7 +11,7 @@ import {
   Subscriptions,
 } from "@/lib/ipc";
 import { fill, useT } from "@/lib/i18n";
-import { hasCommandModifier } from "@/lib/platform";
+import { hasCommandModifier, isComposing } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { Kbd } from "@/components/Kbd";
 import { Button } from "@/components/ui/button";
@@ -69,11 +69,29 @@ export function Popover() {
     };
   }, []);
 
-  const answer = store.current?.answer;
+  const current = store.current;
+  const answer = current?.answer;
+  const reasoning = current?.reasoning;
+  const status = current?.status;
+  const turnCount = store.turns.length;
+
+  // A turn that has just been asked for is followed, whatever was being
+  // re-read: the user scrolled up, typed a follow-up and sent it, and the
+  // question they just asked — and its answer — arrived below the fold of a
+  // window that was no longer following. Retry is the same gesture.
+  React.useEffect(() => {
+    if (status === "waiting-first-token") stick.current = true;
+  }, [status, turnCount]);
+
+  // Everything that moves the bottom of the conversation, not the answer
+  // alone. When a long answer settles, the Stop bar gives way to a taller
+  // composer and the row of Copy, Insert and Regenerate is added under the
+  // text — some forty pixels that used to land below the fold, so the buttons
+  // an answer is used *with* were hidden at the end of every long one.
   React.useEffect(() => {
     if (!stick.current || !scroller.current) return;
     scroller.current.scrollTop = scroller.current.scrollHeight;
-  }, [answer]);
+  }, [answer, reasoning, status, turnCount, store.composing, store.busy]);
 
   // A new trigger is a new conversation in a window that was never destroyed,
   // so it starts at the top and follows again.
@@ -92,6 +110,10 @@ export function Popover() {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // A key the input method is still using is not the window's: the Escape
+      // that abandons a half-typed composition must not also stop the request
+      // or close the Popover over the draft.
+      if (isComposing(event)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         // Esc closes the preview first: it is the only layer over the
@@ -108,6 +130,18 @@ export function Popover() {
       if (exchange.preview && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
         event.preventDefault();
         exchange.stepPreview(event.key === "ArrowRight" ? 1 : -1);
+        return;
+      }
+      // The conversation, from the keyboard. Focus lives in the composer —
+      // the window is summoned by a hotkey and typed into — so the scroller
+      // never has it, and a long answer could be read on only with the wheel.
+      if ((event.key === "PageDown" || event.key === "PageUp") && !exchange.preview) {
+        const box = scroller.current;
+        if (!box) return;
+        event.preventDefault();
+        // Most of a page, so the last lines read stay on screen as the first.
+        const page = Math.max(40, box.clientHeight - 48);
+        box.scrollBy({ top: event.key === "PageDown" ? page : -page });
         return;
       }
       /** Every window shortcut is the same chord with one key changed. */

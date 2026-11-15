@@ -192,6 +192,8 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     }
 
     *state.popover_view.lock().expect("popover view lock") = Some(view);
+    // A new conversation: a snip still out for the last one must not land here.
+    state.supersede_popover();
 
     // Emit before revealing. The window is reused and `load()` re-reads the
     // view asynchronously, so revealing first puts the *previous* Exchange's
@@ -414,6 +416,13 @@ pub fn start_capture(app: &AppHandle) {
         }
     }
 
+    // Which Popover this snip is for. Read after the view was found, so it
+    // names that one.
+    let generation = app
+        .state::<AppState>()
+        .popover_generation
+        .load(Ordering::SeqCst);
+
     let app = app.clone();
     std::thread::spawn(move || {
         let window = app.get_webview_window(WINDOW_POPOVER);
@@ -424,6 +433,24 @@ pub fn start_capture(app: &AppHandle) {
         }
 
         let outcome = platform::snip::grab_capture();
+
+        // The Popover this was taken for is gone — closed, or replaced by a new
+        // trigger while the snip tool had the screen. Everything below would
+        // then happen to the wrong conversation: the screenshot attached to an
+        // Action it was not taken for, a "nothing was captured" note over one
+        // that never asked, and a window brought back with focus after the
+        // user had closed it. So the outcome is dropped, nothing is emitted,
+        // and nothing is revealed. `capturing` is left alone as well: it was
+        // lowered when the count moved, and may already be up again for a snip
+        // the new Popover started.
+        if app
+            .state::<AppState>()
+            .popover_generation
+            .load(Ordering::SeqCst)
+            != generation
+        {
+            return;
+        }
 
         {
             let state = app.state::<AppState>();
@@ -503,6 +530,8 @@ pub fn hide_popover(app: &AppHandle) {
         let state = app.state::<AppState>();
         state.exchanges.discard_all();
         *state.popover_view.lock().expect("popover view lock") = None;
+        // Closed: a snip still out must not bring the window back.
+        state.supersede_popover();
     }
     if let Some(window) = app.get_webview_window(WINDOW_POPOVER) {
         let _ = window.hide();

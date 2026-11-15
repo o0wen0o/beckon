@@ -74,10 +74,21 @@ impl ExchangeManager {
     ///
     /// `content` rather than `&str` because a turn may carry a Capture;
     /// the image travels with the history like any other message.
+    ///
+    /// A turn that follows one nobody answered — it failed, or was stopped
+    /// before the first token, and the user typed on instead of pressing Retry —
+    /// joins that message rather than following it. `commit_assistant` records
+    /// nothing for an empty answer, so pushing would send `[…, user, user]`:
+    /// the same `400` from every strict chat template that `retry_turn` exists
+    /// to avoid, reached by the other button.
     pub fn begin_turn(&self, id: &str, content: impl Into<Content>) -> Option<TurnPlan> {
         let mut map = self.inner.lock().expect("exchange lock");
         let entry = map.get_mut(id)?;
-        entry.exchange.messages.push(Message::user(content.into()));
+        let content = content.into();
+        match entry.exchange.messages.last_mut() {
+            Some(last) if last.role == crate::llm::Role::User => last.content.append(content),
+            _ => entry.exchange.messages.push(Message::user(content)),
+        }
         Some(Self::plan(id, entry))
     }
 
@@ -233,9 +244,15 @@ mod tests {
         let id = manager.create("s", params());
         manager.begin_turn(&id, "one").unwrap();
         manager.commit_assistant(&id, "");
-        // Still just system + "one": the next turn is only the third message.
+        // Still just system + "one" — no assistant message was pushed for the
+        // empty answer, so the next turn joins the unanswered one rather than
+        // following it (`a_follow_up_after_an_unanswered_turn_joins_it`).
         let next = manager.begin_turn(&id, "two").unwrap();
-        assert_eq!(next.messages.len(), 3);
+        assert_eq!(next.messages.len(), 2);
+        assert!(next
+            .messages
+            .iter()
+            .all(|message| message.role != crate::llm::Role::Assistant));
     }
 
     /// A turn that failed before any text came back is still the last message.
@@ -286,6 +303,50 @@ mod tests {
         let retried = manager.retry_turn(&id).unwrap();
         assert_eq!(retried.messages.len(), 2);
         assert_eq!(retried.messages[1].content, Content::from("one"));
+    }
+
+    /// Roles alternate whatever the user does after a turn that got no
+    /// answer: a follow-up typed instead of Retry joins the unanswered message.
+    #[test]
+    fn a_follow_up_after_an_unanswered_turn_joins_it() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        manager.begin_turn(&id, "one").unwrap();
+        // Nothing came back: `commit_assistant` records no empty answer.
+        manager.commit_assistant(&id, "");
+
+        let plan = manager.begin_turn(&id, "two").unwrap();
+        let roles: Vec<_> = plan.messages.iter().map(|m| m.role.clone()).collect();
+        assert_eq!(
+            roles,
+            vec![crate::llm::Role::System, crate::llm::Role::User]
+        );
+        assert_eq!(plan.messages[1].content, Content::Text("one\n\ntwo".into()));
+
+        // An answered turn is followed, not joined.
+        manager.commit_assistant(&id, "answer");
+        let plan = manager.begin_turn(&id, "three").unwrap();
+        assert_eq!(plan.messages.len(), 4);
+    }
+
+    /// The Captures of both halves survive the join, in the order they were sent.
+    #[test]
+    fn joining_keeps_the_captures_of_both_messages() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        manager
+            .begin_turn(
+                &id,
+                Content::with_images("look", ["data:image/png;base64,AA"]),
+            )
+            .unwrap();
+
+        let plan = manager.begin_turn(&id, "and this").unwrap();
+        let Content::Parts(parts) = &plan.messages[1].content else {
+            panic!("an image keeps the message in parts");
+        };
+        assert_eq!(parts.len(), 3);
+        assert!(matches!(&parts[2], crate::llm::Part::Text { text } if text == "and this"));
     }
 
     #[test]

@@ -207,6 +207,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
             <HotkeyInput
               value={draft.hotkey ?? null}
               clearable
+              actionId={action.id}
               onChange={(accelerator) =>
                 store.editDraft((next) => (next.hotkey = accelerator), true)
               }

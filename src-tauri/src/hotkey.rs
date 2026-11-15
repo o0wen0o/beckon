@@ -77,18 +77,36 @@ pub fn parse(accelerator: &str, language: Language) -> Result<Shortcut, String> 
 
 /// Try to register `accelerator` right now, then let it go again. This is what
 /// makes the Settings recorder able to flag a taken hotkey on the spot (README).
-pub fn probe(app: &AppHandle, accelerator: &str) -> Result<(), String> {
-    let language = app.state::<AppState>().config_snapshot().language;
+///
+/// `wanted_by` is who is asking, because "already registered by Beckon" is two
+/// answers. Held by the asker, it is the asker's own hotkey recorded again and
+/// there is nothing to prove. Held by anything else in Beckon, it is taken —
+/// and that used to pass, since asking the OS would have failed "for the wrong
+/// reason". The save then went through, the next `apply` gave the combination
+/// to whichever file sorts first, and the hotkey that stopped working was on an
+/// Action the user had not touched: flagged afterwards, on a different row,
+/// which is the opposite of on the spot.
+pub fn probe(app: &AppHandle, accelerator: &str, wanted_by: &Target) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let language = state.config_snapshot().language;
     let shortcut = parse(accelerator, language)?;
 
-    // Already ours: registering it again would fail for the wrong reason.
-    let already_ours = {
-        let state = app.state::<AppState>();
+    let holder = {
         let hotkeys = state.hotkeys.lock().expect("hotkey lock");
-        hotkeys.bindings.contains_key(&shortcut)
+        hotkeys.bindings.get(&shortcut).cloned()
     };
-    if already_ours {
-        return Ok(());
+    match holder {
+        // Already the asker's: registering it again would fail for the wrong
+        // reason.
+        Some(holder) if holder == *wanted_by => return Ok(()),
+        Some(holder) => {
+            return Err(i18n::hotkey_taken(
+                language,
+                accelerator,
+                &owner_label(&state, &holder, language),
+            ));
+        }
+        None => {}
     }
 
     let manager = app.global_shortcut();
@@ -150,16 +168,7 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
         if let Some(existing) = bindings.get(&shortcut) {
             // Only the loser's message needs a display name, so it is looked up
             // here rather than mapped for every Action on every apply.
-            let owner = match existing {
-                Target::Launcher => i18n::hotkey_owner_launcher(language).to_string(),
-                Target::Action(id) => {
-                    let registry = state.registry.read().expect("registry lock");
-                    let name = registry
-                        .get(id)
-                        .map_or(id.as_str(), |a| a.file.name.as_str());
-                    format!("\"{name}\"")
-                }
-            };
+            let owner = owner_label(&state, existing, language);
             report.action_errors.insert(
                 action_id,
                 i18n::hotkey_taken(language, &accelerator, &owner),
@@ -186,6 +195,24 @@ pub fn apply(app: &AppHandle) -> ApplyReport {
     }
 
     report
+}
+
+/// How the holder of a combination is named to whoever just lost it: the
+/// Launcher by its role, an Action by its display name in quotes — the id is
+/// a filename stem, and the reader knows the Action by what the list calls it.
+/// One function, so the recorder's refusal and the reload's flag cannot name
+/// the same holder two ways.
+fn owner_label(state: &AppState, holder: &Target, language: Language) -> String {
+    match holder {
+        Target::Launcher => i18n::hotkey_owner_launcher(language).to_string(),
+        Target::Action(id) => {
+            let registry = state.registry.read().expect("registry lock");
+            let name = registry
+                .get(id)
+                .map_or(id.as_str(), |a| a.file.name.as_str());
+            format!("\"{name}\"")
+        }
+    }
 }
 
 /// What a pressed accelerator means, or `None` if it is not ours any more.

@@ -62,6 +62,25 @@ pub fn tray_error_title(language: Language) -> &'static str {
     }
 }
 
+/// The other thing the tray's error state can mean. Both arms exist because
+/// the match must be total, but in practice this is read in English: while the
+/// file is not loading, the language in force is the default one.
+pub fn tray_config_title(language: Language) -> &'static str {
+    match language {
+        Language::En => "Beckon: config.toml did not load",
+        Language::Zh => "Beckon：config.toml 未能加载",
+    }
+}
+
+pub fn tray_config_body(language: Language, detail: &str) -> String {
+    match language {
+        Language::En => {
+            format!("{detail}\n\nBeckon is running on its defaults until the file is fixed.")
+        }
+        Language::Zh => format!("{detail}\n\n在修好该文件之前，Beckon 按默认设置运行。"),
+    }
+}
+
 pub fn tray_error_body(language: Language, summary: &str) -> String {
     match language {
         Language::En => {

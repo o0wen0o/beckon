@@ -196,14 +196,21 @@ impl Action {
     }
 }
 
-/// Turn a display name into a filename stem: lowercase, non-alphanumerics
-/// collapsed to `-`. Non-ASCII names can slug to nothing, hence the fallback.
+/// Turn a display name into a filename stem: lowercase, everything that is not
+/// a letter or a digit collapsed to `-`. A name made only of punctuation slugs
+/// to nothing, hence the fallback.
+///
+/// Letters and digits in *any* script. This used to keep ASCII only, so every
+/// Action named in Chinese became `action.toml`, `action-2.toml`,
+/// `action-3.toml` — and the filename is the identity, the thing the user
+/// sees in the folder and the tray names in a hotkey fault. Half the product
+/// is written for people who would name an Action 翻译.
 pub fn slug(name: &str) -> String {
     let mut out = String::new();
     let mut last_dash = true;
     for ch in name.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
+        if ch.is_alphanumeric() {
+            out.extend(ch.to_lowercase());
             last_dash = false;
         } else if !last_dash {
             out.push('-');
@@ -213,9 +220,26 @@ pub fn slug(name: &str) -> String {
     let trimmed = out.trim_matches('-').to_string();
     if trimmed.is_empty() {
         "action".to_string()
+    } else if is_reserved_stem(&trimmed) {
+        // "Aux" is a reasonable thing to call an Action and not a file Windows
+        // will create.
+        format!("{trimmed}-action")
     } else {
         trimmed
     }
+}
+
+/// Whether `stem` is a name Windows reserves for a device, which no extension
+/// rescues: `con.toml` cannot be created there. Asked on every platform, since
+/// `actions/` is meant to copy between them unchanged (README).
+pub fn is_reserved_stem(stem: &str) -> bool {
+    const DEVICES: [&str; 4] = ["con", "prn", "aux", "nul"];
+    let stem = stem.to_ascii_lowercase();
+    DEVICES.contains(&stem.as_str())
+        || matches!(
+            stem.as_bytes(),
+            [b'c', b'o', b'm', b'1'..=b'9'] | [b'l', b'p', b't', b'1'..=b'9']
+        )
 }
 
 #[cfg(test)]
@@ -423,6 +447,14 @@ thinking = true
         assert_eq!(slug("Quick ask"), "quick-ask");
         assert_eq!(slug("Translate  ZH <-> EN"), "translate-zh-en");
         assert_eq!(slug("---"), "action");
-        assert_eq!(slug("翻译"), "action");
+        // Any script's letters are letters: the filename is the identity,
+        // and `action.toml` names nothing.
+        assert_eq!(slug("翻译"), "翻译");
+        assert_eq!(slug("翻译 EN→中文"), "翻译-en-中文");
+        assert_eq!(slug("Résumé"), "résumé");
+        // A device name is not a file Windows will create.
+        assert_eq!(slug("Aux"), "aux-action");
+        assert_eq!(slug("COM1"), "com1-action");
+        assert_eq!(slug("Console"), "console");
     }
 }

@@ -101,6 +101,39 @@ impl Content {
     }
 }
 
+impl Content {
+    /// Add `next` to the end of this content, as one message.
+    ///
+    /// For the turn that follows one the endpoint never answered: two `user`
+    /// messages in a row is what that history would otherwise be, and a chat
+    /// template that insists on alternating roles answers it with a `400`.
+    /// Text meets text across a blank line; anything with an image in it
+    /// becomes parts, in the order they were said.
+    pub fn append(&mut self, next: Content) {
+        match (&mut *self, next) {
+            (Content::Text(have), Content::Text(more)) => {
+                if !have.is_empty() && !more.is_empty() {
+                    have.push_str("\n\n");
+                }
+                have.push_str(&more);
+            }
+            (_, next) => {
+                let mut parts = std::mem::replace(self, Content::Text(String::new())).into_parts();
+                parts.extend(next.into_parts());
+                *self = Content::Parts(parts);
+            }
+        }
+    }
+
+    fn into_parts(self) -> Vec<Part> {
+        match self {
+            Content::Text(text) if text.is_empty() => Vec::new(),
+            Content::Text(text) => vec![Part::Text { text }],
+            Content::Parts(parts) => parts,
+        }
+    }
+}
+
 impl From<&str> for Content {
     fn from(text: &str) -> Self {
         Content::Text(text.to_string())

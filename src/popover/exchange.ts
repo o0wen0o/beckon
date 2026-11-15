@@ -93,6 +93,14 @@ export function settlesInSettings(kind: string | undefined) {
   return kind === "no-credential" || kind === "read-error" || kind === "auth" || kind === "config";
 }
 
+/** A turn Rust is still working on. The three events that settle a turn apply
+ *  only to one of these: Esc lands here first and the stream's own ending a
+ *  moment later, and a turn the user stopped must not be relabelled "done" —
+ *  or failed — by the event that lost the race. */
+function isLive(status: Status) {
+  return status === "waiting-first-token" || status === "streaming";
+}
+
 /** A turn that will not change again, so its answer can be offered for copying. */
 export function isSettled(status: Status) {
   return status === "done" || status === "interrupted" || status === "cancelled";
@@ -271,6 +279,7 @@ class ExchangeStore extends Notifier {
       .add(
         onDone((payload) =>
           this.#forCurrent(payload.exchange_id, (turn) => {
+            if (!isLive(turn.status)) return;
             turn.status = "done";
             this.#waitingSince = 0;
           }),
@@ -279,6 +288,7 @@ class ExchangeStore extends Notifier {
       .add(
         onInterrupted((payload) =>
           this.#forCurrent(payload.exchange_id, (turn) => {
+            if (!isLive(turn.status)) return;
             // Keep whatever was produced; mark it beneath (README).
             turn.status = "interrupted";
             turn.note = payload.message;
@@ -288,7 +298,9 @@ class ExchangeStore extends Notifier {
       )
       .add(
         onExchangeError((payload) =>
-          this.#forCurrent(payload.exchange_id, (turn) => this.#applyFailure(turn, payload)),
+          this.#forCurrent(payload.exchange_id, (turn) => {
+            if (isLive(turn.status)) this.#applyFailure(turn, payload);
+          }),
         ),
       );
   }

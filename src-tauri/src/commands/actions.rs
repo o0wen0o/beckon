@@ -28,9 +28,25 @@ pub fn save_action(
 ) -> Result<(), String> {
     let file_name = sanitize_file_name(&file_name)?;
     let parsed = Action::from_parts(&file_name, action)?;
+    // Probed only when the hotkey is what changed, the way `save_config` probes
+    // the Launcher's. An Action whose Direct Hotkey already lost a conflict —
+    // two files edited by hand to the same combination — must still be able to
+    // save its prompt: the conflict is flagged on its row already, and refusing
+    // every save until it is cleared would hold an unrelated edit hostage.
+    let hotkey_before = state
+        .registry
+        .read()
+        .expect("registry lock")
+        .get(&parsed.id)
+        .and_then(|action| action.file.hotkey.clone());
     if let Some(accelerator) = parsed.file.hotkey.as_deref().map(str::trim) {
-        if !accelerator.is_empty() {
-            hotkey::probe(&app, accelerator)?;
+        let unchanged = hotkey_before.as_deref().map(str::trim) == Some(accelerator);
+        if !accelerator.is_empty() && !unchanged {
+            hotkey::probe(
+                &app,
+                accelerator,
+                &hotkey::Target::Action(parsed.id.clone()),
+            )?;
         }
     }
 
@@ -132,22 +148,39 @@ pub fn write_action_raw(
 }
 
 /// Keep names inside the Actions directory — a `file_name` arrives over IPC.
+///
+/// The name is checked and handed back **as it came**, never tidied. Identity
+/// is the filename, so a name that is trimmed on the way in is a different
+/// Action on the way out: ` translate.toml` — legal on macOS — used to be saved
+/// over `translate.toml`. And the test for "stays in this directory" is that
+/// the name is one ordinary path component, not that it lacks the substring
+/// `..`: `notes..v2.toml` is a file the loader lists, and it could be neither
+/// saved, read nor deleted from Settings.
 fn sanitize_file_name(file_name: &str) -> Result<String, String> {
-    let trimmed = file_name.trim();
-    if trimmed.is_empty() {
+    if file_name.trim().is_empty() {
         return Err("no file name given".to_string());
     }
-    if trimmed.contains('/')
-        || trimmed.contains('\\')
-        || trimmed.contains("..")
-        || trimmed.contains(':')
-    {
-        return Err(format!("\"{trimmed}\" is not a valid Action file name"));
+    let invalid = || format!("\"{file_name}\" is not a valid Action file name");
+    // Spelled out rather than left to `Path`: `\` and `:` are ordinary
+    // characters in a path on macOS, and a name carrying either must be refused
+    // there too — the directory is one the README says copies between platforms.
+    if file_name.contains(['/', '\\', ':']) {
+        return Err(invalid());
     }
-    if !trimmed.ends_with(".toml") {
+    let mut components = std::path::Path::new(file_name).components();
+    if !matches!(
+        (components.next(), components.next()),
+        (Some(std::path::Component::Normal(_)), None)
+    ) {
+        return Err(invalid());
+    }
+    let Some(stem) = file_name.strip_suffix(".toml") else {
         return Err("an Action file name must end in .toml".to_string());
+    };
+    if crate::action::is_reserved_stem(stem) {
+        return Err(invalid());
     }
-    Ok(trimmed.to_string())
+    Ok(file_name.to_string())
 }
 
 #[cfg(test)]
@@ -161,9 +194,40 @@ mod tests {
         assert!(sanitize_file_name("C:\\evil.toml").is_err());
         assert!(sanitize_file_name("notes.txt").is_err());
         assert!(sanitize_file_name("  ").is_err());
+        assert!(sanitize_file_name("..").is_err());
+        assert!(sanitize_file_name("..toml").is_ok());
         assert_eq!(
-            sanitize_file_name(" translate.toml ").unwrap(),
+            sanitize_file_name("translate.toml").unwrap(),
             "translate.toml"
         );
+    }
+
+    /// Identity is the filename, so the name that comes in is the name that is
+    /// written: trimming one turns a save into a write over a different Action.
+    #[test]
+    fn a_name_is_never_tidied_into_another_one() {
+        assert_eq!(
+            sanitize_file_name(" translate.toml").unwrap(),
+            " translate.toml"
+        );
+    }
+
+    /// `..` as a substring is not a parent directory.
+    #[test]
+    fn dots_inside_a_name_are_only_dots() {
+        assert_eq!(
+            sanitize_file_name("notes..v2.toml").unwrap(),
+            "notes..v2.toml"
+        );
+    }
+
+    /// A device name is not a file on Windows whatever extension follows it,
+    /// and the directory is meant to copy between platforms unchanged.
+    #[test]
+    fn rejects_windows_device_names() {
+        assert!(sanitize_file_name("con.toml").is_err());
+        assert!(sanitize_file_name("NUL.toml").is_err());
+        assert!(sanitize_file_name("com1.toml").is_err());
+        assert!(sanitize_file_name("console.toml").is_ok());
     }
 }

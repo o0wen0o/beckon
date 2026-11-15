@@ -13,10 +13,14 @@ interface HotkeyInputProps {
   value: string | null;
   /** Whether an empty value is allowed (Direct Hotkeys are optional). */
   clearable?: boolean;
+  /** The Action this recorder belongs to; absent for the Launcher's. Rust needs
+   *  to know who is asking: a combination another Action already holds is taken,
+   *  and the same one recorded again by its own holder is not. */
+  actionId?: string;
   onChange: (accelerator: string | null) => void;
 }
 
-export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputProps) {
+export function HotkeyInput({ value, clearable = false, actionId, onChange }: HotkeyInputProps) {
   const t = useT();
   const [recording, setRecording] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -27,6 +31,10 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
     event.stopPropagation();
 
     if (event.key === "Escape") {
+      // Backing out abandons the attempt, and the refusal was about the
+      // attempt: left up, it painted the hotkey that is still in force red and
+      // kept saying a combination nobody is asking for is taken.
+      setError(null);
       setRecording(false);
       return;
     }
@@ -39,7 +47,7 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
     if (!accelerator) return; // modifiers only so far — keep listening
 
     try {
-      await probeHotkey(accelerator);
+      await probeHotkey(accelerator, actionId ?? null);
       setError(null);
       setRecording(false);
       onChange(accelerator);
@@ -84,7 +92,11 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
           ].join(" ")}
           onClick={() => setRecording((on) => !on)}
           onKeyDown={onKeyDown}
-          onBlur={() => setRecording(false)}
+          onBlur={() => {
+            // The same abandonment as Escape, made with the mouse.
+            setError(null);
+            setRecording(false);
+          }}
         >
           <KeyboardIcon />
           {recording ? t.controls.hotkey.recording : value ? t.controls.hotkey.change : t.controls.hotkey.record}

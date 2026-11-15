@@ -136,7 +136,7 @@ export function Field({
         {/* The dot is a mark, so the word goes to the accessibility tree — the
             revert control alone would leave the state to be inferred from which
             buttons exist. */}
-        {override?.overridden ? <span className="sr-only">(overridden)</span> : null}
+        {override?.overridden ? <span className="sr-only">({t.words.overridden})</span> : null}
       </Label>
 
       <div

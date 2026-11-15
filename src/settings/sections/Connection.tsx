@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { CARD, CARD_HOVER, Field } from "@/components/Field";
 import { Callout } from "@/components/Callout";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { FieldGroup } from "@/components/FieldGroup";
 import { ModelSelect } from "@/components/ModelSelect";
 import { OnOffSwitch } from "@/components/OnOffSwitch";
@@ -310,6 +311,11 @@ function RemoveButton({
   const store = useStore(settings);
   const last = (store.config?.api.providers.length ?? 0) <= 1;
   const label = provider.label.trim() || t.settings.connection.unnamed;
+  // Asked first. Removing a row deletes its key from the credential store
+  // (`save_config`), and nothing brings that back — while the control is an
+  // icon one row-height from the pencil. Deleting an Action, which loses a
+  // file, has always asked; this loses a secret.
+  const [asking, setAsking] = React.useState(false);
 
   function remove() {
     settings.editConfig((draft) => {
@@ -326,25 +332,52 @@ function RemoveButton({
   const blocked = last || users > 0;
   const why = last ? t.settings.connection.removeLast : t.settings.connection.removeLabel(label);
 
+  const confirm = (
+    <ConfirmDialog
+      open={asking}
+      title={t.settings.connection.removeTitle(label)}
+      confirmLabel={t.settings.connection.remove}
+      destructive
+      onConfirm={() => {
+        setAsking(false);
+        remove();
+      }}
+      onCancel={() => setAsking(false)}
+    >
+      <p>{t.settings.connection.removeBody}</p>
+    </ConfirmDialog>
+  );
+
   if (icon) {
     return (
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="text-muted-quiet hover:text-destructive flex-none"
-        title={why}
-        aria-label={t.settings.connection.removeLabel(label)}
-        disabled={blocked}
-        onClick={remove}
-      >
-        <Trash2Icon className="size-3.5" />
-      </Button>
+      <>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-quiet hover:text-destructive flex-none"
+          title={why}
+          aria-label={t.settings.connection.removeLabel(label)}
+          disabled={blocked}
+          onClick={() => setAsking(true)}
+        >
+          <Trash2Icon className="size-3.5" />
+        </Button>
+        {confirm}
+      </>
     );
   }
   return (
-    <Button variant="destructive-outline" size="sm-note" disabled={blocked} onClick={remove}>
-      {t.settings.connection.removeLabel(label)}
-    </Button>
+    <>
+      <Button
+        variant="destructive-outline"
+        size="sm-note"
+        disabled={blocked}
+        onClick={() => setAsking(true)}
+      >
+        {t.settings.connection.removeLabel(label)}
+      </Button>
+      {confirm}
+    </>
   );
 }
 

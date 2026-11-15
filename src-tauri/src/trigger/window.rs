@@ -57,28 +57,41 @@ pub(super) fn reveal(window: &WebviewWindow) {
 /// to the event loop and an immediate read can still return the old rect —
 /// which would place a window the user has dragged short using the previous
 /// rect's bounds.
+///
+/// Both the fit and the conversion use the monitor *under the cursor*, which
+/// is where the window is going, not the one it was last on. `window.scale_factor()`
+/// answers for the latter: summoned on a 200% display after a 100% one, a
+/// 620×500 window was placed as if it were 620×500 physical and then doubled
+/// by the window manager as it crossed, off the right edge and the bottom.
 pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, height: f64) {
+    let app = window.app_handle();
+    let screen = platform::cursor::cursor_position(app).and_then(|cursor| {
+        platform::cursor::screen_at(app, cursor.0, cursor.1).map(|screen| (cursor, screen))
+    });
+
+    // The user's size, or as much of it as this monitor has room for. Config
+    // is not touched: the fit is for this showing only.
+    let (width, height) = match screen {
+        Some((_, screen)) => platform::fit_to_area((width, height), screen.area, screen.scale),
+        None => (width, height),
+    };
     let size = LogicalSize::new(width, height);
     let _ = window.set_size(size);
 
-    let app = window.app_handle();
     // Recorded before the placement can fail out: this is what tells the resize
-    // that follows apart from one the user dragged.
+    // that follows apart from one the user dragged. The *fitted* size, because
+    // that is what was asked for — recording the remembered one would make the
+    // echo of a fit look like a drag and write the small monitor's size down.
     *app.state::<AppState>()
         .popover_asked_size
         .lock()
         .expect("popover size lock") = PopoverSize { width, height };
-    let Some(cursor) = platform::cursor::cursor_position(app) else {
+    let Some((cursor, screen)) = screen else {
         return;
     };
-    let Some(area) = platform::cursor::work_area_at(app, cursor.0, cursor.1) else {
-        return;
-    };
-    let Ok(scale) = window.scale_factor() else {
-        return;
-    };
-    let physical = size.to_physical::<i32>(scale);
-    let (x, y) = platform::place_near_cursor(cursor, (physical.width, physical.height), area);
+    let physical = size.to_physical::<i32>(screen.scale);
+    let (x, y) =
+        platform::place_near_cursor(cursor, (physical.width, physical.height), screen.area);
     let _ = window.set_position(PhysicalPosition::new(x, y));
 }
 
@@ -125,15 +138,27 @@ pub(super) fn center_on_active_monitor(window: &WebviewWindow) {
         let _ = window.center();
         return;
     };
-    let Some(area) = platform::cursor::work_area_at(app, cursor.0, cursor.1) else {
+    let Some(screen) = platform::cursor::screen_at(app, cursor.0, cursor.1) else {
         let _ = window.center();
         return;
     };
-    let Ok(size) = window.outer_size() else {
+    let area = screen.area;
+    let (Ok(size), Ok(current)) = (window.outer_size(), window.scale_factor()) else {
         return;
     };
-    let x = area.x + (area.width - size.width as i32) / 2;
+    // `outer_size` is in the pixels of the monitor the window was last on. On
+    // the one it is going to it will be this many, once the window manager has
+    // rescaled it to keep its logical size — and centring with the old number
+    // lands it off-centre by half the difference.
+    let rescale = if current > 0.0 {
+        screen.scale / current
+    } else {
+        1.0
+    };
+    let width = (f64::from(size.width) * rescale).round() as i32;
+    let height = (f64::from(size.height) * rescale).round() as i32;
+    let x = area.x + (area.width - width) / 2;
     // Slightly above centre: a list grows downward, so this keeps the eye still.
-    let y = area.y + (area.height - size.height as i32) / 3;
+    let y = area.y + (area.height - height) / 3;
     let _ = window.set_position(PhysicalPosition::new(x.max(area.x), y.max(area.y)));
 }

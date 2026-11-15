@@ -100,10 +100,15 @@ export function ActionDefinition() {
         hint={t.settings.actions.userTemplateHint}
       >
         {({ id, describedBy }) => (
-          <Input
+          // A box that grows, not a one-line field: the template most worth
+          // writing puts the input on a line of its own under an instruction,
+          // and a single-line input cannot hold a newline at all — it had to
+          // be typed into the file by hand.
+          <Textarea
             id={id}
             aria-describedby={describedBy}
-            className="font-mono text-quiet"
+            rows={1}
+            className="min-h-9 resize-none py-1.5 font-mono text-quiet"
             value={draft.prompt.user ?? ""}
             placeholder="{{input}}"
             onChange={(event) => {

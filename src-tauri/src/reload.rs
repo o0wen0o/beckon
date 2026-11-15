@@ -64,9 +64,34 @@ pub fn reload_config(app: &AppHandle) {
     if let Some(error) = &loaded.error {
         log::warn!("{error}");
     }
+    // Stored before anything is re-derived from the config, so `apply_hotkeys`
+    // below reports this load and not the one before it.
+    let loads = loaded.error.is_none();
+    let was_broken = std::mem::replace(
+        &mut *state.config_fault.lock().expect("config fault lock"),
+        loaded.error,
+    )
+    .is_some();
     let language = loaded.config.language;
-    let language_changed = state.config.read().expect("config lock").language != language;
+    let autostart = loaded.config.autostart;
+    let (language_changed, autostart_changed) = {
+        let current = state.config.read().expect("config lock");
+        (current.language != language, current.autostart != autostart)
+    };
     *state.config.write().expect("config lock") = loaded.config;
+
+    // Autostart is derived from the file whoever wrote it, so a hand-edit has
+    // to reach the OS the way a Settings toggle does. Only from a file that
+    // loaded — the defaults a broken one falls back to are not a request — and
+    // always on the load that *repairs* one, because the value in force until
+    // now was a default the comparison above cannot tell from the user's own.
+    // After `write_config` this is a no-op: it has already applied the same
+    // value, and `sync_autostart` asks before it writes.
+    if loads && (autostart_changed || was_broken) {
+        if let Err(err) = sync_autostart(app, autostart) {
+            log::warn!("could not apply the autostart setting: {err}");
+        }
+    }
 
     // Neither the tray nor a title bar is markup, so no `config-changed` event
     // redraws either of them.
@@ -99,14 +124,22 @@ pub fn reload_actions(app: &AppHandle) {
 }
 
 /// Re-register every hotkey and reflect the outcome on the tray.
+///
+/// The tray has one error state and two things that can put it there: a hotkey
+/// that did not register, and a `config.toml` that did not load. Both are
+/// decided here because this is the one function every reload ends in — the
+/// config fault is read rather than passed, so an Action reload that happens
+/// while the file is still broken cannot paint the icon normal over it.
 pub fn apply_hotkeys(app: &AppHandle) {
     let state = app.state::<AppState>();
     let language = state.config.read().expect("config lock").language;
     let report = hotkey::apply(app);
-    if report.is_clean() {
+    let hotkeys = (!report.is_clean()).then(|| report.summary(language));
+    let config = state.config_fault();
+    if hotkeys.is_none() && config.is_none() {
         tray::set_normal(app);
     } else {
-        tray::set_error(app, &report.summary(language));
+        tray::set_error(app, hotkeys.as_deref(), config.as_deref());
     }
 }
 

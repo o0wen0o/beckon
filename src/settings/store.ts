@@ -22,6 +22,7 @@ import {
   getModels,
   getProviderPresets,
   getStartupErrors,
+  getConfigFault,
   saveConfig,
 } from "../lib/ipc";
 import { describeFailure } from "../lib/failures";
@@ -66,6 +67,10 @@ class SettingsStore extends Notifier {
   /** Which endpoint's own screen is open, or `null` for the inventory. */
   editingProvider: string | null = null;
   startupErrors: string[] = [];
+  /** Why `config.toml` did not load, while it does not. Everything this window
+   *  shows is then the defaults, which is the one thing a form cannot say about
+   *  itself — so it is drawn above every pane rather than inside one. */
+  configFault: string | null = null;
   /** `null` until the first answer, so nothing is claimed before it is known. */
   inputPermission: InputPermission | null = null;
   route: SectionRoute = "connection";
@@ -223,19 +228,22 @@ class SettingsStore extends Notifier {
     // Four independent reads, so they go out together rather than paying four
     // round trips in series — this runs on every reveal of a reused window,
     // while the pane is still showing the last visit's contents.
-    const [config, keyStatuses, startupErrors, inputPermission, presets] = await Promise.all([
-      getConfig(),
-      getKeyStatuses(),
-      getStartupErrors(),
-      getInputPermission(),
-      getProviderPresets(),
-    ]);
+    const [config, keyStatuses, startupErrors, configFault, inputPermission, presets] =
+      await Promise.all([
+        getConfig(),
+        getKeyStatuses(),
+        getStartupErrors(),
+        getConfigFault(),
+        getInputPermission(),
+        getProviderPresets(),
+      ]);
 
     // Through `adoptConfig`, not straight assignment: a refresh triggered by
     // reopening the window must obey the same suppression as an event.
     this.adoptConfig(config);
     this.keyStatuses = keyStatuses;
     this.startupErrors = startupErrors;
+    this.configFault = configFault;
     this.inputPermission = inputPermission;
     this.presets = presets;
 
@@ -279,7 +287,15 @@ class SettingsStore extends Notifier {
   /** Startup errors are re-read on every reload: the tray clears them when the
    *  hotkeys come back, so a fixed conflict must stop being reported. */
   async refreshStartupErrors() {
-    this.startupErrors = await getStartupErrors();
+    // The config fault rides along: both are what a reload re-derives, and a
+    // file that parses again must stop being reported on the same event that
+    // brings its settings back.
+    const [startupErrors, configFault] = await Promise.all([
+      getStartupErrors(),
+      getConfigFault(),
+    ]);
+    this.startupErrors = startupErrors;
+    this.configFault = configFault;
     this.notify();
   }
 

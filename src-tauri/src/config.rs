@@ -1076,13 +1076,21 @@ pub fn load_or_create(path: &Path) -> Loaded {
 /// is. One name, overwritten each time, so a file that stays broken across
 /// several writes leaves one copy rather than a pile — and the name does not
 /// end in `.toml`, so the watcher ignores it (`watcher::is_ignored`).
+///
+/// Read as bytes, not as text. A file that is not UTF-8 at all — saved as
+/// UTF-16 by Notepad's "Unicode", or by `>` in Windows PowerShell — fails
+/// [`load_or_create`] exactly the way a typo does, and `read_to_string` would
+/// have refused it here too: no copy, and the write went ahead over the one
+/// file this function exists to keep.
 pub fn set_aside_if_unparsable(path: &Path) -> Option<PathBuf> {
-    let text = fs::read_to_string(path).ok()?;
-    if toml::from_str::<Config>(&text).is_ok() {
+    let bytes = fs::read(path).ok()?;
+    let parses =
+        std::str::from_utf8(&bytes).is_ok_and(|text| toml::from_str::<Config>(text).is_ok());
+    if parses {
         return None;
     }
     let kept = path.with_extension("toml.broken");
-    fs::write(&kept, text).ok()?;
+    fs::write(&kept, bytes).ok()?;
     Some(kept)
 }
 
@@ -1694,6 +1702,39 @@ key_page = "https://platform.deepseek.com/api_keys"
         assert!(load_or_create(&path).error.is_none());
         // Not a `.toml`: the watcher must not take the copy for a config edit.
         assert!(crate::action::watcher::is_ignored(&kept));
+    }
+
+    /// A file that is not text is still the user's file. UTF-16 is what
+    /// Notepad's "Unicode" and Windows PowerShell's `>` both write, and it used
+    /// to be the one unloadable file that was replaced with no copy kept.
+    #[test]
+    fn a_file_that_is_not_utf8_is_set_aside_byte_for_byte() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let utf16: Vec<u8> = [0xFF, 0xFE]
+            .into_iter()
+            .chain("theme = \"dark\"".encode_utf16().flat_map(u16::to_le_bytes))
+            .collect();
+        fs::write(&path, &utf16).unwrap();
+        assert!(load_or_create(&path).error.is_some());
+
+        let kept = set_aside_if_unparsable(&path).expect("a copy is kept");
+        assert_eq!(fs::read(&kept).unwrap(), utf16);
+    }
+
+    /// The byte-order mark `Out-File -Encoding utf8` and Notepad's "UTF-8 with
+    /// BOM" put first is not a typo: the file is the user's own words, and it
+    /// loads as them.
+    #[test]
+    fn a_utf8_byte_order_mark_is_not_a_parse_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "\u{feff}theme = \"dark\"\n").unwrap();
+
+        let loaded = load_or_create(&path);
+        assert_eq!(loaded.error, None);
+        assert_eq!(loaded.config.theme, Theme::Dark);
+        assert_eq!(set_aside_if_unparsable(&path), None);
     }
 
     /// The ordinary case is every write, so it has to cost one read and leave

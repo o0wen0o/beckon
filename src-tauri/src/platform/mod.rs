@@ -94,6 +94,30 @@ pub struct WorkArea {
     pub height: i32,
 }
 
+/// The largest logical size that fits `area` on a monitor of that `scale`,
+/// no larger than the one asked for.
+///
+/// The Popover's size is the user's and is remembered across monitors, so one
+/// dragged out on a 4K display is later summoned on a laptop panel it does not
+/// fit. Placement only ever clamped the *origin*: the window started on-screen
+/// and ran off the bottom, which is where the composer and Stop are. Shrunk for
+/// this showing instead — the remembered size is not rewritten, so the big
+/// monitor still gets the big window.
+pub fn fit_to_area(size: (f64, f64), area: WorkArea, scale: f64) -> (f64, f64) {
+    // A scale that is not a positive number is a monitor that reported
+    // nothing; the size is left as it was rather than divided by it.
+    if !(scale.is_finite() && scale > 0.0) {
+        return size;
+    }
+    let room = (
+        f64::from(area.width) / scale,
+        f64::from(area.height) / scale,
+    );
+    // `min` rather than `clamp`: a work area with no room at all must not
+    // panic on an inverted range, and a size of zero is the caller's to refuse.
+    (size.0.min(room.0), size.1.min(room.1))
+}
+
 /// Gap between the cursor and the Popover's top-left corner.
 pub const CURSOR_OFFSET: i32 = 12;
 
@@ -205,6 +229,40 @@ mod tests {
             height: 892,
         };
         assert_eq!(place_near_cursor((10, 10), POPOVER, mac), (22, 38));
+    }
+
+    /// A window that fits is left exactly as the user dragged it.
+    #[test]
+    fn a_size_that_fits_is_not_touched() {
+        assert_eq!(fit_to_area((620.0, 500.0), SCREEN, 1.0), (620.0, 500.0));
+    }
+
+    /// Dragged out on a 4K monitor, summoned on a laptop panel: the bottom of
+    /// the window is the composer, so it has to end inside the work area.
+    #[test]
+    fn a_size_larger_than_the_work_area_is_shrunk_to_it() {
+        let laptop = WorkArea {
+            x: 0,
+            y: 0,
+            width: 1366,
+            height: 728,
+        };
+        assert_eq!(fit_to_area((1400.0, 1000.0), laptop, 1.0), (1366.0, 728.0));
+    }
+
+    /// The area is physical pixels and the size is logical ones, so the same
+    /// panel holds half as much at 200%.
+    #[test]
+    fn the_room_is_measured_at_the_destination_scale() {
+        let hidpi = WorkArea {
+            x: 0,
+            y: 0,
+            width: 2560,
+            height: 1440,
+        };
+        assert_eq!(fit_to_area((1400.0, 600.0), hidpi, 2.0), (1280.0, 600.0));
+        // A monitor that reports no usable scale changes nothing.
+        assert_eq!(fit_to_area((1400.0, 600.0), hidpi, 0.0), (1400.0, 600.0));
     }
 
     #[test]

@@ -4,15 +4,25 @@
 //! response shape in [`super::wire`], so nothing in this file has to be tested
 //! against a network to be trusted.
 //!
-//! **No timeout, deliberately** (README): a dead network must surface as an
-//! immediate error in the Popover rather than a spinner that never resolves,
-//! and a long thinking pause must not be mistaken for a hang.
+//! **No timeout on a streaming turn, deliberately** (README): a dead network
+//! must surface as an immediate error in the Popover rather than a spinner that
+//! never resolves, and a long thinking pause must not be mistaken for a hang.
+//!
+//! Two bounds that are not that timeout, and do not contradict it. *Connecting*
+//! is bounded ([`CONNECT_TIMEOUT`]): a host that never completes a handshake is
+//! not thinking, and without a bound it is exactly the spinner that never
+//! resolves. And the three unary calls Settings makes — Test connection, the
+//! model list, dialect detection — are bounded whole ([`UNARY_TIMEOUT`]): each
+//! is one small exchange with a button waiting on it, and none of them streams.
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use futures_util::StreamExt;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
-use super::error::{status_error, LlmError};
+use super::error::{chain, status_error, LlmError};
 use super::sse::SseParser;
 use super::wire::{handle_event, parse_model_list, Flow, StreamEvent};
 
@@ -129,17 +139,27 @@ enum Redirect {
     TooMany,
 }
 
-/// Follow within one host, refuse to leave it.
+/// Follow within one origin, refuse to leave it.
 ///
 /// `previous` is every URL already visited, last one first-from; `next` is where
-/// the 3xx points. See [`build_http_client`] for why leaving the host is refused
-/// rather than followed with the credential stripped.
+/// the 3xx points. See [`build_http_client`] for why leaving is refused rather
+/// than followed with the credential stripped.
+///
+/// The *origin*, not the host. A `3xx` from `https://api.example.com` to
+/// `http://api.example.com` names the same host and puts the key on the wire in
+/// plaintext; one to another port names the same host and reaches a different
+/// service. The one crossing still followed is the upgrade — `http` to `https`
+/// on the scheme's own port — because that is a server moving a request to the
+/// safer of its own two doors.
 fn redirect_verdict(previous: &[reqwest::Url], next: &reqwest::Url) -> Redirect {
-    // No previous hop is not a redirect at all; treated as same-host so the
+    // No previous hop is not a redirect at all; treated as same-origin so the
     // arm below is the only one that can stop a request.
-    let same_host = previous
-        .last()
-        .is_none_or(|from| from.host_str() == next.host_str());
+    let same_host = previous.last().is_none_or(|from| {
+        let same_origin = from.scheme() == next.scheme()
+            && from.port_or_known_default() == next.port_or_known_default();
+        let upgrade = from.scheme() == "http" && next.scheme() == "https" && next.port().is_none();
+        from.host_str() == next.host_str() && (same_origin || upgrade)
+    });
     if !same_host {
         Redirect::Stop
     } else if previous.len() > MAX_REDIRECTS {
@@ -157,9 +177,12 @@ pub fn build_http_client() -> reqwest::Client {
     // means a provider is already installed, which is the state being asked for.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    // No `.timeout(..)` on purpose — see the module docs.
+    // No `.timeout(..)` on purpose — see the module docs. The connect bound
+    // is the one that is safe to put on every request, a streaming turn
+    // included: it ends at the handshake, before there is a model to wait for.
     reqwest::Client::builder()
         .user_agent(concat!("beckon/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(CONNECT_TIMEOUT)
         // **A redirect to another host is refused, not followed.** reqwest strips
         // `Authorization` across hosts by itself, but its sensitive-header list
         // is a fixed set and `x-api-key` — which every keyed request carries
@@ -182,6 +205,22 @@ pub fn build_http_client() -> reqwest::Client {
         .build()
         .expect("HTTP client")
 }
+
+/// How long a connection may take to be established: DNS, TCP and TLS. Ten
+/// seconds is several times a slow handshake over a bad link and still short
+/// enough to read as an answer.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long one of Settings' unary calls may take from send to last byte. Wide
+/// on purpose — Test connection against a local endpoint can be the request
+/// that loads the model into memory — and it bounds a button, never a turn.
+const UNARY_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// How long the stream may go quiet before a consumer is told so
+/// ([`StreamEvent::Idle`]). One frame: the same interval the Popover's deltas
+/// are coalesced on, so a held-back tail goes out no later than the next tick
+/// would have sent it.
+const IDLE_AFTER: Duration = Duration::from_millis(16);
 
 /// How much of a body that never parsed is kept to quote. An error message is a
 /// sentence; `status_error` trims what it is handed to 300 characters anyway.
@@ -220,7 +259,7 @@ pub async fn stream_chat(
     let response = tokio::select! {
         biased;
         _ = cancel.cancelled() => return Err(LlmError::Cancelled),
-        result = request.send() => result.map_err(|e| LlmError::Network(e.to_string()))?,
+        result = request.send() => result.map_err(|e| LlmError::Network(chain(&e)))?,
     };
 
     let status = response.status();
@@ -236,6 +275,24 @@ pub async fn stream_chat(
     let mut parser = SseParser::new();
     let mut received_any = false;
     let mut saw_done = false;
+    // Whether anything reached the caller — answer or thinking. Not the same
+    // as `received_any`, which counts frames: a role-only frame, a usage frame
+    // and a frame that would not parse are all frames and none of them is
+    // something to read.
+    //
+    // Atomics rather than `bool`s, though one task owns them: the wrapper
+    // below writes both while the loop reads them, and it is held across every
+    // `await` here — a `Cell` would make this future `!Send`, and it is spawned.
+    let delivered = AtomicBool::new(false);
+    // Text handed over since the caller was last told the stream went quiet.
+    let undrained = AtomicBool::new(false);
+    // The model's own word for how it ended, once it has said.
+    let mut finish: Option<String> = None;
+    let mut on_event = |event: StreamEvent| {
+        delivered.store(true, Ordering::Relaxed);
+        undrained.store(true, Ordering::Relaxed);
+        on_event(event);
+    };
     // The start of the body, kept only until the first event parses. A `200`
     // that is not a stream has to be quoted from somewhere, and by the time
     // that is known the bytes have been through the parser and dropped.
@@ -246,6 +303,17 @@ pub async fn stream_chat(
             biased;
             _ = cancel.cancelled() => return Err(LlmError::Cancelled),
             next = stream.next() => next,
+            // Armed only while the caller is holding text. A consumer that
+            // batches flushes when the *next* token arrives, so the tail of a
+            // burst — several frames in one network read, from a relay that
+            // buffers or an endpoint that is simply fast — sat undrawn until
+            // the following read, and the last thinking before a long pause
+            // was not shown until the pause ended.
+            _ = tokio::time::sleep(IDLE_AFTER), if undrained.load(Ordering::Relaxed) => {
+                on_event(StreamEvent::Idle);
+                undrained.store(false, Ordering::Relaxed);
+                continue;
+            }
         };
 
         let Some(chunk) = chunk else { break };
@@ -253,9 +321,9 @@ pub async fn stream_chat(
             // A drop after partial output is an interruption, not a plain
             // network failure: the partial text is worth keeping.
             if received_any {
-                LlmError::Interrupted(e.to_string())
+                LlmError::Interrupted(chain(&e))
             } else {
-                LlmError::Network(e.to_string())
+                LlmError::Network(chain(&e))
             }
         })?;
 
@@ -265,8 +333,14 @@ pub async fn stream_chat(
         }
 
         for event in parser.push(&chunk) {
-            match handle_event(event, &mut on_event)? {
+            match handle_event(event, &mut on_event)
+                .map_err(|e| unanswered(e, delivered.load(Ordering::Relaxed)))?
+            {
                 Flow::Continue => received_any = true,
+                Flow::Finished(reason) => {
+                    received_any = true;
+                    finish = Some(reason);
+                }
                 Flow::Done => {
                     saw_done = true;
                     break 'stream;
@@ -277,8 +351,14 @@ pub async fn stream_chat(
 
     if !saw_done {
         for event in parser.finish() {
-            match handle_event(event, &mut on_event)? {
+            match handle_event(event, &mut on_event)
+                .map_err(|e| unanswered(e, delivered.load(Ordering::Relaxed)))?
+            {
                 Flow::Continue => received_any = true,
+                Flow::Finished(reason) => {
+                    received_any = true;
+                    finish = Some(reason);
+                }
                 Flow::Done => saw_done = true,
             }
         }
@@ -293,14 +373,65 @@ pub async fn stream_chat(
         return Err(not_a_stream(status.as_u16(), &unparsed));
     }
 
-    // The server closed without `[DONE]`: partial output, mark interrupted.
-    if !saw_done && received_any {
+    // The server closed without `[DONE]` and without the model saying it was
+    // finished: partial output, mark interrupted. With a `finish_reason` the
+    // close *is* the ending — `[DONE]` is a convention some endpoints skip, and
+    // a complete answer labelled "interrupted" is a false alarm on every turn.
+    if !saw_done && finish.is_none() {
         return Err(LlmError::Interrupted(
             "the connection closed before the response finished".to_string(),
         ));
     }
 
-    Ok(())
+    ending(
+        finish.as_deref(),
+        delivered.load(Ordering::Relaxed),
+        status.as_u16(),
+    )
+}
+
+/// What a stream that ended in an orderly way came to.
+///
+/// `Ok` only for an answer that is both complete and present. The two endings
+/// that are not `stop` leave text on screen that is not the whole answer, and
+/// say so the way a dropped connection does — the partial text is kept and
+/// marked. And an ending with nothing delivered at all is a failure, not a
+/// finished turn: it used to be drawn as a blank answer with a Copy button
+/// under it, the one outcome that says nothing went wrong and shows nothing.
+fn ending(finish: Option<&str>, delivered: bool, status: u16) -> Result<(), LlmError> {
+    match finish {
+        Some("length") => Err(LlmError::Interrupted(
+            "the answer was cut off at the endpoint's output limit".to_string(),
+        )),
+        Some("content_filter") => Err(LlmError::Interrupted(
+            "the endpoint's content filter stopped the answer".to_string(),
+        )),
+        _ if !delivered => Err(LlmError::Http {
+            status,
+            message: match finish {
+                Some(reason) => {
+                    format!("the endpoint finished without sending an answer ({reason})")
+                }
+                None => "the endpoint finished without sending an answer".to_string(),
+            },
+        }),
+        _ => Ok(()),
+    }
+}
+
+/// An error frame that arrived before anything else did is not an
+/// interruption: there is no partial answer to keep, and `Interrupted` draws a
+/// settled turn with a note under it and none of a failure's affordances. It is
+/// the request being refused on a `200`, so it is reported as one — in the
+/// vendor's words, with Retry beside it.
+fn unanswered(error: LlmError, delivered: bool) -> LlmError {
+    match error {
+        LlmError::Interrupted(message) if !delivered => LlmError::Http {
+            status: 200,
+            message,
+        },
+        other => other,
+    }
 }
 
 /// Send one prepared non-streaming request and read it to the end.
@@ -318,14 +449,15 @@ async fn send_read(
     request: reqwest::RequestBuilder,
 ) -> Result<(reqwest::StatusCode, String), LlmError> {
     let response = request
+        .timeout(UNARY_TIMEOUT)
         .send()
         .await
-        .map_err(|e| LlmError::Network(e.to_string()))?;
+        .map_err(|e| LlmError::Network(chain(&e)))?;
     let status = response.status();
     let body = response
         .text()
         .await
-        .map_err(|e| LlmError::Network(e.to_string()))?;
+        .map_err(|e| LlmError::Network(chain(&e)))?;
     Ok((status, body))
 }
 
@@ -490,6 +622,89 @@ mod tests {
             ),
             Redirect::Stop
         );
+    }
+
+    /// The same host is not the same recipient. A downgrade puts the key on
+    /// the wire in plaintext, and another port is another service; neither
+    /// `Authorization` stripping nor the host comparison caught `x-api-key`
+    /// going to either.
+    #[test]
+    fn a_redirect_to_another_scheme_or_port_of_the_host_is_refused() {
+        let from = [url("https://api.example.com/v1/models")];
+        assert_eq!(
+            redirect_verdict(&from, &url("http://api.example.com/v1/models")),
+            Redirect::Stop
+        );
+        assert_eq!(
+            redirect_verdict(&from, &url("https://api.example.com:8443/v1/models")),
+            Redirect::Stop
+        );
+        // The explicit default port is the same origin.
+        assert_eq!(
+            redirect_verdict(&from, &url("https://api.example.com:443/v2/models")),
+            Redirect::Follow
+        );
+    }
+
+    /// The one crossing that is still followed: a server sending plain HTTP on
+    /// to its own HTTPS door.
+    #[test]
+    fn an_upgrade_to_https_on_the_same_host_is_followed() {
+        assert_eq!(
+            redirect_verdict(
+                &[url("http://api.example.com/v1/models")],
+                &url("https://api.example.com/v1/models"),
+            ),
+            Redirect::Follow
+        );
+        assert_eq!(
+            redirect_verdict(
+                &[url("http://api.example.com/v1/models")],
+                &url("https://api.example.com:8443/v1/models"),
+            ),
+            Redirect::Stop
+        );
+    }
+
+    /// An orderly ending is `Ok` only when there is an answer and it is whole.
+    #[test]
+    fn an_ending_is_a_success_only_when_the_answer_is_whole_and_present() {
+        assert_eq!(ending(Some("stop"), true, 200), Ok(()));
+        // No `finish_reason` at all, but `[DONE]` and text: an endpoint that
+        // does not send one is still an endpoint that answered.
+        assert_eq!(ending(None, true, 200), Ok(()));
+        assert!(matches!(
+            ending(Some("length"), true, 200),
+            Err(LlmError::Interrupted(_))
+        ));
+        assert!(matches!(
+            ending(Some("content_filter"), false, 200),
+            Err(LlmError::Interrupted(_))
+        ));
+        // Finished, and nothing to show for it.
+        assert!(matches!(
+            ending(Some("stop"), false, 200),
+            Err(LlmError::Http { status: 200, .. })
+        ));
+        assert!(matches!(
+            ending(None, false, 200),
+            Err(LlmError::Http { .. })
+        ));
+    }
+
+    /// A refusal on a `200` is a failure with Retry, not a settled empty turn.
+    #[test]
+    fn an_error_frame_before_any_text_is_a_failure_not_an_interruption() {
+        let refused = LlmError::Interrupted("rate limited".to_string());
+        assert_eq!(
+            unanswered(refused.clone(), false),
+            LlmError::Http {
+                status: 200,
+                message: "rate limited".to_string()
+            }
+        );
+        // After text has arrived it is what it says: the text is kept.
+        assert_eq!(unanswered(refused.clone(), true), refused);
     }
 
     /// Within one host there is no new recipient, so a vendor moving its own

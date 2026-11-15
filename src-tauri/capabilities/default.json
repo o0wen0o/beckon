@@ -10,8 +10,6 @@
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
     "core:window:allow-set-size",
-    "core:event:default",
-    "opener:default",
-    "notification:default"
+    "core:event:default"
   ]
 }

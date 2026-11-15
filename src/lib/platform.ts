@@ -26,6 +26,23 @@ export function hasCommandModifier(event: KeyboardEvent | React.KeyboardEvent) {
   return IS_MAC ? event.metaKey : event.ctrlKey;
 }
 
+/**
+ * True when a keydown belongs to an input method that is still composing — the
+ * Enter that turns pinyin into 汉字, the arrows that walk its candidates, the
+ * Escape that abandons them. None of those is the window's key.
+ *
+ * Two tests because the two webviews disagree. WebView2 reports the key as
+ * `Process` with `isComposing` set, which no handler here matches anyway.
+ * WKWebView fires `compositionend` *before* the keydown that committed it, so
+ * that Enter arrives as a plain `Enter` with `isComposing` already false — and
+ * the only thing still saying "this was the input method's" is the legacy
+ * `keyCode` of 229. Deprecated, and the one field that carries it.
+ */
+export function isComposing(event: KeyboardEvent | React.KeyboardEvent) {
+  const native = "nativeEvent" in event ? event.nativeEvent : event;
+  return native.isComposing || native.keyCode === 229;
+}
+
 /** In macOS order — Control, Option, Shift, Command — which is not the order
  *  an accelerator string is written in. */
 const GLYPHS: [RegExp, string][] = [

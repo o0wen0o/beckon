@@ -7,9 +7,18 @@ use crate::state::{AppState, PopoverView};
 use crate::{hotkey, platform, trigger};
 
 /// Register `accelerator` immediately to prove it is free, then release it.
+///
+/// `action_id` is the Action the recorder belongs to, or nothing for the
+/// Launcher's: a combination is free *for someone*, and one already bound
+/// elsewhere in Beckon is not free for anyone but its holder.
 #[tauri::command]
-pub fn probe_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
-    hotkey::probe(&app, &accelerator)
+pub fn probe_hotkey(
+    app: AppHandle,
+    accelerator: String,
+    action_id: Option<String>,
+) -> Result<(), String> {
+    let wanted_by = action_id.map_or(hotkey::Target::Launcher, hotkey::Target::Action);
+    hotkey::probe(&app, &accelerator, &wanted_by)
 }
 
 #[tauri::command]

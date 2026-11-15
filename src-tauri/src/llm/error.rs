@@ -34,6 +34,31 @@ impl LlmError {
     }
 }
 
+/// An error and everything under it, as one sentence.
+///
+/// reqwest's own `Display` is the outermost layer only — "error sending request
+/// for url (…)" — and the part a person can act on is in `source()`: the name
+/// that did not resolve, the connection that was refused, the certificate that
+/// did not verify. Quoting the top alone made a wrong host, an Ollama that is
+/// not running and a corporate TLS proxy read as the same failure, which they
+/// are not, and each has a different fix.
+///
+/// A layer that only repeats what the one above it already said is skipped:
+/// hyper and reqwest both like to restate their cause.
+pub(super) fn chain(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        let cause_text = cause.to_string();
+        if !cause_text.is_empty() && !text.contains(&cause_text) {
+            text.push_str(": ");
+            text.push_str(&cause_text);
+        }
+        source = cause.source();
+    }
+    text
+}
+
 /// The one place a status code becomes an [`LlmError`]. "Key rejected" has to
 /// stay distinguishable from every other failure, so the 401/403
 /// boundary is decided here rather than at each call site.
@@ -65,6 +90,30 @@ fn trim_error_body(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The cause is the part a person can act on, and it is under the top.
+    #[test]
+    fn a_chain_reads_down_to_the_cause_and_says_nothing_twice() {
+        #[derive(Debug, thiserror::Error)]
+        #[error("error sending request")]
+        struct Outer(#[source] Middle);
+        #[derive(Debug, thiserror::Error)]
+        #[error("client error (Connect)")]
+        struct Middle(#[source] std::io::Error);
+
+        let refused = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "refused");
+        assert_eq!(
+            chain(&Outer(Middle(refused))),
+            "error sending request: client error (Connect): refused"
+        );
+
+        // A layer that only restates its cause is not repeated.
+        #[derive(Debug, thiserror::Error)]
+        #[error("tls: {0}")]
+        struct Restates(#[source] std::io::Error);
+        let inner = std::io::Error::other("bad certificate");
+        assert_eq!(chain(&Restates(inner)), "tls: bad certificate");
+    }
 
     #[test]
     fn error_bodies_prefer_the_json_message() {

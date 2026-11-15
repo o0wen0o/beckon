@@ -177,7 +177,9 @@ class ActionStore extends Notifier {
 
   async create() {
     try {
-      const fileName = await createAction("New Action");
+      // Named in the reader's language: the name is slugged into the file
+      // name, which is the Action's identity from then on.
+      const fileName = await createAction(i18n.strings.settings.actions.newActionName);
       this.snapshot = await getActions();
       // No toast: the editor opening *is* the answer, and one on top of it says
       // the same thing twice.

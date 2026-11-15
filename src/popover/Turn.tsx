@@ -7,6 +7,7 @@
 // everything else is plain text with preserved whitespace — the question is the
 // user's own words and the reasoning is not written to be formatted. Neither
 // path can inject anything into the WebView.
+import * as React from "react";
 import {
   CheckIcon,
   ClipboardPasteIcon,
@@ -49,6 +50,28 @@ const QUIET = "text-muted-quiet";
  *  named here because the buttons they shortcut are. */
 const INSERT_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+Enter`);
 const REGENERATE_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+R`);
+
+/**
+ * The thinking, in a box a few lines tall. While it is still arriving the box
+ * follows it down: the newest line is the one that says what the model is
+ * doing now, and a box that stayed at its top showed the first six lines of
+ * the thought for as long as the thought went on. Once the turn has settled
+ * it is left where the reader puts it.
+ */
+function Reasoning({ text, live }: { text: string; live: boolean }) {
+  const box = React.useRef<HTMLParagraphElement | null>(null);
+  React.useEffect(() => {
+    if (live && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [text, live]);
+  return (
+    <p
+      ref={box}
+      className="text-muted-foreground max-h-30 overflow-y-auto whitespace-pre-wrap text-quiet"
+    >
+      {text}
+    </p>
+  );
+}
 
 interface TurnViewProps {
   turn: Turn;
@@ -114,7 +137,10 @@ export function TurnView({ turn, index, last }: TurnViewProps) {
                     />
                   ))}
                 </div>
-                <span className={cn(QUIET, "text-meta")}>
+                {/* Not `QUIET`: that grey is tuned against the paper, and
+                    this line is inside the card's `--muted` fill, where it
+                    dropped under 4.5:1 at this size. */}
+                <span className="text-muted-foreground text-meta">
                   {many
                     ? t.popover.captureSet(captures.length, totalBytes(captures))
                     : t.popover.captureMeta(
@@ -157,11 +183,7 @@ export function TurnView({ turn, index, last }: TurnViewProps) {
 
         {turn.reasoning ? (
           <>
-            {turn.reasoningOpen ? (
-              <p className="text-muted-foreground max-h-30 overflow-y-auto whitespace-pre-wrap text-quiet">
-                {turn.reasoning}
-              </p>
-            ) : null}
+            {turn.reasoningOpen ? <Reasoning text={turn.reasoning} live={!settled} /> : null}
             {/* One button with two labels, not one per arm: the affordance is
                 the same object either way. */}
             <Button
@@ -211,9 +233,16 @@ export function TurnView({ turn, index, last }: TurnViewProps) {
           <>
             <p className="text-quiet">{failure}</p>
             <div className="mt-1 flex gap-2">
-              <Button size="sm" onClick={() => void exchange.retry()}>
-                <RotateCcwIcon className="size-3.5" /> {t.popover.retry}
-              </Button>
+              {/* Only where there is something to run again. A send that was
+                  refused before an Exchange existed — the Action's file went
+                  away under an open Popover — has no last message for Rust to
+                  resend, and a Retry that does nothing is worse than none: the
+                  composer below is still there to type into. */}
+              {exchange.canRetry ? (
+                <Button size="sm" onClick={() => void exchange.retry()}>
+                  <RotateCcwIcon className="size-3.5" /> {t.popover.retry}
+                </Button>
+              ) : null}
               {settlesInSettings(turn.errorKind) ? (
                 <Button variant="outline" size="sm" onClick={() => void showSettings()}>
                   {t.popover.openSettings}

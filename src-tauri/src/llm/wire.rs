@@ -15,12 +15,20 @@ pub enum StreamEvent {
     Content(String),
     /// Thinking text, when the model is in thinking mode.
     Reasoning(String),
+    /// Nothing has arrived for a moment. Not text: it is the stream saying that
+    /// whatever a consumer is holding back to batch should go out now, because
+    /// the next token that would have carried it along is not coming soon.
+    Idle,
 }
 
 /// Whether the stream should keep reading after a frame.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Flow {
     Continue,
+    /// The model said it was finished and why — `finish_reason`, verbatim. The
+    /// stream keeps being read (a usage frame and `[DONE]` may follow), but
+    /// from here a close is an ending rather than an interruption.
+    Finished(String),
     Done,
 }
 
@@ -47,7 +55,11 @@ pub(super) fn handle_event(
         return Err(LlmError::Interrupted(error.message));
     }
 
+    let mut finished = None;
     for choice in chunk.choices {
+        if let Some(reason) = choice.finish_reason.filter(|r| !r.is_empty()) {
+            finished = Some(reason);
+        }
         let Some(delta) = choice.delta else { continue };
         // Whichever field this host names its thinking with; never both, and no
         // host sends both.
@@ -63,7 +75,7 @@ pub(super) fn handle_event(
         }
     }
 
-    Ok(Flow::Continue)
+    Ok(finished.map_or(Flow::Continue, Flow::Finished))
 }
 
 /// Split out from the request so the shape can be tested without a network.
@@ -94,6 +106,11 @@ struct Chunk {
 #[derive(Debug, Deserialize)]
 struct Choice {
     delta: Option<Delta>,
+    /// `null` on every frame but the last one of a choice. `stop` is the
+    /// ordinary ending; `length` and `content_filter` are endings the reader
+    /// has to be told about, because the text on screen is not the whole answer.
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -132,10 +149,32 @@ pub(super) struct ApiErrorFrame {
     pub error: Option<ApiError>,
 }
 
+/// An error envelope's one useful field, read from whichever shape it came in.
+///
+/// The documented shape is `{"error":{"message":"…"}}`, and it is not the only
+/// one in the wild: gateways send `{"error":"overloaded"}`, and some send an
+/// object whose `message` is `null`. Deserialising those as a struct failed,
+/// which made the whole frame "unparseable" — ignored mid-stream, so the
+/// vendor's sentence was replaced by "the connection closed before the response
+/// finished". Whatever is there is quoted: the string, the message, or failing
+/// both the envelope itself, which is still the vendor's words.
 #[derive(Debug, Deserialize)]
+#[serde(from = "serde_json::Value")]
 pub(super) struct ApiError {
-    #[serde(default)]
     pub message: String,
+}
+
+impl From<serde_json::Value> for ApiError {
+    fn from(value: serde_json::Value) -> Self {
+        let message = match &value {
+            serde_json::Value::String(text) => text.clone(),
+            other => match other.get("message").and_then(|m| m.as_str()) {
+                Some(text) => text.to_string(),
+                None => other.to_string(),
+            },
+        };
+        Self { message }
+    }
 }
 
 #[cfg(test)]
@@ -222,5 +261,46 @@ mod tests {
             result.err(),
             Some(LlmError::Interrupted("rate limited".into()))
         );
+    }
+
+    /// The envelope is not always the documented one, and a shape that would
+    /// not deserialise used to make the frame "unparseable" — skipped, with the
+    /// vendor's sentence lost. Whatever is there is what gets quoted.
+    #[test]
+    fn an_error_frame_is_quoted_whatever_shape_it_comes_in() {
+        let (_, result) = drain(r#"{"error":"overloaded"}"#);
+        assert_eq!(
+            result.err(),
+            Some(LlmError::Interrupted("overloaded".into()))
+        );
+
+        let (_, result) = drain(r#"{"error":{"message":null,"code":429}}"#);
+        assert_eq!(
+            result.err(),
+            Some(LlmError::Interrupted(
+                r#"{"code":429,"message":null}"#.into()
+            ))
+        );
+
+        // `null` is no error at all, which is what OpenAI-shaped frames carry.
+        let (_, result) = drain(r#"{"error":null,"choices":[]}"#);
+        assert_eq!(result, Ok(Flow::Continue));
+    }
+
+    /// The last frame of a choice says how it ended, and carries the text that
+    /// came with it like any other frame.
+    #[test]
+    fn a_finish_reason_ends_the_answer_without_losing_its_last_delta() {
+        let (events, result) =
+            drain(r#"{"choices":[{"delta":{"content":"end."},"finish_reason":"stop"}]}"#);
+        assert_eq!(events, vec![StreamEvent::Content("end.".into())]);
+        assert_eq!(result, Ok(Flow::Finished("stop".into())));
+
+        // `null` on every frame before it, and an empty string from the odd
+        // endpoint that sends one, are both "not finished".
+        let (_, result) = drain(r#"{"choices":[{"delta":{"content":"a"},"finish_reason":null}]}"#);
+        assert_eq!(result, Ok(Flow::Continue));
+        let (_, result) = drain(r#"{"choices":[{"delta":{"content":"a"},"finish_reason":""}]}"#);
+        assert_eq!(result, Ok(Flow::Continue));
     }
 }

@@ -35,7 +35,7 @@ pub fn save_config(
     // provider table with it, and neither read needs its own copy.
     let before = state.config_snapshot();
     if config.launcher_hotkey != before.launcher_hotkey {
-        hotkey::probe(&app, &config.launcher_hotkey)?;
+        hotkey::probe(&app, &config.launcher_hotkey, &hotkey::Target::Launcher)?;
     }
 
     // The table's invariants are `fold_legacy`'s, so they hold at the *boundary*
@@ -102,6 +102,16 @@ pub fn reveal_config_dir(app: AppHandle, state: State<AppState>) -> Result<(), S
 #[tauri::command]
 pub fn get_provider_presets() -> Vec<crate::config::Provider> {
     crate::config::presets()
+}
+
+/// Why `config.toml` is not the config in force, or `None` when it is.
+///
+/// The parser's own words, unlocalised on purpose: while this is set the
+/// language in force is the default one — the file that would have named
+/// another is the file that did not load.
+#[tauri::command]
+pub fn get_config_fault(state: State<AppState>) -> Option<String> {
+    state.config_fault()
 }
 
 #[tauri::command]

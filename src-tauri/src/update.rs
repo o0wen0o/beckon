@@ -55,7 +55,13 @@ pub fn check_on_startup(app: &AppHandle) {
         // run, so the switch can be turned off inside these thirty seconds, and
         // the check that has not happened yet is exactly the one being
         // declined. The tray item is unaffected — a click is not this switch.
-        if !app.state::<AppState>().config_snapshot().update_check {
+        //
+        // And not at all while `config.toml` is not loading: the config in
+        // force is then the defaults, whose `update_check = true` is not
+        // something anyone chose — the file that says `false` is the one with
+        // the typo in it.
+        let state = app.state::<AppState>();
+        if state.config_fault().is_some() || !state.config_snapshot().update_check {
             return;
         }
         run_check(&app, Voice::Quiet).await;
@@ -157,6 +163,14 @@ pub fn install(app: &AppHandle) {
             // Said out loud either way: the user asked for something and is
             // getting nothing.
             Ok(Installed::NothingToDo) => say_up_to_date(&app, language, true),
+            // A Popover opened while the download ran. The same refusal the
+            // click would have met, said the same way; the version stays
+            // pending, so the menu item is still there to press again.
+            Ok(Installed::Deferred) => notify(
+                &app,
+                i18n::update_busy_title(language),
+                i18n::update_busy_body(language),
+            ),
             Err(detail) => say_failed(&app, language, &detail),
         }
     });
@@ -166,6 +180,8 @@ pub fn install(app: &AppHandle) {
 enum Installed {
     Yes,
     NothingToDo,
+    /// Downloaded and verified, and not installed: an Exchange is on screen.
+    Deferred,
 }
 
 /// What the manifest offers, if it offers anything.
@@ -188,10 +204,22 @@ async fn download(app: &AppHandle) -> Result<Installed, String> {
     };
     // No progress callbacks: the tray has a menu and a balloon and no third
     // place to put a percentage, and a notification per chunk is not it.
-    update
-        .download_and_install(|_chunk, _total| {}, || {})
+    let bytes = update
+        .download(|_chunk, _total| {}, || {})
         .await
         .map_err(|err| err.to_string())?;
+
+    // Asked again, between the two halves. `install` checked for a Popover at
+    // the click, and the download that followed can run for minutes — long
+    // enough to summon an Action and be half-way through reading its answer
+    // when the installer ends the process. The reason for refusing is the same
+    // as at the click, so the refusal is too: the bytes are dropped and the
+    // next click fetches them again, which costs a download and loses nothing.
+    if popover_is_visible(app) {
+        return Ok(Installed::Deferred);
+    }
+
+    update.install(bytes).map_err(|err| err.to_string())?;
     Ok(Installed::Yes)
 }
 

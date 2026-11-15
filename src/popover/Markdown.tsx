@@ -258,16 +258,24 @@ interface MarkdownProps {
 }
 
 /**
- * Re-parsed whole on every delta, which is the simple thing and is fast enough:
- * an answer here is a screen or two, not a document. What `memo` buys is the
- * turns *above* the live one — their text is the same string, so a follow-up
- * streaming under them costs them nothing.
+ * Re-parsed whole on every delta, which is the simple thing — and deferred, so
+ * that it stays affordable when the answer is not a screen or two. Rust sends
+ * a delta per frame, and each one is a full parse of everything so far: on a
+ * long, code-heavy answer that is quadratic work at sixty parses a second, and
+ * what it starved was the window's own keys — Esc to stop, the composer.
+ * `useDeferredValue` lets React skip the parses it cannot keep up with and
+ * draw the latest text when it can; the last delta is never skipped, because a
+ * deferred value always catches up once nothing newer is arriving.
+ *
+ * What `memo` buys is the turns *above* the live one — their text is the same
+ * string, so a follow-up streaming under them costs them nothing.
  */
 export const Markdown = React.memo(function Markdown({ text, streaming }: MarkdownProps) {
+  const shown = React.useDeferredValue(text);
   return (
     <div className={cn(BLOCKS, streaming && ARRIVING)}>
       <ReactMarkdown remarkPlugins={PLUGINS} components={COMPONENTS}>
-        {text}
+        {shown}
       </ReactMarkdown>
     </div>
   );

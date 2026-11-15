@@ -31,6 +31,9 @@ export const EN = {
     credentialStore: IS_MAC ? "Keychain" : "Windows Credential Manager",
     /** Where Beckon sits when no window is open. */
     tray: IS_MAC ? "menu bar" : "tray",
+    /** Read out beside a field's label when an Action overrides what it would
+     *  inherit; the dot that shows it is a mark, not a word. */
+    overridden: "overridden",
     /** The autostart switch's name, which is the platform's own phrase for it. */
     autostart: IS_MAC ? "Start at login" : "Start with Windows",
     /** What `theme = "system"` follows. */
@@ -182,6 +185,11 @@ export const EN = {
       openFolderFailed: "Could not open the folder",
     },
 
+    configFault: {
+      lead: "config.toml did not load.",
+      body: "Beckon is running on its defaults until the file is fixed, so nothing below is what you wrote. A change made here replaces the file — yours is kept beside it as config.toml.broken.",
+    },
+
     status: {
       notSaved: (message: string) => `Not saved — ${message}`,
       saving: "Saving…",
@@ -222,6 +230,9 @@ export const EN = {
       edit: (label: string) => `Edit ${label}`,
       removeLabel: (label: string) => `Remove ${label}`,
       removeHint: "Removes this endpoint and its saved key.",
+      removeTitle: (label: string) => `Remove “${label}”?`,
+      /** Keeps its warning, for the same reason `deleteBody` does. */
+      removeBody: "The endpoint and its saved key are removed. This cannot be undone.",
       /** Refused rather than cascaded: which endpoint those Actions should use
        *  instead is not a decision this button gets to make. */
       removeBlocked: (names: string) => `${names} use this endpoint. Point them elsewhere first.`,
@@ -405,6 +416,9 @@ export const EN = {
       deleted: (file: string) => `${file} was deleted.`,
       deleteFailed: "Could not delete the file",
       createFailed: "Could not create the Action",
+      /** What a new Action is called until it is renamed — and, slugged, what
+       *  its file is called for good, since the filename is the identity. */
+      newActionName: "New Action",
       rawOpenFailed: "Could not read the file",
       /** The raw editor swapping back to the form is the answer already, but
        *  only to someone who knows why — said out loud, it is the repair

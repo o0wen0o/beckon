@@ -14,6 +14,19 @@ use tauri::AppHandle;
 
 use super::WorkArea;
 
+/// The monitor a window is about to be shown on: where it may go, and how many
+/// physical pixels a logical one is there.
+///
+/// The scale belongs with the area because it is the *destination's*. A window
+/// knows only the scale of the monitor it was last on, and a size worked out
+/// with that one is wrong by the ratio between the two as soon as the window
+/// crosses — the window manager keeps the logical size and rescales the rect.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Screen {
+    pub area: WorkArea,
+    pub scale: f64,
+}
+
 /// Where the pointer is, relative to the top-left of the desktop.
 pub fn cursor_position(app: &AppHandle) -> Option<(i32, i32)> {
     let position = app.cursor_position().ok()?;
@@ -35,18 +48,18 @@ pub fn cursor_position(app: &AppHandle) -> Option<(i32, i32)> {
 /// The hop cannot deadlock a caller that is already on the main thread:
 /// `run_on_main_thread` runs the closure inline in that case, so the value is
 /// in the channel before the receive.
-pub fn work_area_at(app: &AppHandle, x: i32, y: i32) -> Option<WorkArea> {
+pub fn screen_at(app: &AppHandle, x: i32, y: i32) -> Option<Screen> {
     let (tx, rx) = mpsc::channel();
     let handle = app.clone();
     app.run_on_main_thread(move || {
-        let _ = tx.send(monitor_work_area(&handle, x, y));
+        let _ = tx.send(monitor_screen(&handle, x, y));
     })
     .ok()?;
     rx.recv().ok()?
 }
 
 /// The lookup itself, main thread assumed.
-fn monitor_work_area(app: &AppHandle, x: i32, y: i32) -> Option<WorkArea> {
+fn monitor_screen(app: &AppHandle, x: i32, y: i32) -> Option<Screen> {
     let monitor = app
         .monitor_from_point(x as f64, y as f64)
         .ok()
@@ -54,10 +67,13 @@ fn monitor_work_area(app: &AppHandle, x: i32, y: i32) -> Option<WorkArea> {
         .or_else(|| app.primary_monitor().ok().flatten())?;
 
     let area = monitor.work_area();
-    Some(WorkArea {
-        x: area.position.x,
-        y: area.position.y,
-        width: area.size.width as i32,
-        height: area.size.height as i32,
+    Some(Screen {
+        area: WorkArea {
+            x: area.position.x,
+            y: area.position.y,
+            width: area.size.width as i32,
+            height: area.size.height as i32,
+        },
+        scale: monitor.scale_factor(),
     })
 }

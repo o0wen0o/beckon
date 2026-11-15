@@ -44,12 +44,15 @@ Settings opens by itself, because there is no API key yet.
 An **Action** is a saved prompt: a system prompt, a model, and how it gets its input. You pick one
 from the Launcher, or bind it to its own hotkey and skip the Launcher entirely.
 
-- **Launcher** — global hotkey, type to filter, Enter to run.
+- **Launcher** — global hotkey, type to filter, Enter to run. `Ctrl+1`–`Ctrl+9` (`Cmd` on macOS)
+  runs the row with that number without walking to it.
 - **Direct Hotkey** — per-Action, straight to the answer with zero interaction.
 - **Selection** — the platform copy shortcut is simulated to grab it, and your clipboard is put
   back afterwards. Nothing selected is not an error: the Popover just gives you a box to type in.
 - **Popover** — takes focus, streams, accepts follow-up turns. Drag any edge or corner to resize;
-  the size sticks for next time. `Esc` cancels a running request, then closes. The answer is
+  the size sticks for next time — on a screen too small for it, it is shrunk to fit for that
+  showing only. `Esc` cancels a running request, then closes; `PageUp` and `PageDown` scroll the
+  conversation while the caret stays in the box. The answer is
   rendered as Markdown — lists, tables, and code blocks with a Copy of their own — while Copy on the
   turn still hands you the source. A link opens in your browser; an image is shown as a link rather
   than fetched, and HTML in an answer is just text.
@@ -100,7 +103,10 @@ answer or a screenshot.
 
 A `config.toml` that stops parsing — a typo mid-edit — is never written over in place: Beckon runs
 on defaults until it is fixed, and if it has to write the file in the meantime it first keeps yours
-beside it as `config.toml.broken`.
+beside it as `config.toml.broken`. It says so while it lasts: the tray icon goes to its error state,
+and Settings quotes the parser's own sentence above every pane. Two things the defaults would
+otherwise switch back on are left alone until the file loads again — starting with the machine, and
+the update check.
 
 The whole directory copies between platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super`
 all parse on both, and only the defaults differ.

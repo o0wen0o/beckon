@@ -142,8 +142,20 @@ pub fn set_pending_update(app: &AppHandle, version: Option<String>) {
     rebuild(app);
 }
 
-/// Switch to the error icon and, the first time only, show the balloon.
-pub fn set_error(app: &AppHandle, summary: &str) {
+/// Switch to the error icon and say why, once per fault.
+///
+/// `hotkeys` is the summary of what did not register; `config` is why
+/// `config.toml` did not load. Either or both. They stay two arguments rather
+/// than one joined string because they are told to different people in
+/// different places: the hotkey list is what Settings → Triggering shows above
+/// the recorder that can fix it, and a file that will not parse is fixed in no
+/// pane at all.
+pub fn set_error(app: &AppHandle, hotkeys: Option<&str>, config: Option<&str>) {
+    let summary = [config, hotkeys]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("\n");
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         if let Ok(icon) = Image::from_bytes(ICON_ERROR) {
             let _ = tray.set_icon(Some(icon));
@@ -151,25 +163,41 @@ pub fn set_error(app: &AppHandle, summary: &str) {
         let _ = tray.set_tooltip(Some(format!("Beckon — {summary}")));
     }
 
-    {
-        let state = app.state::<AppState>();
-        let mut errors = state.startup_errors.lock().expect("startup errors lock");
-        // Replace, never append: `summary` is already the complete list of
-        // what is currently broken. Appending kept the previous summary around
-        // after the user had fixed it, so Settings reported repairs as faults.
-        *errors = vec![summary.to_string()];
-        if state.balloon_shown.swap(true, Ordering::SeqCst) {
-            return;
-        }
-    }
+    let state = app.state::<AppState>();
+    // Replace, never append: `hotkeys` is already the complete list of what is
+    // currently broken. Appending kept the previous summary around after the
+    // user had fixed it, so Settings reported repairs as faults.
+    *state.startup_errors.lock().expect("startup errors lock") =
+        hotkeys.map(str::to_string).into_iter().collect();
 
-    let language = app.state::<AppState>().config_snapshot().language;
-    let _ = app
-        .notification()
-        .builder()
-        .title(i18n::tray_error_title(language))
-        .body(i18n::tray_error_body(language, summary))
-        .show();
+    // One balloon per fault, and the config one first: while the file is not
+    // loading, the hotkeys being reported are the *defaults'*, so naming them
+    // would send the reader to fix a combination they never chose.
+    let language = state.config_snapshot().language;
+    let (title, body) = match (config, hotkeys) {
+        (Some(detail), _) => {
+            if state.config_balloon_shown.swap(true, Ordering::SeqCst) {
+                return;
+            }
+            (
+                i18n::tray_config_title(language),
+                i18n::tray_config_body(language, detail),
+            )
+        }
+        (None, Some(summary)) => {
+            // The file loads again, so the next time it does not is news.
+            state.config_balloon_shown.store(false, Ordering::SeqCst);
+            if state.balloon_shown.swap(true, Ordering::SeqCst) {
+                return;
+            }
+            (
+                i18n::tray_error_title(language),
+                i18n::tray_error_body(language, summary),
+            )
+        }
+        (None, None) => return,
+    };
+    let _ = app.notification().builder().title(title).body(body).show();
 }
 
 pub fn set_normal(app: &AppHandle) {
@@ -185,4 +213,10 @@ pub fn set_normal(app: &AppHandle) {
         .lock()
         .expect("startup errors lock")
         .clear();
+    // Everything is working again, so the next fault is a new one and gets a
+    // balloon of its own. Left set, a hotkey that broke in the afternoon was
+    // announced only by an icon changing colour, because one had broken — and
+    // been fixed — in the morning.
+    state.balloon_shown.store(false, Ordering::SeqCst);
+    state.config_balloon_shown.store(false, Ordering::SeqCst);
 }

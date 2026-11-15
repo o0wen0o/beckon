@@ -20,7 +20,12 @@ import {
   Subscriptions,
 } from "@/lib/ipc";
 import { fill, useT } from "@/lib/i18n";
-import { COMMAND_MODIFIER, formatAccelerator, hasCommandModifier } from "@/lib/platform";
+import {
+  COMMAND_MODIFIER,
+  formatAccelerator,
+  hasCommandModifier,
+  isComposing,
+} from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
 import { ActionRow, BrokenRow } from "./ActionRow";
 import { actionStore } from "./actions";
@@ -113,6 +118,11 @@ export function Launcher() {
   // a handler bound to the tree stops answering Escape after the first click.
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Mid-composition every key here is the input method's: Enter commits
+      // the candidate rather than running a row, the arrows walk the candidates
+      // rather than the list, and Escape abandons the composition rather than
+      // the window.
+      if (isComposing(event)) return;
       switch (event.key) {
         case "Escape":
           event.preventDefault();
@@ -140,6 +150,17 @@ export function Launcher() {
             event.preventDefault();
             openSettings();
           }
+          return;
+      }
+      // The nth row, without walking to it: the list is short and its order is
+      // the same every time, so a row's number is something a hand learns.
+      // Read off `code`, not `key` — on a layout whose digit row needs Shift
+      // the key is a symbol, and the number printed on the cap is still what
+      // was meant.
+      const digit = /^Digit([1-9])$/.exec(event.code);
+      if (digit && hasCommandModifier(event) && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        run(Number(digit[1]) - 1);
       }
     };
 
@@ -235,7 +256,10 @@ export function Launcher() {
                     query: <code className="text-foreground font-mono">{query}</code>,
                   })}
                 </p>
-                <p className="text-muted-quiet text-note">{t.launcher.widen}</p>
+                {/* `--muted-foreground`, not the quieter grey: that one is
+                    tuned against the paper, and this line sits on the list's
+                    `--muted` well, where it fell under 4.5:1. */}
+                <p className="text-muted-foreground text-note">{t.launcher.widen}</p>
               </>
             )}
           </li>
@@ -252,7 +276,8 @@ export function Launcher() {
         {matches.length > 0 ? (
           <span className="flex flex-none items-center gap-1" aria-hidden="true">
             <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> {t.launcher.move} <Kbd>↵</Kbd> {t.launcher.run}
+            <Kbd>↓</Kbd> {t.launcher.move} <Kbd>↵</Kbd>{" "}
+            <Kbd>{formatAccelerator(`${COMMAND_MODIFIER}+1`)}–9</Kbd> {t.launcher.run}
           </span>
         ) : null}
         <Button

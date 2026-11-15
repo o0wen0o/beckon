@@ -5,7 +5,7 @@
 //! read what you need, drop the guard, then do the slow thing.
 
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde::Serialize;
@@ -246,8 +246,23 @@ pub struct AppState {
     /// can both land before the window is even hidden, and two snip tools
     /// fighting over one clipboard is not a state worth defining.
     pub capturing: AtomicBool,
-    /// The startup hotkey-failure balloon fires once only (README).
+    /// Which Popover is on screen, counted: bumped whenever the view is
+    /// replaced by a new trigger or dropped by a close
+    /// ([`AppState::supersede_popover`]).
+    ///
+    /// A snip runs on its own thread for as long as the user takes — and on
+    /// Windows a cancelled one is only noticed when its 45 seconds run out. The
+    /// thread comes back to *a* Popover, not necessarily the one that started
+    /// it, and this is how it tells: a count that moved means its screenshot
+    /// was taken for a conversation that is gone.
+    pub popover_generation: AtomicU64,
+    /// The hotkey-failure balloon fires once per fault (README): set when it
+    /// is shown, cleared when the tray goes back to normal.
     pub balloon_shown: AtomicBool,
+    /// The same latch for the "config.toml did not load" balloon. Its own bit,
+    /// because the two faults come and go independently and each is announced
+    /// in its own words.
+    pub config_balloon_shown: AtomicBool,
     /// The version the update endpoint is offering, once a check has found one.
     /// Not config and not derived from disk: it is what the tray
     /// menu's one variable item is labelled from, and the only thing that can
@@ -268,6 +283,15 @@ pub struct AppState {
     pub popover_asked_size: Mutex<PopoverSize>,
     /// Errors that put the tray icon into its error state.
     pub startup_errors: Mutex<Vec<String>>,
+    /// Why `config.toml` did not load, while it does not.
+    ///
+    /// A slot of its own rather than one more line in `startup_errors`: those
+    /// are the hotkeys', re-derived and wiped by every `hotkey::apply`, and
+    /// they are worded for the pane that can fix them. This is a fault no pane
+    /// can fix — the file has to be — and while it stands `config` above is
+    /// `Config::default()`, so every setting the user wrote is being ignored.
+    /// That used to be said only to a logger nothing installed.
+    pub config_fault: Mutex<Option<String>>,
 }
 
 impl AppState {
@@ -287,16 +311,38 @@ impl AppState {
             popover_view: Mutex::new(None),
             watcher: Mutex::new(None),
             capturing: AtomicBool::new(false),
+            popover_generation: AtomicU64::new(0),
             balloon_shown: AtomicBool::new(false),
+            config_balloon_shown: AtomicBool::new(false),
             pending_update: Mutex::new(None),
             updating: AtomicBool::new(false),
             popover_asked_size: Mutex::new(PopoverSize::default()),
             startup_errors: Mutex::new(Vec::new()),
+            config_fault: Mutex::new(None),
         }
     }
 
     pub fn config_snapshot(&self) -> Config {
         self.config.read().expect("config lock").clone()
+    }
+
+    /// The Popover that was on screen is not the one on screen now — a new
+    /// trigger replaced it, or it was closed. Returns nothing: callers bump,
+    /// and only [`crate::trigger::start_capture`] reads the count back.
+    ///
+    /// `capturing` goes down with it. A snip still running belongs to the
+    /// Popover that is gone and will drop its own result when it returns; left
+    /// up, its flag made the screenshot button in the *new* Popover dead for
+    /// however long the old tool took to give up.
+    pub fn supersede_popover(&self) {
+        self.popover_generation.fetch_add(1, Ordering::SeqCst);
+        self.capturing.store(false, Ordering::SeqCst);
+    }
+
+    /// Why the config in force is the defaults rather than the user's file, if
+    /// that is what it is.
+    pub fn config_fault(&self) -> Option<String> {
+        self.config_fault.lock().expect("config fault lock").clone()
     }
 }
 

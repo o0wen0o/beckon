@@ -7,6 +7,7 @@ import { onActionsChanged, onConfigChanged, onSettingsOpened, Subscriptions } fr
 import { PaneProvider } from "@/lib/pane";
 import { IS_MAC } from "@/lib/platform";
 import { useStore } from "@/lib/useStore";
+import { Callout } from "@/components/Callout";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PaneEnter } from "@/components/PaneEnter";
 import { StatusBar } from "@/components/StatusBar";
@@ -138,6 +139,21 @@ export function Settings() {
                 rather than inside the section is what keeps the entrance to one
                 per change — as a wrapper in both places, arriving at Actions ran
                 the two of them at once. */}
+            {/* Above every pane and outside the keyed entrance: it is about the
+                whole window — each field below is showing a default — and it
+                must not replay its arrival on every change of section. The
+                parser's sentence is quoted as it came; while this is up the
+                language in force is the default one. */}
+            {store.configFault ? (
+              <Callout tone="danger">
+                <p>
+                  <strong>{t.settings.configFault.lead}</strong>
+                </p>
+                <p className="font-mono text-note whitespace-pre-wrap">{store.configFault}</p>
+                <p>{t.settings.configFault.body}</p>
+              </Callout>
+            ) : null}
+
             <PaneEnter key={paneKey}>
               <Pane />
             </PaneEnter>

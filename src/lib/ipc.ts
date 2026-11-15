@@ -30,6 +30,8 @@ export const revealConfigDir = () => invoke<void>("reveal_config_dir");
 /** The filled-in rows "Add from preset" offers. */
 export const getProviderPresets = () => invoke<Provider[]>("get_provider_presets");
 export const getStartupErrors = () => invoke<string[]>("get_startup_errors");
+/** Why `config.toml` is not the config in force, or `null` when it is. */
+export const getConfigFault = () => invoke<string | null>("get_config_fault");
 
 // --- actions --------------------------------------------------------------
 
@@ -74,7 +76,10 @@ export const getModels = (providerId: string, live: boolean) =>
 
 // --- hotkeys --------------------------------------------------------------
 
-export const probeHotkey = (accelerator: string) => invoke<void>("probe_hotkey", { accelerator });
+/** `actionId` is whose recorder is asking — an Action's, or `null` for the
+ *  Launcher's. A combination Beckon already holds is free only for its holder. */
+export const probeHotkey = (accelerator: string, actionId: string | null) =>
+  invoke<void>("probe_hotkey", { accelerator, actionId });
 
 // --- platform -------------------------------------------------------------
 

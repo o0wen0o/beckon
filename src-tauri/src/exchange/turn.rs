@@ -140,6 +140,14 @@ impl DeltaSink {
     }
 
     fn push(&mut self, event: StreamEvent) {
+        // The stream went quiet: whatever is being held for the next tick goes
+        // out now, since the token that would have carried it is not coming
+        // yet. Not a token itself, so it announces nothing.
+        if event == StreamEvent::Idle {
+            self.flush();
+            return;
+        }
+
         // Thinking text counts as a first token: it is proof the request is
         // alive, which is the distinction the README asks the UI to make.
         if !self.announced_first {
@@ -153,6 +161,8 @@ impl DeltaSink {
                 self.content.push_str(&text);
             }
             StreamEvent::Reasoning(text) => self.reasoning.push_str(&text),
+            // Returned on above.
+            StreamEvent::Idle => {}
         }
 
         if self.last_flush.elapsed() >= DELTA_TICK {

@@ -75,6 +75,12 @@ whole snapshot (`config-changed`, `actions-changed`). Three consequences:
 - Per-Action diagnostics (unparsable TOML, a Direct Hotkey that lost a conflict) are *derived state*
   built by `Registry::load` / `hotkey::apply` in the current language, so a language change re-runs
   both.
+- A `config.toml` that does not load is state too: `AppState::config_fault`, set by `load_state` and
+  every `reload_config`. While it is set the config in force is `Config::default()`, so nothing
+  derived from a *default* is applied as if the user had asked for it (autostart, the startup update
+  check), `reload::apply_hotkeys` puts the tray in its error state for it as well as for a hotkey,
+  and Settings draws it above every pane. It is not one of `startup_errors` — those are the hotkeys',
+  worded for the pane that can fix them.
 
 ### The trigger flow
 
@@ -95,10 +101,16 @@ load-bearing:
 A Capture rides the same flow sideways: `start_capture` hides the Popover *window* —
 never `hide_popover`, which would discard the Exchange — runs the OS snip tool on a thread, and
 emits `popover:capture` rather than `popover:view`, because re-reading the view is the new-trigger
-path and would remount the composer over the note the screenshot was taken for.
+path and would remount the composer over the note the screenshot was taken for. The snip thread can
+outlive the Popover that started it — a cancelled snip on Windows is noticed only when its 45 seconds
+run out — so it remembers `popover_generation` and drops its result if a new trigger or a close has
+bumped it (`AppState::supersede_popover`): no attach, no event, no reveal.
 
-The size that step 3 reveals at is the user's, unconditionally: `config.popover`, with no
-phase overriding it. The Popover is undecorated, so the
+The size that step 3 reveals at is the user's: `config.popover`, with no phase overriding it
+— shrunk only where the monitor under the cursor has no room for
+it (`platform::fit_to_area`), for that showing and without rewriting config. Size and position are
+both worked out at *that* monitor's scale factor (`platform::cursor::Screen`), never the window's
+own, which is the scale of wherever it was last shown. The Popover is undecorated, so the
 eight grips that resize it are markup (`ResizeGrips`) handing the drag to `startResizeDragging`, and
 the window reports the result back debounced. Rust drops any report matching `popover_asked_size` —
 the size it last asked for — because every `set_size` reports itself, and a report echoing what Rust

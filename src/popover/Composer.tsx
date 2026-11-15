@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { describeFailure } from "@/lib/failures";
 import { useT } from "@/lib/i18n";
-import { COMMAND_MODIFIER, formatAccelerator } from "@/lib/platform";
+import { COMMAND_MODIFIER, formatAccelerator, isComposing } from "@/lib/platform";
 import type { Capture, CaptureNotice } from "@/lib/types";
 import { CaptureRail } from "./CaptureRail";
 import { sendable } from "./exchange";
@@ -118,7 +118,10 @@ export function Composer({
           aria-label={attached ? t.popover.captureNote : placeholder}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            // An Enter that commits a composition is the input method's, not
+            // Send: without the guard a Chinese sentence goes out at its
+            // first confirmed word on macOS.
+            if (event.key === "Enter" && !event.shiftKey && !isComposing(event)) {
               event.preventDefault();
               send();
             }

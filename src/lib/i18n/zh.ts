@@ -16,6 +16,7 @@ export const ZH: Strings = {
   words: {
     credentialStore: IS_MAC ? "钥匙串" : "Windows 凭据管理器",
     tray: IS_MAC ? "菜单栏" : "通知区域",
+    overridden: "已覆盖",
     autostart: IS_MAC ? "登录时启动" : "开机时启动",
     systemAppearance: IS_MAC ? "macOS 外观设置" : "Windows 外观设置",
     modifierAdvice: IS_MAC ? "Cmd、Control、Option 或 Shift" : "Ctrl、Alt 或 Shift",
@@ -126,6 +127,11 @@ export const ZH: Strings = {
       openFolderFailed: "无法打开该文件夹",
     },
 
+    configFault: {
+      lead: "config.toml 未能加载。",
+      body: "在修好该文件之前，Beckon 按默认设置运行，下面显示的都不是你写的内容。在这里所做的改动会替换该文件 —— 你原来的文件会保存在旁边，名为 config.toml.broken。",
+    },
+
     status: {
       notSaved: (message: string) => `未保存 —— ${message}`,
       saving: "保存中…",
@@ -155,6 +161,8 @@ export const ZH: Strings = {
       edit: (label: string) => `编辑 ${label}`,
       removeLabel: (label: string) => `移除 ${label}`,
       removeHint: "删除此端点及其已保存的密钥。",
+      removeTitle: (label: string) => `移除“${label}”？`,
+      removeBody: "此端点及其已保存的密钥将被删除。此操作无法撤销。",
       removeBlocked: (names: string) => `${names} 正在使用此端点。请先把它们指向别处。`,
       removeLast: "最后一个端点不能移除。",
       back: "连接",
@@ -242,7 +250,7 @@ export const ZH: Strings = {
       lede: "如何唤起 Beckon。",
       hotkeyDeadLead: "有热键未生效。",
       hotkeyDeadBody: "请在下方录制另一个组合键。",
-      permissionLead: "Beckon 无法读取你选中的文本。",
+      permissionLead: "Beckon 无法读取你的选中内容。",
       permissionBody: " macOS 只允许在“隐私与安全性 → 辅助功能”中受信任的应用这样做。",
       permissionStillWorks: "热键和手动输入照常可用。请在列表中打开 Beckon，然后回到这里。",
       openAccessibility: "打开辅助功能设置",
@@ -288,6 +296,7 @@ export const ZH: Strings = {
       deleted: (file: string) => `${file} 已删除。`,
       deleteFailed: "无法删除该文件",
       createFailed: "无法创建该 Action",
+      newActionName: "新 Action",
       rawOpenFailed: "无法读取该文件",
       rawSaved: (file: string) => `${file} 已修好 —— 返回编辑器。`,
 
@@ -301,7 +310,7 @@ export const ZH: Strings = {
       inputSource: "输入来源",
       sourceHint: {
         prompt: "总是请你手动输入。",
-        auto: "用你选中的文本，没有就请你手动输入。",
+        auto: "用你的选中内容，没有就请你手动输入。",
       },
       directHotkey: "专属热键",
       directHotkeyHint: "可选。不设置就从启动器运行。",
