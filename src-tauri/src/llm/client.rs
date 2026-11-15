@@ -150,6 +150,13 @@ fn redirect_verdict(previous: &[reqwest::Url], next: &reqwest::Url) -> Redirect 
 }
 
 pub fn build_http_client() -> reqwest::Client {
+    // reqwest is built with `rustls-no-provider` (see `Cargo.toml`), under which
+    // building a `Client` with no process-wide crypto provider is a panic rather
+    // than an error. The updater plugin installs ring too, but lazily, on its
+    // first check — long after `AppState` has built this client. An `Err` here
+    // means a provider is already installed, which is the state being asked for.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     // No `.timeout(..)` on purpose — see the module docs.
     reqwest::Client::builder()
         .user_agent(concat!("beckon/", env!("CARGO_PKG_VERSION")))

@@ -6,7 +6,7 @@ name = "beckon"
 version = "0.1.0"
 description = "A background-resident LLM shortcut for Windows and macOS"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.91"
 default-run = "beckon"
 
 [build-dependencies]
@@ -36,7 +36,7 @@ tauri-plugin-updater = "2"
 # A Capture leaves the clipboard as a BMP on Windows and a TIFF on macOS, and
 # goes on the wire as base64 PNG (ADR-0016). Default features off: the two
 # decoders and the one encoder that path needs, nothing else.
-base64 = "0.22"
+base64 = "0.23"
 image = { version = "0.25", default-features = false, features = [
     "png",
     "bmp",
@@ -48,30 +48,41 @@ image = { version = "0.25", default-features = false, features = [
 # `memcpy` per turn.
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
-toml = "0.8"
+toml = "1"
 thiserror = "2"
 log = "0.4"
 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 tokio-util = "0.7"
 futures-util = "0.3"
-reqwest = { version = "0.12", default-features = false, features = [
+# `rustls-no-provider` rather than `rustls`: the latter compiles aws-lc-rs, a C
+# and assembly build, into a binary that already carries ring — the updater
+# plugin asks for exactly this pair, so naming the same one keeps a single
+# reqwest and a single crypto provider in the process. The price is that reqwest
+# panics if no provider is installed when a `Client` is built, which is why
+# `llm::client::build_http_client` installs ring first.
+#
+# Certificates are verified by the OS trust store (rustls-platform-verifier)
+# since 0.13; 0.12's `rustls-tls` carried Mozilla's roots in the binary.
+reqwest = { version = "0.13", default-features = false, features = [
     "json",
     "stream",
-    "rustls-tls",
+    "rustls-no-provider",
 ] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 # `notify` itself is used through the debouncer's re-export, so the two can
 # never drift onto incompatible versions.
-notify-debouncer-full = "0.5"
-# The backend is chosen per target below; keyring's own default is a store that
-# refuses every operation, which is what a third platform would get.
-keyring = { version = "3", default-features = false }
+notify-debouncer-full = "0.7"
+# The default `v1` feature is the whole dependency: it picks the store per
+# target — the Credential Manager on Windows, the login Keychain on macOS — and
+# is the only feature under which `keyring::Entry` exists at all since 4.0 moved
+# the stores into crates of their own.
+keyring = "4"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
-keyring = { version = "3", features = ["windows-native"] }
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
     "Win32_System_DataExchange",
@@ -80,14 +91,13 @@ windows = { version = "0.61", features = [
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# The login Keychain, the AppKit half of `platform/macos/`, and CoreGraphics for
-# the synthetic Cmd+C. Default features are left on deliberately: the objc2
-# crates gate every class behind its own feature, and a missing one is a link
-# error nobody on a Windows machine can see.
-keyring = { version = "3", features = ["apple-native"] }
+# The AppKit half of `platform/macos/`, and CoreGraphics for the synthetic
+# Cmd+C. Default features are left on deliberately: the objc2 crates gate every
+# class behind its own feature, and a missing one is a link error nobody on a
+# Windows machine can see.
 objc2-foundation = "0.3"
 objc2-app-kit = "0.3"
-core-graphics = "0.24"
+core-graphics = "0.25"
 
 [dev-dependencies]
 tempfile = "3"

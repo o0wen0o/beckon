@@ -47,7 +47,7 @@ const POLL_CAP: Duration = Duration::from_millis(300);
 
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
-    /// `CGEventSourceFlagsState`. Not in `core-graphics` 0.24, and the only way
+    /// `CGEventSourceFlagsState`. Not in `core-graphics` 0.25, and the only way
     /// to ask which modifiers the user is physically holding.
     fn CGEventSourceFlagsState(state_id: i32) -> u64;
 }

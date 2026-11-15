@@ -44,11 +44,11 @@ jobs:
             rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -61,7 +61,7 @@ jobs:
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The minisign key `plugins.updater.pubkey` verifies against. Without
@@ -89,5 +89,12 @@ jobs:
             key and need none of the above.
           # `latest.json` — the manifest every installed copy polls. Without
           # this the release has artifacts nobody's app can find.
-          includeUpdaterJson: true
+          #
+          # Since v1 of the action the URLs in it are the API's
+          # (`api.github.com/repos/…/releases/assets/{id}`) rather than
+          # `releases/download/{tag}/…`. An asset id survives the draft being
+          # published; the updater plugin fetches it with
+          # `Accept: application/octet-stream`, which is what makes that URL
+          # answer with the file instead of its metadata.
+          uploadUpdaterJson: true
           args: ${{ matrix.args }}

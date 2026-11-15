@@ -20,7 +20,7 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         launcher: "launcher.html",
         popover: "popover.html",
