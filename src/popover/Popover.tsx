@@ -20,13 +20,13 @@ import { Composer } from "./Composer";
 import { PopoverHeader } from "./PopoverHeader";
 import { ResizeGrips } from "./ResizeGrips";
 import { TurnView } from "./Turn";
-import { exchange } from "./exchange";
+import { exchange, isSettled } from "./exchange";
 
 /** How far off the bottom counts as "the user has scrolled up to re-read". */
 const STICK_WITHIN = 48;
 
 /** How long a resize has to stop for before it counts as the size the user
- *  meant (ADR-0018). A drag reports every pixel, and each report Rust keeps is a
+ *  meant. A drag reports every pixel, and each report Rust keeps is a
  *  write to `config.toml`. */
 const SIZE_SETTLE = 400;
 
@@ -50,7 +50,7 @@ export function Popover() {
     };
   }, []);
 
-  // The size the window is dragged to is remembered across summons (ADR-0018).
+  // The size the window is dragged to is remembered across summons.
   // Every resize reports itself, ours included; Rust drops the ones it caused,
   // so this reports all of them and decides nothing. The report is physical
   // pixels straight off the event — `setPopoverSize` converts, once per settled
@@ -75,18 +75,26 @@ export function Popover() {
     scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [answer]);
 
-  // A new trigger is a new conversation in a window that was never destroyed
-  // (ADR-0007), so it starts at the top and follows again.
+  // A new trigger is a new conversation in a window that was never destroyed,
+  // so it starts at the top and follows again.
   React.useEffect(() => {
     stick.current = true;
     if (scroller.current) scroller.current.scrollTop = 0;
   }, [store.epoch]);
 
   React.useEffect(() => {
+    /** Whether the Insert chord went down in this window and has not come up. */
+    let insertArmed = false;
+    /** The last turn's answer, once it has stopped changing — or nothing. */
+    const insertable = () => {
+      const current = exchange.current;
+      return current?.answer && isSettled(current.status) ? current.answer : null;
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        // Esc closes the preview first (ADR-0017): it is the only layer over the
+        // Esc closes the preview first: it is the only layer over the
         // window, so it is the nearest thing to back out of — and closing it
         // must not also cancel the request underneath it.
         if (exchange.closePreview()) return;
@@ -102,19 +110,46 @@ export function Popover() {
         exchange.stepPreview(event.key === "ArrowRight" ? 1 : -1);
         return;
       }
-      /** Both window shortcuts are the same chord with one letter changed. */
+      /** Every window shortcut is the same chord with one key changed. */
       const chord = (key: string) =>
         event.key.toLowerCase() === key && hasCommandModifier(event) && event.shiftKey;
       // The screenshot shortcut, so a Popover summoned by a hotkey can grab one
-      // without the mouse (ADR-0016). Window-scoped: it is not registered
+      // without the mouse. Window-scoped: it is not registered
       // globally and means nothing when the Popover is not up.
       if (chord("s")) {
         event.preventDefault();
         void startCapture();
         return;
       }
-      // Copy is the only export path, so it gets a shortcut that works while
-      // the composer has focus.
+      // Insert: the answer goes back to the app Beckon was summoned
+      // over and this window closes — so a Direct Hotkey, a read, and this chord
+      // is a rewrite done without the mouse. Enter rather than V: this chord
+      // with V is "paste as plain text" in the composer, and taking a text
+      // field's own key away is how a shortcut gets resented. Only a settled
+      // answer — half a stream pasted into a document is not what was asked for.
+      //
+      // Armed here and fired on the way up (`onKeyUp`). Insert hands the
+      // foreground to another app while this key is still physically down, and
+      // a key held past the repeat delay then repeats *into that app* — as a
+      // bare Enter, because Rust has released the modifiers by then. In a chat
+      // window a bare Enter is Send. Waiting for the release costs nothing a
+      // person can feel and means the only keystroke the target ever sees is
+      // the paste.
+      if (chord("enter")) {
+        if (!insertable()) return;
+        event.preventDefault();
+        insertArmed = true;
+        return;
+      }
+      // Run the last turn again: Regenerate on a settled one, Retry on a failed
+      // one — the same request either way. Swallowed even when there is nothing
+      // to rerun, because unswallowed this chord is the webview's hard reload.
+      if (chord("r")) {
+        event.preventDefault();
+        if (exchange.canRetry) void exchange.retry();
+        return;
+      }
+      // Copy gets a shortcut that works while the composer has focus.
       if (chord("c")) {
         const current = exchange.current;
         if (!current?.answer) return;
@@ -122,8 +157,32 @@ export function Popover() {
         void exchange.copy(current.answer, exchange.turns.length - 1);
       }
     };
+
+    // The release that fires an armed Insert. The modifiers are not asked
+    // about: whichever key of the chord comes up first, the gesture was made
+    // on the way down, and Rust releases what is still held.
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || !insertArmed) return;
+      insertArmed = false;
+      // Asked again rather than remembered: a new trigger can have replaced
+      // the conversation between the two halves of one key press.
+      const answer = insertable();
+      if (answer) void exchange.insert(answer, exchange.turns.length - 1);
+    };
+    // A release this window never sees — focus went elsewhere mid-press —
+    // must not leave the next plain Enter armed.
+    const disarm = () => {
+      insertArmed = false;
+    };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", disarm);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", disarm);
+    };
   }, []);
 
   const view = store.view;
@@ -133,7 +192,7 @@ export function Popover() {
     // The frameless card fills the window rect exactly, so the drop shadow
     // under it is the compositor's rather than one painted here. `relative` is
     // for the preview layer: it covers this card, not the viewport, so the
-    // rounded corners stay the window's own (ADR-0017).
+    // rounded corners stay the window's own.
     <div className="bg-background relative flex h-screen flex-col overflow-hidden rounded-lg border">
       <PopoverHeader
         actionName={view?.action_name ?? "Beckon"}
@@ -152,9 +211,8 @@ export function Popover() {
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3.5 py-3 scrollbar-gutter-stable"
       >
         {/* Which notice this is comes from the store; a notice has no side to
-            sit on. Neither is an alarm any more — the one that was is the hint
-            ADR-0020 removed, and an empty grab now lands in the composer. They
-            share one element rather than two matching ones, so "the same slot,
+            sit on. Neither is an alarm: an empty grab lands in the composer.
+            They share one element rather than two matching ones, so "the same slot,
             with no step of difference between them" is structural instead of two
             class strings kept equal by hand. */}
         {store.notice === "none" ? null : (
@@ -168,7 +226,12 @@ export function Popover() {
         )}
 
         {store.turns.map((turn, index) => (
-          <TurnView key={index} turn={turn} index={index} />
+          <TurnView
+            key={index}
+            turn={turn}
+            index={index}
+            last={index === store.turns.length - 1}
+          />
         ))}
       </div>
 
@@ -190,7 +253,7 @@ export function Popover() {
       {store.composing ? (
         <Composer
           // A fresh element per trigger: the draft and the grown height are the
-          // browser's, and remounting is what clears both (ADR-0007).
+          // browser's, and remounting is what clears both.
           // A Capture arriving is *not* a new trigger — it lands on
           // `popover:capture` precisely so the draft it belongs to survives.
           key={store.epoch}
@@ -207,7 +270,7 @@ export function Popover() {
 
       {/* Last child and `absolute inset-0`, so it covers the title bar as well:
           a preview under the drag region would leave the window's one grab
-          handle sitting on top of the picture (ADR-0017). */}
+          handle sitting on top of the picture. */}
       {store.preview ? (
         <CapturePreview
           items={store.preview.items}
@@ -218,8 +281,8 @@ export function Popover() {
       ) : null}
 
       {/* After the preview, and above it: the window stays resizable while a
-          screenshot is being looked at, which is when its size matters most
-          (ADR-0018). */}
+          screenshot is being looked at, which is when its size matters most.
+          */}
       <ResizeGrips />
     </div>
   );

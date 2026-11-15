@@ -53,6 +53,12 @@ from the Launcher, or bind it to its own hotkey and skip the Launcher entirely.
   rendered as Markdown — lists, tables, and code blocks with a Copy of their own — while Copy on the
   turn still hands you the source. A link opens in your browser; an image is shown as a link rather
   than fetched, and HTML in an answer is just text.
+- **Insert** — the button beside Copy, or `Ctrl+Shift+Enter` (`Cmd+Shift+Enter`). The answer is
+  pasted into the app you summoned Beckon over and the Popover closes: if what you selected is still
+  highlighted there it is replaced, otherwise the text lands at the caret. It is Copy plus one
+  keystroke, so the answer is also on your clipboard — and stays there, which is what makes a paste
+  that missed one `Ctrl+V` from fixed.
+- **Regenerate** — on the last answer, or `Ctrl+Shift+R`. The same question, asked again.
 - **Screenshot** — the button in the Popover runs your OS snip tool and attaches the result, up to
   four per turn. It is attached, then sent — never captured-and-sent. Whether the model reads
   images is between you and your endpoint.
@@ -203,16 +209,16 @@ Exchange is never on disk to come back to.
 
 | | Why |
 | --- | --- |
-| History, search, saved conversations | An Exchange dies with the window, on purpose ([ADR-0004](./docs/adr/0004-exchanges-are-never-persisted.md)) |
+| History, search, saved conversations | An Exchange dies with the window, on purpose |
 | Action categories or tags | At a dozen Actions, fuzzy search is enough; subdirectories can do it later for free |
 | Fill-in-the-blank Actions | Breaks "press it and wait"; the system prompt can decide instead |
-| Replacing the selected text in place | [ADR-0002](./docs/adr/0002-selection-via-simulated-ctrl-c.md) |
+| Replacing the selected text *automatically* | Insert is a button you press after reading the answer; an Action that pastes over your words unread is not offered |
 | A floating icon after you select text | Needs global selection polling — power-hungry, easy to misfire, and it fights the copy-shortcut grab |
 | Token usage display | A flash translation costs a fraction of a cent; the number changes nothing |
-| Web search where the endpoint makes it a tool call | Kimi's `$web_search` and its kind need a second round trip to answer; a turn here is one request ([ADR-0026](./docs/adr/0026-web-search-is-a-per-action-switch-the-row-can-express.md)) |
+| Web search where the endpoint makes it a tool call | Kimi's `$web_search` and its kind need a second round trip to answer; a turn here is one request |
 | Citing the pages a search read | The endpoints Beckon can ask fold the results into the answer; the sources some of them stream alongside are not rendered yet |
 | Linux | The stubs in `platform/fallback.rs` keep the crate compiling, and are not a promise |
-| Code signing and notarization | Not set up on either platform ([ADR-0013](./docs/adr/0013-support-macos-alongside-windows.md)) |
+| Code signing and notarization | Not set up on either platform |
 
 ## Building it yourself
 
@@ -230,5 +236,4 @@ will accept. See [CLAUDE.md](./CLAUDE.md) for the four gates CI enforces.
 ## Reading further
 
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary, one name per concept, English and Chinese.
-- [docs/adr/](./docs/adr/) — 28 decisions, each with what was rejected and why.
 - [docs/macos-testing.md](./docs/macos-testing.md) — the behaviour no compiler checks.

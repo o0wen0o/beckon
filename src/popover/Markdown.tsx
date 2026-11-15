@@ -1,4 +1,4 @@
-// An answer, rendered as Markdown (ADR-0028).
+// An answer, rendered as Markdown.
 //
 // Only the answer: the question card is the user's own words and the reasoning
 // is a model talking to itself, and neither is written to be formatted. An
@@ -31,17 +31,15 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import { copyToClipboard, openLink } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
+// How long a code block's Copy says what happened is the turn's own number:
+// the two buttons are one behaviour at two sizes.
+import { REPORT_FOR } from "./exchange";
 
 /** The tree `react-markdown` hands a component beside its props. Read off the
  *  library's own type rather than imported from `hast`, which is a dependency
  *  of a dependency. */
 type Element = NonNullable<ExtraProps["node"]>;
 type Child = Element["children"][number];
-
-/** How long a code block's Copy says what happened — the same 1600ms the
- *  turn's own Copy holds its checkmark for (`exchange.copy`), so the two
- *  buttons are one behaviour at two sizes. */
-const REPORT_FOR = 1600;
 
 /** The answer is the only prose in the product, so it gets its own leading.
  *  `max-w-full min-w-0` is for the blocks that scroll sideways: the column
@@ -142,7 +140,7 @@ function CodeBlock({ node }: ExtraProps) {
   const copy = async () => {
     let outcome: "copied" | "failed" = "copied";
     try {
-      // A user-requested clipboard write: not restored (ADR-0002).
+      // A user-requested clipboard write: not restored.
       await copyToClipboard(text);
     } catch {
       outcome = "failed";

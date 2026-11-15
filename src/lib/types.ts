@@ -1,10 +1,10 @@
 // Mirrors the serde shapes in src-tauri. Rust is authoritative for all of it
-// (ADR-0003) — nothing here is a local source of truth.
+// — nothing here is a local source of truth.
 
 export type InputSource = "prompt" | "auto";
 
 /**
- * How an endpoint is told **not** to think (ADR-0021).
+ * How an endpoint is told **not** to think.
  *
  * A property of the endpoint, never of the model — a DeepSeek-weighted model
  * served by SiliconFlow speaks the plain OpenAI dialect — so it cannot be
@@ -20,7 +20,7 @@ export type Reasoning =
   | "none";
 
 /**
- * How an endpoint is asked to **search the web** (ADR-0026).
+ * How an endpoint is asked to **search the web**.
  *
  * `Reasoning` with the polarity reversed: these are on-switches, because no
  * endpoint searches unless asked. `none` is every endpoint with no such field
@@ -115,14 +115,14 @@ export type Theme = "light" | "dark" | "system";
 /**
  * Which language every surface is written in; `en` is what an absent setting
  * is. There is no `system` arm the way `Theme` has one — the OS locale is a
- * guess about a reader rather than a setting (ADR-0015).
+ * guess about a reader rather than a setting.
  */
 export type Language = "en" | "zh";
 
 export interface Config {
   launcher_hotkey: string;
   autostart: boolean;
-  /** The automatic once-per-launch update check (ADR-0022). The tray's own item
+  /** The automatic once-per-launch update check. The tray's own item
    *  is a click and is never what this declines. */
   update_check: boolean;
   theme: Theme;
@@ -130,7 +130,7 @@ export interface Config {
   /** What an Action that names no provider gets. Not "active": nothing is. */
   defaults: { provider: string };
   api: { providers: Provider[] };
-  /** The size the Popover is summoned at, in logical pixels (ADR-0018). Rust
+  /** The size the Popover is summoned at, in logical pixels. Rust
    *  clamps it, so this is always a size a window can actually be. */
   popover: { width: number; height: number };
 }
@@ -142,7 +142,7 @@ export type KeyStatus =
 
 /**
  * Whether the OS will let Beckon synthesise the copy keystroke the Selection is
- * grabbed with (ADR-0002, ADR-0013).
+ * grabbed with.
  *
  * `not-required` is Windows, and is not the same statement as `granted`: there
  * is nothing to grant, so Settings says nothing rather than reporting a
@@ -169,7 +169,7 @@ export interface ModelOption {
   description: string;
   thinking: ThinkingSupport | null;
   /**
-   * Whether this endpoint's search field reaches this model (ADR-0027).
+   * Whether this endpoint's search field reaches this model.
    * `null` is "the vendor documents neither", and the switch stays offered on
    * it; `false` is the vendor's own word, and the only thing that greys one.
    */
@@ -182,7 +182,7 @@ export interface ModelOption {
  * which spelled one three-state as two booleans with an impossible combination.
  *
  * - `live` — the endpoint answered *just now*.
- * - `cached` — the list it served last time, kept on disk (ADR-0024), because it
+ * - `cached` — the list it served last time, kept on disk, because it
  *   was not asked or did not answer.
  * - `none` — it has never answered; only the configuration names anything, and
  *   on a fresh row that is nothing at all.
@@ -203,8 +203,8 @@ export interface ModelCatalog {
 export type PopoverPhase = "needs-input" | "running";
 
 /**
- * A screenshot the user grabbed with the OS snip tool, normalised to PNG in Rust
- * (ADR-0016). `data_url` is both the `<img src>` and the value that goes on the
+ * A screenshot the user grabbed with the OS snip tool, normalised to PNG in Rust.
+ * `data_url` is both the `<img src>` and the value that goes on the
  * wire — one copy, so the thumbnail cannot differ from what was sent.
  */
 export interface Capture {
@@ -222,14 +222,14 @@ export interface PopoverView {
   phase: PopoverPhase;
   input: string | null;
   exchange_id: string | null;
-  /** Attached and not yet sent, oldest first (ADR-0017). */
+  /** Attached and not yet sent, oldest first. */
   captures: Capture[];
   /** What the last snip had to say, if it had anything. */
   capture_notice: CaptureNotice | null;
 }
 
 /**
- * What one run of the snip tool left to say (ADR-0016).
+ * What one run of the snip tool left to say.
  *
  * One value rather than a flag beside an error, because the two can never both
  * stand: a run either attached a Capture, produced nothing, or produced bytes

@@ -22,7 +22,7 @@ export function Appearance() {
   // No icon set: `Segmented`'s icons are all-or-nothing, and there is no second
   // glyph that means "Chinese" the way a moon means dark. Each language names
   // itself in itself instead, which is what a reader who cannot read the
-  // current one needs (ADR-0015).
+  // current one needs.
   const languages = [
     { value: "en", label: t.settings.appearance.english },
     { value: "zh", label: t.settings.appearance.chinese },

@@ -22,7 +22,7 @@ pub use self::secrets::*;
 pub use self::windows::*;
 
 /// Re-exported so a command still returns `commands::Failure`: it lives at the
-/// crate root because `platform::capture` produces one too (ADR-0016), and one
+/// crate root because `platform::capture` produces one too, and one
 /// shape is what makes `describeFailure` a single reader.
 pub use crate::failure::Failure;
 

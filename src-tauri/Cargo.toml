@@ -1,8 +1,8 @@
 [package]
 name = "beckon"
 # Not the version Beckon reports. `tauri.conf.json` reads `../package.json`, and
-# that is what reaches the bundle, the manifest and `package_info().version`
-# (ADR-0022). This one is the crate's, and nothing consumes it.
+# that is what reaches the bundle, the manifest and `package_info().version`.
+# This one is the crate's, and nothing consumes it.
 version = "0.1.0"
 description = "A background-resident LLM shortcut for Windows and macOS"
 edition = "2021"
@@ -15,26 +15,26 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # `macos-private-api` is what makes a transparent window legal on macOS; the
 # Launcher and Popover are frameless cards over a transparent `<body>` on both
-# platforms (ADR-0013). It is inert on Windows.
+# platforms. It is inert on Windows.
 tauri = { version = "2", features = [
     "tray-icon",
     "image-png",
     "macos-private-api",
 ] }
-# One process, always (ADR-0023). Registered first in `main` so a second launch
+# One process, always. Registered first in `main` so a second launch
 # dies before it can touch the tray, the hotkeys or the config watcher.
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
-# The self-update channel (ADR-0022). The signature it verifies is the minisign
+# The self-update channel. The signature it verifies is the minisign
 # one over the release artifact, not a platform code signature — the trust
 # anchor is `plugins.updater.pubkey`, compiled into this binary.
 tauri-plugin-updater = "2"
 
 # A Capture leaves the clipboard as a BMP on Windows and a TIFF on macOS, and
-# goes on the wire as base64 PNG (ADR-0016). Default features off: the two
+# goes on the wire as base64 PNG. Default features off: the two
 # decoders and the one encoder that path needs, nothing else.
 base64 = "0.23"
 image = { version = "0.25", default-features = false, features = [
@@ -44,7 +44,7 @@ image = { version = "0.25", default-features = false, features = [
 ] }
 
 # `rc`: a Capture's data URL lives behind an `Arc<str>` so resending the
-# untruncated history (ADR-0004) is a refcount bump rather than megabytes of
+# untruncated history is a refcount bump rather than megabytes of
 # `memcpy` per turn.
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"

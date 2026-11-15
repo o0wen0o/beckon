@@ -12,7 +12,7 @@ import { startTheme } from "./theme";
  * Both are awaited so the window never paints one palette — or one language —
  * and then flips. They are read concurrently because neither depends on the
  * other, and they are two reads of the same config file. Launcher and Popover
- * are created hidden at startup (ADR-0007), so the wait is paid once at launch
+ * are created hidden at startup, so the wait is paid once at launch
  * and never on the hot path.
  */
 export async function mountSurface(element: ReactElement) {

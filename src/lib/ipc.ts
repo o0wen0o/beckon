@@ -27,7 +27,7 @@ import type {
 export const getConfig = () => invoke<Config>("get_config");
 export const saveConfig = (config: Config) => invoke<void>("save_config", { config });
 export const revealConfigDir = () => invoke<void>("reveal_config_dir");
-/** The filled-in rows "Add from preset" offers (ADR-0021). */
+/** The filled-in rows "Add from preset" offers. */
 export const getProviderPresets = () => invoke<Provider[]>("get_provider_presets");
 export const getStartupErrors = () => invoke<string[]>("get_startup_errors");
 
@@ -46,7 +46,7 @@ export const writeActionRaw = (fileName: string, text: string) =>
 
 /**
  * Every configured row's credential status, in one read — the Connection pane
- * draws the whole inventory at once (ADR-0021).
+ * draws the whole inventory at once.
  */
 export const getKeyStatuses = () => invoke<Record<string, KeyStatus>>("get_key_statuses");
 /** One row's status, for the operations that change exactly one of them. */
@@ -95,29 +95,35 @@ export const cancelExchange = (exchangeId: string) =>
   invoke<void>("cancel_exchange", { exchangeId });
 export const retryExchange = (exchangeId: string) => invoke<void>("retry_exchange", { exchangeId });
 /**
- * Runs the OS snip tool; the result arrives as `popover:capture` (ADR-0016).
+ * Runs the OS snip tool; the result arrives as `popover:capture`.
  *
  * There is deliberately nothing worth awaiting and no "capturing" flag anywhere:
  * the window hides while the snip tool owns the screen, so it is not there to
  * show one.
  */
 export const startCapture = () => invoke<void>("start_capture");
-/** One tile's remove button, by position in the attached list (ADR-0017). */
+/** One tile's remove button, by position in the attached list. */
 export const discardCapture = (index: number) => invoke<void>("discard_capture", { index });
 export const hidePopover = () => invoke<void>("hide_popover");
 export const hideLauncher = () => invoke<void>("hide_launcher");
 export const showSettings = () => invoke<void>("show_settings");
 export const copyToClipboard = (text: string) => invoke<void>("copy_to_clipboard", { text });
 /**
- * A link in an answer, opened in the system browser (ADR-0028). Rust refuses
+ * Copy, close the Popover, and paste into the app Beckon was summoned over.
+ * Resolving means the window is already gone; a rejection means it
+ * is still up, which is the only time there is anywhere to say so.
+ */
+export const insertAnswer = (text: string) => invoke<void>("insert_answer", { text });
+/**
+ * A link in an answer, opened in the system browser. Rust refuses
  * anything that is not `http`/`https`: the URL is the model's text, and the
  * check belongs on the side that did not render it.
  */
 export const openLink = (url: string) => invoke<void>("open_link", { url });
 
-// --- the Popover's own size (ADR-0018) ------------------------------------
+// --- the Popover's own size ------------------------------------
 /**
- * Which edge or corner of the window a grip drags (ADR-0018).
+ * Which edge or corner of the window a grip drags.
  *
  * Spelled out here rather than imported: `@tauri-apps/api/window` declares the
  * union but does not export it, and the member names are the plugin's wire
@@ -135,7 +141,7 @@ export type ResizeDirection =
 
 /**
  * Hand a press on one of the Popover's grips to the window manager, which owns
- * the drag from there (ADR-0018). An undecorated window has no border for the OS
+ * the drag from there. An undecorated window has no border for the OS
  * to hit-test, so this is the only way one is resized by pointer.
  */
 export const startResizeDragging = (direction: ResizeDirection) =>
@@ -154,7 +160,7 @@ export const onWindowResized = (fn: (width: number, height: number) => void) => 
 };
 
 /**
- * Remember the size the window was dragged to (ADR-0018), given the physical
+ * Remember the size the window was dragged to, given the physical
  * size the resize event reported. Debounce it: a drag reports every pixel, and
  * each report Rust keeps is a write to `config.toml`.
  *

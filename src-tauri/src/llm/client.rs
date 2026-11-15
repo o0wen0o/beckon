@@ -86,11 +86,11 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 ///
 /// `None` is a real answer, not a missing one: a local endpoint wants no
 /// `Authorization` header at all, and sending `Bearer ` with nothing after it is
-/// a 401 from anything that reads the header (ADR-0021). Every request goes
+/// a 401 from anything that reads the header. Every request goes
 /// through here so "no key means no header" is one rule.
 ///
 /// **Both credential schemes go on every keyed request**, which is what lets the
-/// provider table stay free of the `auth` field ADR-0021 refuses. Anthropic is
+/// provider table stay free of an `auth` field. Anthropic is
 /// the one vendor whose compatibility layer is not the whole story: its native
 /// `GET /v1/models` reads an `Authorization: Bearer` as an *OAuth* token and
 /// rejects an API key outright, while `x-api-key` authenticates on both that
@@ -165,7 +165,7 @@ pub fn build_http_client() -> reqwest::Client {
         // is a fixed set and `x-api-key` — which every keyed request carries
         // since Anthropic's native routes needed it — is not in it. Following
         // would hand the user's key in plaintext to whatever host the 3xx names,
-        // which is a party the user never chose and a disclosure ADR-0025 could
+        // which is a party the user never chose and the relay disclosure could
         // not have shown them. Stopping surfaces the 3xx as an ordinary status
         // error instead.
         //
@@ -329,7 +329,7 @@ async fn send_read(
     Ok((status, body))
 }
 
-/// "Test connection" (Phase 2 / ADR-0005): the smallest request that proves the
+/// "Test connection": the smallest request that proves the
 /// key and `base_url` work, reporting auth failure separately from a network
 /// failure.
 pub async fn test_connection(
@@ -378,7 +378,7 @@ pub(super) async fn accepts_body(
 /// The ids the endpoint says it serves.
 ///
 /// Every failure comes back as an ordinary [`LlmError`], so a rejected key
-/// stays distinguishable from an unreachable API (ADR-0005) even though the
+/// stays distinguishable from an unreachable API even though the
 /// caller's response to both is the same: fall back to the documented list.
 pub async fn list_models(
     http: &reqwest::Client,
@@ -539,7 +539,7 @@ mod tests {
         assert_eq!(headers["anthropic-version"], ANTHROPIC_VERSION);
     }
 
-    /// The other half of the same rule (ADR-0021): no key means no credential
+    /// The other half of the same rule: no key means no credential
     /// at all, because a local endpoint wants an ordinary unauthenticated
     /// request and `Bearer ` with nothing after it is a 401.
     #[test]

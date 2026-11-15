@@ -18,8 +18,7 @@ per *Checking a vendor's facts* in [SKILL.md](SKILL.md), and finish at *Not done
 
 ## Retiring
 
-Keep the row: a config that still names a withdrawn model has to keep working and be explained
-(ADR-0021).
+Keep the row: a config that still names a withdrawn model has to keep working and be explained.
 
 1. Set `retired: true` and put the withdrawal date in both descriptions.
    `a_configured_retired_model_is_offered_and_explained` asserts the English one carries the date.

@@ -1,8 +1,8 @@
 //! The one piece of clipboard mechanics both Win32 grabs are built on.
 //!
 //! Two callers want the same thing and want it with different timings: the
-//! Selection grab polls for 300ms after synthesising Ctrl+C (ADR-0002), the
-//! Capture polls for 45 seconds while a person drags a rectangle (ADR-0016).
+//! Selection grab polls for 300ms after synthesising Ctrl+C, the
+//! Capture polls for 45 seconds while a person drags a rectangle.
 //! What is *identical* is the subtlety — the sequence number moves when the
 //! owner opens the clipboard, which can be a beat before the data is readable —
 //! and that is the part worth having exactly one copy of.

@@ -1,4 +1,4 @@
-//! Stubs for a platform Beckon does not ship on yet (ADR-0001, ADR-0013).
+//! Stubs for a platform Beckon does not ship on yet.
 //!
 //! Nothing here works; the point is that the crate still compiles off Windows
 //! and macOS, which is what keeps the isolation honest — a Win32 or AppKit call
@@ -22,6 +22,9 @@ pub mod selection {
     }
     pub fn write_clipboard_text(_text: &str) -> Result<(), String> {
         Err("clipboard access is not implemented on this platform".to_string())
+    }
+    pub fn send_paste() -> Result<(), String> {
+        Err("pasting is not implemented on this platform".to_string())
     }
 }
 

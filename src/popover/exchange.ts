@@ -8,7 +8,7 @@
 // over `exchange:*`. It touches no DOM — following the stream and focusing the
 // composer are effects in the components, keyed off what changed here.
 //
-// A module-level singleton: one Popover window, never destroyed (ADR-0007).
+// A module-level singleton: one Popover window, never destroyed.
 import {
   cancelExchange,
   copyToClipboard,
@@ -16,6 +16,7 @@ import {
   describeError,
   followUp,
   getPopoverView,
+  insertAnswer,
   onDelta,
   onDone,
   onExchangeError,
@@ -32,7 +33,7 @@ import type { Capture, CaptureNotice, CapturePayload, Failure, PopoverView } fro
 
 /**
  * Whether there is anything to send. A Capture is input on its own: the Action's
- * own prompt is the question being asked about it (ADR-0016).
+ * own prompt is the question being asked about it.
  *
  * A free function rather than a getter, because the draft lives in the composer
  * and the guard lives in the store — one rule, read from both sides.
@@ -56,8 +57,8 @@ export type Status =
 
 export interface Turn {
   question: string;
-  /** The Captures that went with the question, in the order they were taken
-   *  (ADR-0016, ADR-0017). Empty for a turn that carried only words. */
+  /** The Captures that went with the question, in the order they were taken.
+   *  Empty for a turn that carried only words. */
   captures: Capture[];
   answer: string;
   reasoning: string;
@@ -70,6 +71,11 @@ export interface Turn {
   reasoningTouched: boolean;
   questionExpanded: boolean;
 }
+
+/** How long a button says what its gesture came to — Copied, or either
+ *  refusal. One number, exported for the code block's own Copy
+ *  (`Markdown.tsx`), because all of them are one behaviour at two sizes. */
+export const REPORT_FOR = 1600;
 
 /** How often the "waiting" counter reads the clock. */
 const TICK = 250;
@@ -94,7 +100,7 @@ export function isSettled(status: Status) {
 
 /**
  * The standing notice a conversation carries when it has no turns yet. None of
- * them is an alarm since ADR-0020 removed the hint, so the Popover renders each
+ * them is an alarm, so the Popover renders each
  * of them as ordinary prose rather than as a `Callout`.
  */
 export type Notice = "none" | "no-view" | "awaiting-input";
@@ -103,7 +109,7 @@ class ExchangeStore extends Notifier {
   view: PopoverView | null = null;
   turns: Turn[] = [];
   /**
-   * Attached and not yet sent, oldest first. Rust owns them (ADR-0003) and hands
+   * Attached and not yet sent, oldest first. Rust owns them and hands
    * them over on `popover:capture`; this is that value, not a second opinion
    * about it.
    */
@@ -117,13 +123,21 @@ class ExchangeStore extends Notifier {
    * A second field rather than a tri-state on `copiedTurn`, because the two are
    * not the same shape: a success is one turn's checkmark and a failure is one
    * turn's warning, and a value that is either would have to be read as both
-   * everywhere it is used. Copy is the only way a result leaves Beckon, so the
+   * everywhere it is used. Copy is how a result leaves Beckon, so the
    * checkmark simply not appearing is not a report — that is indistinguishable
    * from a button that did nothing.
    */
   copyFailedTurn: number | null = null;
   /**
-   * Bumped by every reveal. The window is reused (ADR-0007), so the composer
+   * The turn whose Insert was refused, if one was.
+   *
+   * There is no `insertedTurn` beside it: an Insert that worked closed the
+   * window, so there is nothing left to draw a checkmark on. Only the refusal
+   * has a window to be reported in.
+   */
+  insertFailedTurn: number | null = null;
+  /**
+   * Bumped by every reveal. The window is reused, so the composer
    * still holds the last trigger's draft at the last trigger's height; keying
    * it on this remounts it, which clears both at once.
    */
@@ -163,13 +177,12 @@ class ExchangeStore extends Notifier {
   /**
    * Which set is being looked at full size, and where in it — never the images
    * themselves. `"composer"` is the pending tray, a number is that turn's own
-   * set; the two are different sets and the arrows must not cross between them
-   * (ADR-0017).
+   * set; the two are different sets and the arrows must not cross between them.
    *
    * Frontend-only, like `reasoningOpen`: nothing about looking at an image
    * changes what would be sent, so Rust has no opinion about it. Naming the set
    * rather than copying it is what keeps it from becoming a second opinion
-   * about what is attached (ADR-0003) — the tray shrinking under an open
+   * about what is attached — the tray shrinking under an open
    * preview shortens it, and emptying closes it, with nothing to invalidate.
    */
   #preview: { source: "composer" | number; index: number } | null = null;
@@ -200,9 +213,8 @@ class ExchangeStore extends Notifier {
   }
 
   /** Structural rather than a phase read: whether there is a view, and whether
-   *  it has turns yet. ADR-0020 removed the phase that used to pick between two
-   *  notices here, so an empty grab lands in the same notice typed input does —
-   *  which is why no `PopoverPhase` is consulted below. */
+   *  it has turns yet. No phase picks between notices here: an empty grab
+   *  lands in the same notice typed input does — which is why no `PopoverPhase` is consulted below. */
   get notice(): Notice {
     if (this.view === null) return "no-view";
     if (this.turns.length > 0) return "none";
@@ -211,7 +223,7 @@ class ExchangeStore extends Notifier {
 
   /** Which of the two words the bar along the bottom says. `busy` decides
    *  whether the bar is there at all; this picks between "streaming" and
-   *  "waiting", and the words themselves are the catalog's (ADR-0015). */
+   *  "waiting", and the words themselves are the catalog's. */
   get streaming() {
     return this.current?.status === "streaming";
   }
@@ -219,7 +231,7 @@ class ExchangeStore extends Notifier {
   // --- lifecycle ----------------------------------------------------------
 
   /**
-   * Wire the window up. The Popover outlives every trigger (ADR-0007), so a
+   * Wire the window up. The Popover outlives every trigger, so a
    * new one arrives as `popover:view`, not as a mount.
    */
   listen(subscriptions: Subscriptions) {
@@ -283,7 +295,7 @@ class ExchangeStore extends Notifier {
 
   /**
    * Only the "waiting for the first token" counter reads the clock; the window
-   * is never destroyed (ADR-0007), so this would otherwise re-render four times
+   * is never destroyed, so this would otherwise re-render four times
    * a second forever. It publishes only when the displayed second changes.
    */
   startClock() {
@@ -314,6 +326,7 @@ class ExchangeStore extends Notifier {
     this.view = view;
     this.copiedTurn = null;
     this.copyFailedTurn = null;
+    this.insertFailedTurn = null;
     this.epoch += 1;
     // A Capture belongs to the Popover that was showing, so a fresh trigger
     // starts with nothing attached — and Rust says so, rather than this
@@ -361,7 +374,7 @@ class ExchangeStore extends Notifier {
 
   /** Look at one Capture full size. `source` is the set it belongs to — the
    *  pending tray, or the turn at that index — so the arrows walk that set and
-   *  nothing else (ADR-0017). */
+   *  nothing else. */
   openPreview(source: "composer" | number, index: number) {
     this.#preview = { source, index };
     this.notify();
@@ -413,7 +426,7 @@ class ExchangeStore extends Notifier {
       if (this.view) {
         // The two capture fields are deliberately left as they were: they are
         // only ever read by `load`, which replaces the whole view with Rust's
-        // own (ADR-0003), so nulling them here would be a write nothing reads.
+        // own, so nulling them here would be a write nothing reads.
         this.view = { ...this.view, phase: "running", exchange_id: exchangeId, input: text };
         // The turn was already running while the id was on its way back.
         this.#adoptEarly();
@@ -424,9 +437,24 @@ class ExchangeStore extends Notifier {
     }
   }
 
+  /** Whether the last turn can be run again: there is an Exchange to run it
+   *  against, and nothing is in flight. The button and the chord both ask. */
+  get canRetry() {
+    return this.view?.exchange_id != null && this.current !== null && !this.busy;
+  }
+
+  /**
+   * Run the last turn again, as it stands. Two buttons end up here and they are
+   * one operation: Retry on a turn that failed, Regenerate on one that settled.
+   * Rust resends the same message and drops whatever came after it
+   * (`retry_turn`), so the answer on screen is cleared to match.
+   */
   async retry() {
     const current = this.current;
-    if (!this.view?.exchange_id || !current) return;
+    // `busy` as well: the chord reaches this with no button to have hidden, and
+    // a second request against a turn still streaming would interleave two
+    // answers into one.
+    if (!this.view?.exchange_id || !current || this.busy) return;
     current.status = "waiting-first-token";
     current.note = undefined;
     current.answer = "";
@@ -458,17 +486,17 @@ class ExchangeStore extends Notifier {
   async copy(text: string, index: number) {
     // Both callers are `void exchange.copy(...)` — the button and the window's
     // own chord — so a rejection escaping here is swallowed entirely and the
-    // only export path fails in silence. Caught rather than thrown on: the
+    // export path fails in silence. Caught rather than thrown on: the
     // report belongs on the button that was pressed.
     try {
-      // A user-requested clipboard write: not restored (ADR-0002).
+      // A user-requested clipboard write: not restored.
       await copyToClipboard(text);
     } catch {
       // The cause is not quoted. `write_clipboard_text` fails when another
       // process holds the clipboard, which is a sentence about Win32 rather
       // than about anything the reader can act on — and this label sits inside
       // a 12px button. Everywhere a cause *is* worth quoting there is a toast
-      // or a field to quote it into; the Popover has neither (ADR-0007: the
+      // or a field to quote it into; the Popover has neither (the
       // window is a conversation, not a form).
       this.copiedTurn = null;
       this.copyFailedTurn = index;
@@ -477,7 +505,7 @@ class ExchangeStore extends Notifier {
         if (this.copyFailedTurn !== index) return;
         this.copyFailedTurn = null;
         this.notify();
-      }, 1600);
+      }, REPORT_FOR);
       return;
     }
     this.copyFailedTurn = null;
@@ -487,7 +515,31 @@ class ExchangeStore extends Notifier {
       if (this.copiedTurn !== index) return;
       this.copiedTurn = null;
       this.notify();
-    }, 1600);
+    }, REPORT_FOR);
+  }
+
+  /**
+   * Paste an answer into the app Beckon was summoned over. Rust
+   * copies it, closes this window and sends the paste shortcut; the view event
+   * that follows is what empties the store, so success leaves nothing to do
+   * here.
+   *
+   * A refusal — nothing to insert into, a window that has since closed, a
+   * clipboard that would not take the text — comes back with the Popover still
+   * up, and is reported on the button for the reason a failed Copy is.
+   */
+  async insert(text: string, index: number) {
+    try {
+      await insertAnswer(text);
+    } catch {
+      this.insertFailedTurn = index;
+      this.notify();
+      setTimeout(() => {
+        if (this.insertFailedTurn !== index) return;
+        this.insertFailedTurn = null;
+        this.notify();
+      }, REPORT_FOR);
+    }
   }
 
   toggleReasoning(turn: Turn) {
@@ -503,7 +555,7 @@ class ExchangeStore extends Notifier {
 
   // --- internals ----------------------------------------------------------
 
-  /** Rust owns all three (ADR-0003); they arrive together and are adopted
+  /** Rust owns all three; they arrive together and are adopted
    *  together, from the event and from a fresh view alike. */
   #adoptCapture(payload: CapturePayload) {
     this.captures = payload.captures;
@@ -556,7 +608,7 @@ class ExchangeStore extends Notifier {
   /**
    * The window has just learned which Exchange it is showing: replay what that
    * Exchange already said, in order, and forget the rest. Everything else held
-   * belonged to an Exchange that is gone (ADR-0004), so it is dropped here
+   * belonged to an Exchange that is gone, so it is dropped here
    * rather than kept against an id that will never be adopted.
    *
    * The caller publishes; this only applies.

@@ -1,8 +1,8 @@
 // Kinds matter: a rejected key is not an unreachable API, and neither is a
-// missing credential (ADR-0005). One map for every consumer of a `Failure.kind`
+// missing credential. One map for every consumer of a `Failure.kind`
 // — Settings' Connection banner and the Popover's failed turn — so a new kind
 // cannot reach one and miss the other. The map itself is `failure` in the
-// catalogs (ADR-0015); what lives here is the sentence built from it.
+// catalogs; what lives here is the sentence built from it.
 import type { Strings } from "./i18n";
 import type { Failure } from "./types";
 

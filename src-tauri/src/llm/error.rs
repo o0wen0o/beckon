@@ -6,7 +6,7 @@ use super::wire::ApiErrorFrame;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum LlmError {
     /// The key was rejected. Distinct from every "cannot read the key" case in
-    /// [`crate::secrets`] (ADR-0005).
+    /// [`crate::secrets`].
     #[error("the API key was rejected ({status}): {message}")]
     Auth { status: u16, message: String },
     #[error("the API returned HTTP {status}: {message}")]
@@ -34,8 +34,8 @@ impl LlmError {
     }
 }
 
-/// The one place a status code becomes an [`LlmError`]. ADR-0005 needs "key
-/// rejected" to stay distinguishable from every other failure, so the 401/403
+/// The one place a status code becomes an [`LlmError`]. "Key rejected" has to
+/// stay distinguishable from every other failure, so the 401/403
 /// boundary is decided here rather than at each call site.
 pub(super) fn status_error(status: u16, body: &str) -> LlmError {
     let message = trim_error_body(body);

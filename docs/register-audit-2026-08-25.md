@@ -4,7 +4,7 @@ One line per row, per `.claude/skills/model-register/audit.md`. A row with no li
 fine. Verdicts are the ones that file names: **Current**, **Moved**, **Live but superseded**, **Alias
 that has drifted**, **Gone**, **Unverified**.
 
-This is the first audit written to `docs/`. The six code comments and ADR-0024 that cited
+This is the first audit written to `docs/`. The six code comments that cited
 `docs/register-audit-2026-08-24.md` cited a file that was never committed — that pass happened and
 its conclusions are live in the code, but its per-row table does not exist. Those citations now point
 here.
@@ -139,8 +139,8 @@ What the vendor documents today, per model:
 So the arm cannot be a plain reuse of `Deepseek`: one host serves three models that disagree, one of
 which must be *refused* rather than sent to, the way `ALWAYS_THINKING_MINIMAX` refuses. That makes it
 a `Reasoning` arm **with a per-model list**, which SKILL.md places outside an audit's authority —
-ADR-0021 named per-model knowledge as the thing putting the dialect on the row got rid of, so each
-further list is a narrowing that gets recorded against 0021 or in a new ADR.
+putting the dialect on the row is what removed per-model knowledge, so each further list is a
+design change, not an audit fix.
 
 Left as `None` and marked `TODO(register):` at the row. Adding the arm is the
 [dialect.md](../.claude/skills/model-register/dialect.md) branch and its eight sites, not this pass.
@@ -162,9 +162,9 @@ families get an offered switch whose field reaches nothing.
 
 Deliberately **not** narrowed today, for two reasons:
 
-1. The error direction is the cheap one. Over-offering costs the feature silently (ADR-0026: a model
+1. The error direction is the cheap one. Over-offering costs the feature silently (a model
    ignoring its host's search field costs the feature, not the turn). Narrowing wrongly costs the
-   expensive one ADR-0027 was written about — a greyed switch and Settings telling the user, on
+   expensive one — a greyed switch and Settings telling the user, on
    Beckon's word, that their model cannot search.
 2. The sources disagree. Alibaba's web-search page carries the Responses-API-only note; third-party
    aggregations list `qwen3.6-plus` and `qwen3.6-flash` as `enable_search` models. Neither is settled
@@ -184,7 +184,7 @@ Two things the re-check settles for whoever picks it up:
 - **`search_engine` has a documented default on the mainland host**, so "required" overstates it there.
   That weakens but does not remove the 400 risk, because the *international* half of the split is the
   one whose value set is disjoint.
-- **The shape is a `tools` array entry, not a top-level field.** Under ADR-0026's own rule — the named
+- **The shape is a `tools` array entry, not a top-level field.** Under the `Search` rule — the named
   arms are exactly the endpoints whose search is one field and one round trip — a `tools` entry is not
   the shape a `Search` arm carries today, whatever its engine id turns out to be. Zhipu runs it
   server-side in one round trip, so the round-trip half is satisfied and the field half is not. That

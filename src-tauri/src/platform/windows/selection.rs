@@ -1,4 +1,4 @@
-//! Grabbing the Selection by simulating Ctrl+C (ADR-0002).
+//! Grabbing the Selection by simulating Ctrl+C.
 //!
 //! The order of operations here is load-bearing; each step exists because of a
 //! specific failure:
@@ -6,8 +6,8 @@
 //! 1. Release the modifiers the user is *physically* holding. The trigger
 //!    hotkey is still down, so without this the target app receives
 //!    `Ctrl+Alt+C`, not `Ctrl+C`, and nothing is copied.
-//! 2. Back up the clipboard, plain text only (ADR-0002 accepts losing rich text
-//!    and images).
+//! 2. Back up the clipboard, plain text only (losing rich text and images is
+//!    accepted).
 //! 3. Read the clipboard sequence number, then send Ctrl+C.
 //! 4. **Poll** the sequence number rather than sleeping a fixed interval —
 //!    a fixed sleep is either a race or a stall.
@@ -15,6 +15,11 @@
 //!    Beckon must not leave an extra retained copy of the user's clipboard.
 //! 6. Timeout or an empty result is `None`, not an error. Elevated windows fail
 //!    silently and that is handled by the Action's `input_source`.
+//!
+//! The other direction lives here too: [`send_paste`] is Ctrl+V
+//! through the same `SendInput` and after the same modifier release, and it is
+//! the *whole* of the write-back. There is no backup and no restore around it —
+//! an Insert is a Copy the user asked for, followed by one keystroke.
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -30,6 +35,8 @@ use super::clipboard;
 /// `C`. Spelled out because the named constant is not in every `windows`
 /// release, and this value is fixed by the platform.
 const VK_C: VIRTUAL_KEY = VIRTUAL_KEY(0x43);
+/// `V`, for the same reason.
+const VK_V: VIRTUAL_KEY = VIRTUAL_KEY(0x56);
 const VK_CONTROL_LEFT: VIRTUAL_KEY = VK_LCONTROL;
 
 /// How long the target app gets to see the modifier key-ups before Ctrl+C
@@ -59,7 +66,7 @@ pub fn grab_selection() -> Option<String> {
     let backup = read_clipboard_text();
     let before = clipboard::sequence_number();
 
-    if let Err(err) = send_ctrl_c() {
+    if let Err(err) = send_ctrl(VK_C) {
         log::warn!("could not synthesise Ctrl+C: {err}");
         return None;
     }
@@ -70,7 +77,7 @@ pub fn grab_selection() -> Option<String> {
     // Restore before returning, and let the backup drop at the end of this
     // scope — no long-lived copy of the user's clipboard.
     //
-    // Only if the copy shortcut wrote something. What ADR-0002 restores is the
+    // Only if the copy shortcut wrote something. What the restore undoes is the
     // pollution the grab caused, and a grab with nothing selected causes none:
     // the clipboard is still exactly what the user left there. "Restoring" over
     // that replaced it with its own plain-text half — and when it held no text
@@ -84,9 +91,22 @@ pub fn grab_selection() -> Option<String> {
 }
 
 /// A user-requested clipboard write (the Popover's Copy). Not restored, by
-/// design: the user asked for it (ADR-0002).
+/// design: the user asked for it.
 pub fn write_clipboard_text(text: &str) -> Result<(), String> {
     clipboard_win::set_clipboard_string(text).map_err(|e| e.to_string())
+}
+
+/// Ctrl+V into whatever has focus. The caller has already put the
+/// text on the clipboard and the target window in front; this is the keystroke
+/// and nothing else.
+///
+/// The modifiers are released first for the reason the grab releases them: the
+/// Popover's Insert chord is still physically down, and Ctrl+Shift+V is "paste
+/// without formatting" in one app and nothing at all in the next.
+pub fn send_paste() -> Result<(), String> {
+    release_held_modifiers();
+    sleep(MODIFIER_SETTLE);
+    send_ctrl(VK_V)
 }
 
 fn read_clipboard_text() -> Option<String> {
@@ -123,11 +143,14 @@ fn is_physically_down(key: VIRTUAL_KEY) -> bool {
     (state as u16 & 0x8000) != 0
 }
 
-fn send_ctrl_c() -> Result<(), String> {
+/// Ctrl plus one key, down and up, as a single `SendInput` batch so nothing
+/// the user types can land between the four events. One function for both
+/// directions: the copy and the paste differ by a letter.
+fn send_ctrl(key: VIRTUAL_KEY) -> Result<(), String> {
     send(&[
         key_input(VK_CONTROL_LEFT, KEYBD_EVENT_FLAGS(0)),
-        key_input(VK_C, KEYBD_EVENT_FLAGS(0)),
-        key_input(VK_C, KEYEVENTF_KEYUP),
+        key_input(key, KEYBD_EVENT_FLAGS(0)),
+        key_input(key, KEYEVENTF_KEYUP),
         key_input(VK_CONTROL_LEFT, KEYEVENTF_KEYUP),
     ])
 }
@@ -168,6 +191,14 @@ mod tests {
     fn the_clipboard_wait_is_polled_not_slept() {
         assert!(POLL_INTERVAL < POLL_CAP);
         assert!(POLL_CAP <= Duration::from_millis(500));
+    }
+
+    /// The copy and the paste are the same chord with one key changed, and the
+    /// two keys are fixed by the platform rather than by a named constant.
+    #[test]
+    fn the_copy_and_paste_keys_are_c_and_v() {
+        assert_eq!(VK_C.0, b'C' as u16);
+        assert_eq!(VK_V.0, b'V' as u16);
     }
 
     #[test]

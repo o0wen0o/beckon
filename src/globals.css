@@ -3,7 +3,7 @@
    library's own file, not hand-authored styling. Components carry no CSS of
    their own — every rule below this comment belongs to shadcn/ui or Tailwind.
 
-   It is the design system for all three windows (ADR-0009). The notes below say
+   It is the design system for all three windows. The notes below say
    "the pane" because Settings is where each decision was made and is the widest
    surface it has to hold, but the Launcher and the Popover read the same tokens
    and added one between them: `--text-query`, noted where it is defined.
@@ -24,7 +24,7 @@
      copy, not a whisper. 0.475 is 6.68:1 on the background and 6.05:1 on
      `--muted`. Dark mode keeps the generated `0.708` (7.63:1 and 5.83:1).
    - `--input` is `--border`: a control's edge is the same line as the card that
-     holds it (ADR-0012), so the pane carries one weight of edge instead of a
+     holds it, so the pane carries one weight of edge instead of a
      light card drawn around a darker box. It was split away and darkened to
      clear 3:1 (WCAG 1.4.11 treats a text field's boundary as a UI component)
      and that margin is spent here — `--border` is 1.32:1 light, 1.24:1 dark.
@@ -34,7 +34,7 @@
      control has under the pointer: the line strengthens and nothing fills, so
      a fill still means "selected" and nothing else. It is also what the
      Launcher's cards hover to, since `--muted` is the ground they stand on
-     rather than a ground they can move to (ADR-0014).
+     rather than a ground they can move to.
    - `--ring` is `--primary` rather than the generated grey. shadcn draws the
      ring at `ring/50`, and the generated `0.708` lands at 1.6:1 that way —
      invisible, on the one affordance a keyboard user has. At `--primary` it is
@@ -46,7 +46,7 @@
      component naming its own colour is what this file exists to prevent.
      Light 6.11:1 and 5.67:1; dark 11.23:1 and 11.97:1.
    - `--scrim` is added, and like `--brand` it has exactly one consumer: the
-     Capture preview's ground (ADR-0017). A screenshot is mostly pale and has no
+     Capture preview's ground. A screenshot is mostly pale and has no
      border of its own, so on `--background` its edges are simply not there —
      the ground under a picture has to be greyer than the picture. It is a grey
      of its own rather than `--muted`, which is `--accent` to the pixel in both
@@ -183,7 +183,7 @@
      which on Windows is a bitmap-era face a size heavier than the Latin around
      it. Each platform's own UI face is listed first, so a mixed line — "打开
      Beckon" — stays one weight. Latin comes first in the stack either way, so
-     an English build is byte-for-byte the face it was (ADR-0015). */
+     an English build is byte-for-byte the face it was. */
   --font-sans:
     "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei UI", "PingFang SC",
     "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;

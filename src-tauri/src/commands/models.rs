@@ -1,13 +1,12 @@
 //! The model dropdown's one command. Its job is to offer whatever can be
 //! vouched for, and to say by cause why the list is not the live one.
 //!
-//! It used to be "never leave the dropdown empty", by falling back to a
-//! documented catalog. A provider row carries no catalog any more
-//! (`docs/register-audit-2026-08-25.md`), so an empty answer is now a real
+//! There is no documented catalog to fall back to — a provider row carries none
+//! (`docs/register-audit-2026-08-25.md`) — so an empty answer is a real
 //! answer — the state of a row whose endpoint has never spoken — and the pane
 //! renders it rather than a select rendering a blank box.
 //!
-//! Asked **per provider** since ADR-0021: there is one `base_url` and one key
+//! Asked **per provider**: there is one `base_url` and one key
 //! per row, so "the model list" is a different list per endpoint. Which is also
 //! why `configured` is gathered per provider — see [`get_models`].
 
@@ -31,14 +30,14 @@ use super::{secrets::require_api_key, Failure};
 /// itself is load-bearing, which is why it did not collapse into one flag: the
 /// pane suppresses its fallback notice for a live list, so a cached list
 /// reported as live would show a full dropdown, the words "listed by this
-/// endpoint", and no sign that the key was rejected. ADR-0005's three causes
+/// endpoint", and no sign that the key was rejected. The three credential causes
 /// have to stay three things all the way to the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ModelSource {
     /// The endpoint answered **just now**.
     Live,
-    /// The list this endpoint served last time (ADR-0024), because it was not
+    /// The list this endpoint served last time, because it was not
     /// asked or did not answer.
     Cached,
     /// The endpoint has never answered. Whatever is on offer is only what the
@@ -51,7 +50,7 @@ pub enum ModelSource {
 pub struct ModelCatalog {
     pub options: Vec<ModelOption>,
     pub source: ModelSource,
-    /// Why the list is not the endpoint's own answer, by cause: ADR-0005 needs
+    /// Why the list is not the endpoint's own answer, by cause: the UI needs
     /// "no credential", "read error" and "key rejected" to stay three different
     /// things, and this is the last hop before the UI. Set alongside a
     /// [`ModelSource::Cached`] or [`ModelSource::None`] list when a fetch failed.
@@ -100,7 +99,7 @@ pub async fn get_models(app: AppHandle, provider_id: String, live: bool) -> Mode
         //
         // Resolved through `Config::provider_id`, which is where "an Action
         // naming no provider is on the default row" lives: a second spelling of
-        // that fallback is a dropdown that disagrees with the wire (ADR-0021).
+        // that fallback is a dropdown that disagrees with the wire.
         let mut configured: Vec<String> = vec![provider.model.clone()];
         configured.extend(registry.actions.iter().filter_map(|action| {
             (config.provider_id(action.file.model.provider.as_deref()) == provider_id)

@@ -1,4 +1,4 @@
-# A tag is the only thing that ships (ADR-0022).
+# A tag is the only thing that ships.
 #
 # `ci.yml` proves the code compiles on both platforms; this file turns one
 # commit into the artifacts a person installs, plus the signed `latest.json` the
@@ -74,7 +74,7 @@ jobs:
           releaseName: Beckon ${{ github.ref_name }}
           releaseDraft: true
           # Neither platform is code-signed, so say so where it is read rather
-          # than only in the README (ADR-0013).
+          # than only in the README.
           releaseBody: |
             Install, then press the hotkey.
 

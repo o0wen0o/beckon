@@ -12,12 +12,12 @@
 //
 // House style, and the reason most sentences here are one clause: say what the
 // reader can act on and stop. A wire field name, an HTTP header, a path inside
-// the request — those are facts about Beckon's implementation, and a reader who
-// needs them has the ADRs. What stays long is what a reader would be worse off
+// the request — those are facts about Beckon's implementation, not something a
+// reader acts on. What stays long is what a reader would be worse off
 // not knowing: the privacy disclosure on a relaying row, and the two "this
 // cannot be undone" sentences.
 //
-// The words that differ per platform live here too (ADR-0015). `platform.ts`
+// The words that differ per platform live here too. `platform.ts`
 // keeps `IS_MAC` and the accelerator logic; what it no longer keeps is prose,
 // because prose has two dimensions now — platform *and* language — and a
 // constant can only hold one of them.
@@ -27,7 +27,7 @@ import { kb } from "./units";
 export const EN = {
   /** Words the product needs in more than one surface. */
   words: {
-    /** What the OS calls the place the API key is kept (ADR-0005). */
+    /** What the OS calls the place the API key is kept. */
     credentialStore: IS_MAC ? "Keychain" : "Windows Credential Manager",
     /** Where Beckon sits when no window is open. */
     tray: IS_MAC ? "menu bar" : "tray",
@@ -93,7 +93,7 @@ export const EN = {
     close: "Close",
     thinking: "thinking",
     /** Beside it, and the same kind of thing: a capability this turn is using,
-     *  and the one that is billed per request (ADR-0026). */
+     *  and the one that is billed per request. */
     webSearch: "web search",
     nothingToShow: "Nothing to show.",
     /** `{name}` is the Action, set bold by the caller. */
@@ -117,11 +117,28 @@ export const EN = {
     openSettings: "Open Settings",
     copy: "Copy",
     copied: "Copied",
-    /** Copy is the only way a result leaves Beckon, so a clipboard write that
-     *  failed cannot be reported by the checkmark simply not appearing. On the
-     *  button rather than as a toast: the Popover hosts no Toaster, and the
-     *  button is where the gesture was made. */
+    /** Copy is how a result leaves Beckon — Insert is Copy plus a keystroke
+     *  — so a clipboard write that failed cannot be reported by the
+     *  checkmark simply not appearing. On the button rather than as a toast:
+     *  the Popover hosts no Toaster, and the button is where the gesture was
+     *  made. */
     copyFailed: "Could not copy",
+    /** Copy, then paste into the app Beckon was summoned over.
+     *  "Insert" rather than "Replace": it replaces only while the Selection is
+     *  still highlighted there, and lands at the caret otherwise. The
+     *  accelerator is given for the last turn only — that is the one the
+     *  window's chord acts on. */
+    insert: "Insert",
+    insertTooltip: (accelerator: string | null) =>
+      accelerator
+        ? `Paste into the app you came from (${accelerator})`
+        : "Paste into the app you came from",
+    /** On the button, like `copyFailed` and for the same reason. A refusal is
+     *  the only outcome reported: an Insert that worked closed the window. */
+    insertFailed: "Could not insert",
+    /** Retry's other name: the same request, on a turn that did not fail. */
+    regenerate: "Regenerate",
+    regenerateTooltip: (accelerator: string) => `Ask again for a new answer (${accelerator})`,
 
     /** The Capture (CONTEXT.md) is a screenshot in prose — nobody calls it a
      *  Capture out loud, and the term is for code and comments. */
@@ -145,7 +162,7 @@ export const EN = {
     nextCapture: "Next screenshot",
     closeCapture: "Close screenshot",
     /** On the image itself, because zoom has no visible control of its own —
-     *  the wheel and a click are the whole interface (ADR-0017). */
+     *  the wheel and a click are the whole interface. */
     zoomHint: "Click to zoom, scroll to resize",
     zoomOutHint: "Click to fit, drag to move",
   },
@@ -176,7 +193,7 @@ export const EN = {
       title: "Connection",
       /** `fallback` is the default row's label, `store` what the OS calls its
        *  credential store. Both are in the sentence because both are the answer
-       *  to "where does my text go and what does it carry" (ADR-0021). */
+       *  to "where does my text go and what does it carry". */
       lede: (fallback: string, store: string) =>
         `Where your text is sent. Actions use ${fallback} unless they say otherwise. Keys are kept in the ${store}, never in a file.`,
       welcomeLead: "Welcome.",
@@ -236,8 +253,8 @@ export const EN = {
       /** The test also settles the dialect on a row no preset filled in, so it
        *  reports what it found rather than making the user check. */
       testOkDetected: (dialect: string) => `Connected — thinking control set to ${dialect}.`,
-      /** A relaying row, said on the identity line under the URL it is about
-       *  (ADR-0025). Two sentences, and the length is earned: this is the one
+      /** A relaying row, said on the identity line under the URL it is about.
+       *  Two sentences, and the length is earned: this is the one
        *  place a reader learns a second company sees their text. */
       relaysLead: "Relays.",
       relaysBody: (broker: string) =>
@@ -248,7 +265,7 @@ export const EN = {
       refresh: "Refresh models",
       loading: "Loading models…",
       live: "From this endpoint.",
-      /** A list from disk rather than from the endpoint just now (ADR-0024).
+      /** A list from disk rather than from the endpoint just now.
        *  Distinct from `live` because `listNotice` may be showing beside it. */
       cached: "From an earlier check.",
       /** Named for the list, not for a catalog: a provider row carries no
@@ -257,8 +274,8 @@ export const EN = {
       listNotice: (cause: string) => `${cause} — showing the earlier list.`,
       /** The initial state of every row a user adds: a row ships no model, so
        *  until the endpoint answers there is nothing to pick. Two of them,
-       *  because a local endpoint wants no key and telling it to store one names
-       *  the single thing ADR-0021 says is not a fault. */
+       *  because a local endpoint wants no key, and telling it to store one would
+       *  report a working setup as a fault. */
       noModelsYet: "Save a key, then press Refresh models.",
       noModelsYetLocal: "Start this endpoint, then press Refresh models.",
       listUnavailable: "Could not load the model list",
@@ -299,7 +316,7 @@ export const EN = {
       thinkingHint: (label: string) => `Slower, but better at hard questions. ${label} supports it.`,
       thinkingHintNone: (label: string) => `${label} has no thinking switch, so this does nothing.`,
 
-      /** The web-search wire (ADR-0026). Unlike `reasoning`, this one is *asked*
+      /** The web-search wire. Unlike `reasoning`, this one is *asked*
        *  rather than stated: nothing detects it, because a probe would run a
        *  real search and be billed for it. A preset already carries the answer,
        *  so only a hand-made row is asked. */
@@ -341,8 +358,8 @@ export const EN = {
       updates: "Updates",
       updateCheck: "Check for updates automatically",
       /** Says what the switch does *not* cover: the tray item stays there
-       *  either way, and would otherwise read as the switch being ignored
-       *  (ADR-0022). */
+       *  either way, and would otherwise read as the switch being ignored.
+       *  */
       updateCheckHint: (tray: string) =>
         `Checks quietly at startup. You can also check any time from the ${tray}.`,
     },
@@ -411,7 +428,7 @@ export const EN = {
 
       overrides: "Model overrides",
       overridesNote: (label: string) => `Unmarked rows follow ${label}`,
-      /** The row ADR-0021 added, and the reason there is no global switch. */
+      /** The per-Action endpoint row, and the reason there is no global switch. */
       provider: "Endpoint",
       providerHint: "Where this Action sends. Unmarked follows the default.",
       providerLocal: (label: string) => `${label} — local`,
@@ -460,7 +477,7 @@ export const EN = {
     },
     model: {
       /** The two control names, here rather than under a pane: both the endpoint
-       *  screen and an Action's overrides draw the same row (ADR-0021). */
+       *  screen and an Action's overrides draw the same row. */
       label: "Model",
       thinking: "Think before answering",
       configuredGroup: "Added by you",
@@ -473,17 +490,17 @@ export const EN = {
       alwaysThinks: (model: string) => `${model} always thinks; it cannot be turned off.`,
       neverThinks: (model: string) => `${model} has no thinking mode.`,
       /** Not a failure and not the model's fault: the *endpoint* has no field
-       *  for it, so its own default stands (ADR-0021). */
+       *  for it, so its own default stands. */
       noThinkingSwitch: (label: string) => `${label} has no thinking switch.`,
-      /** The second switch a turn carries (ADR-0026). Named for what it does to
+      /** The second switch a turn carries. Named for what it does to
        *  the answer, not for the field it becomes on any one endpoint. */
       webSearch: "Search the web",
       /** The one thing that can go wrong with it, and it is amber: the Action
        *  still runs, the endpoint just never hears the question. */
       noSearchSwitch: (label: string) => `${label} cannot search, so this is ignored.`,
       /** The model's own answer rather than the endpoint's, and the one that
-       *  greys the switch: the vendor says this model does not take the field
-       *  (ADR-0027). Amber and not an error — an Action file that already says
+       *  greys the switch: the vendor says this model does not take the field.
+       *  Amber and not an error — an Action file that already says
        *  so still runs, without a search. */
       modelCannotSearch: (model: string) =>
         `${model} cannot search here. Pick another model, or leave this off.`,

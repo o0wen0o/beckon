@@ -4,7 +4,7 @@
 //
 // A switch rather than a checkbox: these settings take effect immediately, and a
 // checkbox reads as "will be applied when you save", which there is no way to
-// do here (ADR-0003).
+// do here.
 import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/i18n";
 
@@ -15,7 +15,7 @@ interface OnOffSwitchProps {
   id?: string;
   describedBy?: string;
   /** Set where throwing it on could not work — never where it traps a value
-   *  the user already has (ADR-0027). */
+   *  the user already has. */
   disabled?: boolean;
   onChange: (on: boolean) => void;
 }

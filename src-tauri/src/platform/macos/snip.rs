@@ -1,5 +1,4 @@
-//! Running the macOS screenshot tool and reading what it left on the pasteboard
-//! (ADR-0016).
+//! Running the macOS screenshot tool and reading what it left on the pasteboard.
 //!
 //! `screencapture -i -c` is the same interactive selection Cmd+Shift+4 starts,
 //! writing to the pasteboard instead of the desktop. Unlike the Windows verb it
@@ -13,7 +12,7 @@
 //!   counter is `selection`'s: the Capture reads it once rather than in a loop,
 //!   because the child process is the thing that says when to look.
 //!
-//! ADR-0002's clipboard restore deliberately does not apply: nothing was
+//! The grab's clipboard restore deliberately does not apply: nothing was
 //! synthesised here, so the pasteboard write is the user's own action.
 
 use std::process::Command;

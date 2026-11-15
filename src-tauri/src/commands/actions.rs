@@ -1,4 +1,4 @@
-//! Action commands. Identity is the filename (ADR-0003), so every one of these
+//! Action commands. Identity is the filename, so every one of these
 //! takes a `file_name` — and every `file_name` arrives over IPC, hence
 //! [`sanitize_file_name`].
 

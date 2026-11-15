@@ -44,31 +44,36 @@ Ordered by how likely they are to be wrong.
 |---|---|---|
 | 1 | Select a sentence in **Safari**, press the Translate Action's hotkey | The Popover opens next to the cursor and translates the selected text. This is the whole port in one step: `CGEventPost`, the pasteboard poll, and the Accessibility permission |
 | 2 | Repeat in **Notes**, **VS Code**, **Terminal**, and **Slack or Chrome** | Same. Electron and native apps take different paths through the pasteboard |
-| 3 | Copy something distinctive first, then run step 1, then press Cmd+V somewhere | Your original clipboard content pastes, not the grabbed Selection (ADR-0002 restores it) |
+| 3 | Copy something distinctive first, then run step 1, then press Cmd+V somewhere | Your original clipboard content pastes, not the grabbed Selection: the grab restores it |
 | 4 | Trigger the Popover near the **bottom-right of the screen**, and again near the **top-left** | It stays fully on screen, never under the Dock and never behind the menu bar. This is `Monitor::work_area` on macOS |
 | 5 | Same on a **second display**, especially one above or left of the main one (negative coordinates) | Still on screen, on the display the cursor is on |
 | 6 | Same on a **Retina display** | Correct size, not half or double |
 | 7 | Press Esc to close the Popover | Focus returns to the app you were reading — the *app*, not just some window of it |
-| 7a | In the Popover, press the screenshot button (or Cmd+Shift+S), drag a region | Beckon's windows vanish while the snip runs — the Popover must not be in the shot — then the Popover comes back with a thumbnail above the box and the caret still in it. This is `screencapture -i -c` plus the pasteboard read (ADR-0016) |
+| 7-1 | Select a sentence in **TextEdit**, run an Action on it, wait for the answer, press **Insert** (or Cmd+Shift+Enter) | The Popover closes, TextEdit comes forward, and the answer replaces the sentence. This is `activateWithOptions`, the frontmost-pid poll and a second `CGEventPost` |
+| 7-2 | Repeat in **Safari** (a text field), **VS Code** and **Slack or Chrome** | Same. If the app comes forward but nothing is pasted, the keystroke was sent before the app was really frontmost, or Cmd+V arrived with Shift still held |
+| 7-3 | After 7-1, press Cmd+V somewhere else | The answer pastes again: Insert never restores the clipboard |
+| 7-4 | Run an Action, **quit the app you ran it over**, then press Insert | The button reads "Could not insert" for a moment and the Popover stays open. The answer is on the clipboard |
+| 7-5 | Under a finished answer press **Regenerate** (or Cmd+Shift+R) | The answer clears and streams again; the question card does not double |
+| 7a | In the Popover, press the screenshot button (or Cmd+Shift+S), drag a region | Beckon's windows vanish while the snip runs — the Popover must not be in the shot — then the Popover comes back with a thumbnail above the box and the caret still in it. This is `screencapture -i -c` plus the pasteboard read |
 | 7b | Repeat, and press **Esc** in the snip overlay instead of dragging | The Popover comes back saying nothing was captured. Nothing is sent, and any previously attached screenshot is still attached |
 | 7c | Type a note beside an attached screenshot, then Send, with the Action's model set to `deepseek-v4-flash-vision-exp` | The image and the note go as one turn; the answer streams as usual |
-| 7d | Same, with the model left at `deepseek-v4-pro` | The request is sent anyway; the provider's own error is shown verbatim (Beckon gates nothing on the model, ADR-0016) |
-| 7e | Attach a screenshot, take a **second** one without sending the first | Both are attached, oldest tile first, and the note being typed survives (ADR-0017) |
+| 7d | Same, with the model left at `deepseek-v4-pro` | The request is sent anyway; the provider's own error is shown verbatim (Beckon gates nothing on the model) |
+| 7e | Attach a screenshot, take a **second** one without sending the first | Both are attached, oldest tile first, and the note being typed survives |
 | 7f | Take a **fifth** screenshot without sending | It is refused with "there is no room for another screenshot"; the four already attached stay attached |
 | 7g | Click a tile in the rail, then press ← / → , then Esc | The screenshot opens full size over the whole window on a grey ground, the arrows walk the set and wrap, Esc closes the preview only — the Exchange and the draft are still there |
-| 7g1 | With a preview open, click the grey space beside the image | It closes. A click on the image itself does not close it — that one zooms (ADR-0017) |
-| 7g2 | Preview a **full-screen** snip | The whole image is on screen, no edge cut off, both arrows still in their places (ADR-0017) |
+| 7g1 | With a preview open, click the grey space beside the image | It closes. A click on the image itself does not close it — that one zooms |
+| 7g2 | Preview a **full-screen** snip | The whole image is on screen, no edge cut off, both arrows still in their places |
 | 7g3 | In the preview, **scroll the wheel** up and down over the image | It zooms continuously, the title bar reads the percentage while zoomed, and scrolling back down stops at fit rather than shrinking past it. A trackpad's two-finger scroll is the same gesture |
 | 7g4 | **Click** the image, then drag it, then click again | The first click goes to the image's own pixels, dragging pans, the second click returns to fit — and the click that ends a drag does *not* toggle it |
-| 7g5 | Zoom in, then drag to each **corner** of the image | All four corners are reachable; nothing is stranded off the top or left edge (ADR-0017) |
+| 7g5 | Zoom in, then drag to each **corner** of the image | All four corners are reachable; nothing is stranded off the top or left edge |
 | 7g6 | Zoom in, then press ← or → | The next Capture opens fitted, not at the previous one's zoom |
-| 7g7 | Zoom in and look at the edges of the image area | No scrollbar appears on either axis, and the image does not jump smaller the moment it is zoomed (ADR-0017) |
-| 7g8 | Zoom in, then drag the image and **release with the pointer outside the image**, over the grey | It pans and stays open — the release does not close the preview (ADR-0017) |
+| 7g7 | Zoom in and look at the edges of the image area | No scrollbar appears on either axis, and the image does not jump smaller the moment it is zoomed |
+| 7g8 | Zoom in, then drag the image and **release with the pointer outside the image**, over the grey | It pans and stays open — the release does not close the preview |
 | 7h | Click a screenshot inside a *sent* turn's card | The same preview, walking that turn's images rather than the composer's |
-| 7i | Send two screenshots with a note, then ask a follow-up | The follow-up carries no image of its own, and the answer can still refer to both (the history is resent, ADR-0004) |
-| 7j | Drag each **edge and corner** of the Popover | It resizes from all eight, and cannot go below 380×200. An undecorated NSWindow has no border of its own, so this is `startResizeDragging` and nothing else (ADR-0018) |
+| 7i | Send two screenshots with a note, then ask a follow-up | The follow-up carries no image of its own, and the answer can still refer to both (the history is resent) |
+| 7j | Drag each **edge and corner** of the Popover | It resizes from all eight, and cannot go below 380×200. An undecorated NSWindow has no border of its own, so this is `startResizeDragging` and nothing else |
 | 7k | Resize the Popover, close it, then trigger any Action again | It opens at the size you left it, still next to the cursor. `[popover]` in `config.toml` holds it |
-| 7l | Resize the Popover to an odd size on a **scaled** display, then trigger an Action several times over | `[popover]` in `config.toml` still reads what you dragged to: our own `set_size` is not written back as though it were a drag, so the remembered size never walks a pixel at a time (ADR-0018) |
+| 7l | Resize the Popover to an odd size on a **scaled** display, then trigger an Action several times over | `[popover]` in `config.toml` still reads what you dragged to: our own `set_size` is not written back as though it were a drag, so the remembered size never walks a pixel at a time |
 | 8 | Open the Launcher hotkey while an app is fullscreen | The Launcher appears and takes focus |
 | 9 | In Settings, click into the API key field and press **Cmd+V** | It pastes. If not, Tauri's default menu is missing and every text field in the app is crippled |
 | 10 | With a Beckon window focused, press **Cmd+Q** | The app quits. From the menu bar's Quit item too |
@@ -78,15 +83,15 @@ Ordered by how likely they are to be wrong.
 | 14 | Switch the theme to **System** and flip macOS between light and dark | All three surfaces follow, live |
 | 15 | Turn **Start at login** on, log out, log back in | Beckon is running |
 | 16 | Quit Beckon, delete `~/Library/Application Support/Beckon/`, relaunch | The two example Actions are written and Settings opens on Connection |
-| 17 | With no newer release published, open the menu-bar menu and click **Check for Updates…** | A notification says Beckon is up to date and names the running version. The item still reads "Check for Updates…" (ADR-0022) |
-| 18 | Publish a release one version higher, wait for the check (or click the item), then click **Update to X…** with a Popover open | It refuses, saying to close the Popover first: installing ends the process and the Exchange is not saved (ADR-0004) |
-| 19 | Close the Popover and click **Update to X…** again | The `.app` is replaced and Beckon relaunches itself, still in the menu bar, now reporting the new version. This is the macOS half of ADR-0022 — `restart` has to run on AppKit's thread and the bundle swap is not something a compiler can check |
+| 17 | With no newer release published, open the menu-bar menu and click **Check for Updates…** | A notification says Beckon is up to date and names the running version. The item still reads "Check for Updates…" |
+| 18 | Publish a release one version higher, wait for the check (or click the item), then click **Update to X…** with a Popover open | It refuses, saying to close the Popover first: installing ends the process and the Exchange is not saved |
+| 19 | Close the Popover and click **Update to X…** again | The `.app` is replaced and Beckon relaunches itself, still in the menu bar, now reporting the new version. This is the macOS half of self-update — `restart` has to run on AppKit's thread and the bundle swap is not something a compiler can check |
 | 19a | Repeat on an **Intel** Mac | Same. The release ships one universal `.dmg`, so an arm64-only artifact would surface here as "up to date" on a Mac that is not |
 | 19b | Point `plugins.updater.endpoints` at a manifest signed with a **different** key, then check | It fails with a signature error rather than installing. The trust anchor is the key compiled into the running binary, and this is the only test that proves it |
 | 19c | Turn **Check for updates automatically** off in Settings → Triggering, then restart Beckon with a newer release published | Nothing is said, and no request leaves. The menu-bar item still checks when clicked, and still finds it |
-| 20 | With Beckon resident, run `open -n /Applications/Beckon.app` | Settings opens and there is still one menu-bar icon. A Finder double-click is *not* this test — LaunchServices reopens the running copy without starting a process, so nothing happens at all (ADR-0023) |
-| 20a | With an installed Beckon resident, run `npm run tauri dev` | The dev build exits at once and the installed copy's Settings opens. Both carry `com.beckon.app`, so quit the installed one from the menu bar before developing (ADR-0023) |
-| 20b | Do step 19, then run `open -n` again | Settings opens, still one process. The successor reclaimed the socket the old copy released by hand before `restart` (ADR-0023) |
+| 20 | With Beckon resident, run `open -n /Applications/Beckon.app` | Settings opens and there is still one menu-bar icon. A Finder double-click is *not* this test — LaunchServices reopens the running copy without starting a process, so nothing happens at all |
+| 20a | With an installed Beckon resident, run `npm run tauri dev` | The dev build exits at once and the installed copy's Settings opens. Both carry `com.beckon.app`, so quit the installed one from the menu bar before developing |
+| 20b | Do step 19, then run `open -n` again | Settings opens, still one process. The successor reclaimed the socket the old copy released by hand before `restart` |
 
 ## What to send back
 
@@ -105,15 +110,15 @@ For anything that fails, the useful report is:
   Accessibility permission will not stick.
 - **Rebuilding changes the app's identity** as far as Accessibility is concerned. If the grab
   stops working after a rebuild, remove Beckon from the Accessibility list and add it again.
-- The Mac App Store is foreclosed by `macOSPrivateApi` (ADR-0013). Direct distribution is not.
+- The Mac App Store is foreclosed by `macOSPrivateApi`. Direct distribution is not.
 - **The automatic update check runs once per launch** — thirty seconds in, one HTTP GET to GitHub —
-  unless it is turned off in Settings → Triggering. The menu-bar item asks either way (ADR-0022).
+  unless it is turned off in Settings → Triggering. The menu-bar item asks either way.
 
 ## The one thing to re-check on Windows
 
 The port changed exactly one thing that runs on Windows: `platform::cursor` now reads the cursor
 and the monitor's work area from Tauri instead of from `GetCursorPos` and `MONITORINFO.rcWork`
-directly, so that macOS and Windows share one coordinate space (ADR-0013). Everything else under
+directly, so that macOS and Windows share one coordinate space. Everything else under
 `platform/windows/` is byte-for-byte what it was.
 
 That makes Popover placement the Windows regression check, and it is 30 seconds:
@@ -126,7 +131,7 @@ That makes Popover placement the Windows regression check, and it is 30 seconds:
    or to the left of the primary, where coordinates go negative.
 4. On a display at 150% scaling, check the window is the right size.
 
-And one thing that is not the port's: the Windows update path (ADR-0022) has never been run either.
+And one thing that is not the port's: the Windows update path has never been run either.
 Install from the `.exe`, publish a newer release, and take the tray menu's **Update to X…** — the NSIS
 installer should replace Beckon and bring it back to the tray without a wizard. The `.msi` is not part
 of that check; it cannot update itself by design.

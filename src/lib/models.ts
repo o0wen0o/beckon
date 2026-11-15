@@ -20,8 +20,7 @@ export function modelOptions(current: string, catalog: ModelCatalog | null): Mod
   if (current === "" || options.some((option) => option.id === current)) return options;
   return [
     // `null` on both readings: this is the moment before the catalog arrived,
-    // so nothing is known about the model either way — and unknown is not a no
-    // (ADR-0027).
+    // so nothing is known about the model either way — and unknown is not a no.
     {
       id: current,
       label: current,
@@ -51,7 +50,7 @@ export function unknownModelHint(
 
 /**
  * Whether turning thinking *off* is something Beckon can express at this
- * endpoint at all (ADR-0021). `none` is most endpoints: there is no field to
+ * endpoint at all. `none` is most endpoints: there is no field to
  * send, so neither direction reaches the wire.
  */
 export function canSuppressThinking(provider: Provider | undefined): boolean {
@@ -84,8 +83,8 @@ export function thinkingWarning(
 }
 
 /**
- * Whether asking this endpoint to search the web reaches a field at all
- * (ADR-0026). `none` is most endpoints, and for two different reasons the pane
+ * Whether asking this endpoint to search the web reaches a field at all.
+ * `none` is most endpoints, and for two different reasons the pane
  * does not distinguish: no search, or a search that takes a second round trip
  * Beckon does not make.
  */
@@ -95,7 +94,7 @@ export function canWebSearch(provider: Provider | undefined): boolean {
 
 /**
  * What a web search switch should say and whether it should still open, for one
- * endpoint-and-model pairing (ADR-0026, ADR-0027).
+ * endpoint-and-model pairing.
  *
  * Both readings come off one lookup because they are one question asked twice:
  * whether an ask would reach a field. `warning` is that question in the on

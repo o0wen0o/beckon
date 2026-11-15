@@ -1,4 +1,4 @@
-//! Exchanges: in-memory only, one per Popover (ADR-0004).
+//! Exchanges: in-memory only, one per Popover.
 //!
 //! No storage layer exists anywhere in this module on purpose. Follow-up turns
 //! resend the full history untruncated — a single Exchange is short-lived, so
@@ -72,8 +72,8 @@ impl ExchangeManager {
     /// cancellation token is installed: a cancelled token stays cancelled, so
     /// the previous turn's token cannot be reused.
     ///
-    /// `content` rather than `&str` because a turn may carry a Capture
-    /// (ADR-0016); the image travels with the history like any other message.
+    /// `content` rather than `&str` because a turn may carry a Capture;
+    /// the image travels with the history like any other message.
     pub fn begin_turn(&self, id: &str, content: impl Into<Content>) -> Option<TurnPlan> {
         let mut map = self.inner.lock().expect("exchange lock");
         let entry = map.get_mut(id)?;
@@ -141,7 +141,7 @@ impl ExchangeManager {
     }
 
     /// Cancel and forget everything. Hiding the Popover and a fresh trigger
-    /// both end up here — the Exchange dies with the window (ADR-0004).
+    /// both end up here — the Exchange dies with the window.
     pub fn discard_all(&self) {
         let mut map = self.inner.lock().expect("exchange lock");
         for entry in map.values() {
@@ -194,7 +194,7 @@ mod tests {
     }
 
     /// A Capture rides in the history like any other content, so a follow-up
-    /// still has the image the first answer was about (ADR-0004: untruncated).
+    /// still has the image the first answer was about (untruncated).
     #[test]
     fn a_capture_stays_in_the_history_for_the_next_turn() {
         let manager = ExchangeManager::default();

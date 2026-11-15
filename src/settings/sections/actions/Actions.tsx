@@ -3,7 +3,7 @@
 // Launcher is summoned by a hotkey to pick something and get out of the way, and
 // a form is the opposite of that.
 //
-// There is no Save button and there must never be one (ADR-0003); the write is
+// There is no Save button and there must never be one; the write is
 // scheduled by the store as the fields change.
 import * as React from "react";
 import { ArrowLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
@@ -54,7 +54,7 @@ export function Actions() {
     const onDefinition = editing.kind === "action" && editing.screen === "definition";
     // On the Definition screen the heading is the screen and the Action's name is
     // the line under it — otherwise the name is the heading and its filename,
-    // which is the identity (ADR-0003), sits underneath.
+    // which is the identity, sits underneath.
     const title = onDefinition ? t.settings.actions.definition : name;
     const under = onDefinition
       ? name
@@ -154,7 +154,7 @@ export function Actions() {
         </FieldGroup>
       ) : null}
 
-      {/* A file that does not parse is reported, never dropped (ADR-0003), and
+      {/* A file that does not parse is reported, never dropped, and
           the way back is the raw editor this row opens. */}
       {snapshot.errors.length > 0 ? (
         <FieldGroup title={t.settings.actions.willNotParse}>

@@ -11,7 +11,7 @@ Beckon discovers no vendor fact. Two hand-kept tables carry them:
   first-party endpoint: **where to fetch and how to connect, never what to run.** `base_url`,
   `key_page`, and the two fields a user cannot look up, `Reasoning` and `Search`. A wrong arm is a
   `400` on every turn that row serves — every turn for `Reasoning`, every *searching* turn for
-  `Search` (ADR-0026).
+  `Search`.
 - **`CATALOG`** in [llm/models.rs](../../../src-tauri/src/llm/models.rs) — DeepSeek's models and what
   each does with thinking mode. It feeds `thinking_wire` in
   [llm/request.rs](../../../src-tauri/src/llm/request.rs) and nothing else, so **only its `thinking`
@@ -19,7 +19,7 @@ Beckon discovers no vendor fact. Two hand-kept tables carry them:
 
 **A row ships no model.** `presets()` leaves `model` empty on every row but `deepseek`; the list a
 user picks from is the endpoint's own `GET {base_url}/models`, kept between launches in
-[models_cache.rs](../../../src-tauri/src/models_cache.rs) (ADR-0024). Adding a `CATALOG` row puts the
+[models_cache.rs](../../../src-tauri/src/models_cache.rs). Adding a `CATALOG` row puts the
 model in nobody's dropdown — what the row buys is the `thinking` answer and a readable label. So the
 highest-impact check is not "is this id current" but "does the listing endpoint still answer, and
 with what credential".
@@ -112,21 +112,18 @@ Outcomes:
 | `label`, `description` + `description_zh` per row | same rows | with the row; both languages live here, not in `src/lib/i18n/`. Enrichment only — a stale one mislabels an id the endpoint served, it does not offer a wrong model |
 | Provenance dates in the module doc | `llm/models.rs` header | every re-check of the DeepSeek docs |
 | `DEFAULT_MODEL` | `config.rs` | the default is retired or renamed. The **one** shipped model id outside a dialect's per-model list |
-| `DEEPSEEK_TEMPERATURE` | `config.rs` | DeepSeek changes its own guidance (ADR-0019 → ADR-0021) |
+| `DEEPSEEK_TEMPERATURE` | `config.rs` | DeepSeek changes its own guidance |
 | `DEFAULT_BASE_URL`, `DEFAULT_PROVIDER_ID`, `DEFAULT_PROVIDER_LABEL`, `DEFAULT_KEY_PAGE` | `config.rs` | DeepSeek moves a host or a key page |
 | `presets()` rows — `base_url`, `key_page`, `reasoning`, `search`, and the **checked date** in the doc comment | `config.rs` | any vendor moves a host or a key page, or a new endpoint is added; the date on every audit. **Not `model`** |
 | The version rule in `api_url`, and its mirror `chatUrl` | [llm/client.rs](../../../src-tauri/src/llm/client.rs), [providers.ts](../../../src/lib/providers.ts) | a vendor's compatibility path is versioned in a shape the rule misreads. Move the two together: nothing links them, and a pane on the old rule draws a URL Beckon does not post to |
-| `BROKERS`, and its mirror in `providers.ts` | `config.rs`, [providers.ts](../../../src/lib/providers.ts) | a broker is added as a preset, or a new relaying host appears (ADR-0025). Move the two together: the pane draws its disclosure from the TS half |
+| `BROKERS`, and its mirror in `providers.ts` | `config.rs`, [providers.ts](../../../src/lib/providers.ts) | a broker is added as a preset, or a new relaying host appears. Move the two together: the pane draws its disclosure from the TS half |
 | A `Reasoning` arm and its seven mirrors — `DETECTABLE` and `build_dialect_probe` in `llm/request.rs`, [types.ts](../../../src/lib/types.ts), `REASONINGS` in [Connection.tsx](../../../src/settings/sections/Connection.tsx), `reasoningName`/`reasoningHint` in [en.ts](../../../src/lib/i18n/en.ts) + `zh.ts`, the legal-values comment in [README.md](../../../README.md) | `config.rs` + those files | a new wire dialect. Only the first site is compiler-checked; [dialect.md](dialect.md) walks all eight. `Reasoning::guess` is frozen — legacy files only |
 | A `Search` arm and its six mirrors — `types.ts`, `SEARCH_WIRES` in `Connection.tsx`, `searchName`/`searchHint` in `en.ts` + `zh.ts`, the legal-values comment in `README.md` | `config.rs` + those files | a vendor documents or withdraws a one-field web search on `/chat/completions`. [search.md](search.md) walks all nine sites; nothing detects a `Search` arm, so the dropdown is the only way a hand-made row reaches one |
-| `Search::supports_model` — the model families each arm searches with, and the vendor's own exclusions | `config.rs` | a vendor moves web search onto or off a tier (ADR-0027). Families, never ids; **silence is `None`, not `false`**, because `false` greys the switch out in Settings |
+| `Search::supports_model` — the model families each arm searches with, and the vendor's own exclusions | `config.rs` | a vendor moves web search onto or off a tier. Families, never ids; **silence is `None`, not `false`**, because `false` greys the switch out in Settings |
 | `EFFORT_NONE_FAMILIES` + its checked date | `llm/request.rs` | OpenAI ships or withdraws a family documenting `reasoning_effort: "none"`. An **allow**-list |
 | `ALWAYS_THINKING_MINIMAX` + its checked date | same file | MiniMax ships or withdraws a family it documents as unable to stop thinking. A **deny**-list where the row above is an allow-list — read each with its polarity in hand |
 | Model ids in the config examples | [README.md](../../../README.md) | an id in an example no longer exists |
 | Model ids in the manual test checklist | [docs/macos-testing.md](../../../docs/macos-testing.md) | same; the vision and non-vision rows each name one |
-
-Leave model ids quoted inside `docs/adr/` alone. An ADR records what was decided when, so a rotted id
-there is history — fix it only if the ADR is being superseded anyway.
 
 ## Comments at the site
 
@@ -163,7 +160,7 @@ are working in, say the gates did not run; never infer them from inspection.
   Re-read it whenever a vendor's tier names change.
 - **A relaying row that discloses nothing** — a broker whose host `relays()` does not recognise, or a
   `BROKERS` list edited in `config.rs` without its `providers.ts` mirror. Both type fine; the pane
-  simply stays quiet, which is the failure the old ban was really guarding against (ADR-0025).
+  simply stays quiet, which is the failure the old ban was really guarding against.
 - **An arm missing from `DETECTABLE` or `build_dialect_probe`.** Test connection never proposes it,
   and nothing anywhere reports that it did not.
 - **A wrong `reasoning`** on a preset row, including one that was right when written and was made
@@ -187,18 +184,18 @@ are working in, say the gates did not run; never infer them from inspection.
 - **A user's own model choice.** A configured id is surfaced, never rewritten, even when nothing
   vouches for it (`Origin::Configured`). Leave a config file's id as the user wrote it.
 - **The live list, and the cache behind it.** `get_models` offers what the endpoint serves and
-  `models_cache.rs` remembers it (ADR-0024). There is no documented fallback: adding a model to
+  `models_cache.rs` remembers it. There is no documented fallback: adding a model to
   `CATALOG` is not how *any* endpoint's models appear, DeepSeek's included.
-- **Temperature as a control.** ADR-0019 decided there is no temperature UI; ADR-0021 moved the pinned
-  DeepSeek value onto that vendor's row. A preset may carry one; nothing else may.
-- **Per-model capability gates.** The catalog records no image column — nothing is gated on one
-  (ADR-0016), and `search_wire` consults no model either: a model ignoring its host's search field
-  costs the feature, not the turn (ADR-0026).
+- **Temperature as a control.** There is no temperature UI; the pinned DeepSeek value lives on
+  that vendor's row. A preset may carry one; nothing else may.
+- **Per-model capability gates.** The catalog records no image column — nothing is gated on one,
+  and `search_wire` consults no model either: a model ignoring its host's search field
+  costs the feature, not the turn.
 - **A search that takes a tool loop.** Kimi's `$web_search` and its kind need a second round trip; a
-  turn is one request. That is an ADR, not a register entry ([search.md](search.md)).
-- **Contradicting an ADR.** A change needing the register to *work* differently rather than to *say*
-  something different needs a new ADR first (see [CLAUDE.md](../../../CLAUDE.md)). Adding a
-  `Reasoning` arm is *not* one of those **when the row alone decides it** — ADR-0021 made the dialect
-  a property of the row precisely so such an arm is data. An arm needing a **per-model list** is the
-  other case: 0021 named per-model knowledge as the thing putting the dialect on the row got rid of,
-  so each further list narrows it and gets recorded in 0021's footnote or a new ADR.
+  turn is one request. That changes what a turn is, not what the register says ([search.md](search.md)).
+- **Changing how the register works.** A change needing the register to *work* differently rather
+  than to *say* something different is a design change, not a register edit. Adding a `Reasoning`
+  arm is *not* one of those **when the row alone decides it** — the dialect is a property of the row
+  precisely so such an arm is data. An arm needing a **per-model list** is the other case: putting
+  the dialect on the row is what removed per-model knowledge, so each further list is a design
+  change, not data.

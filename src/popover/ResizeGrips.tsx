@@ -1,4 +1,4 @@
-// The Popover's eight resize grips (ADR-0018).
+// The Popover's eight resize grips.
 //
 // The window is undecorated, so the OS draws no border to hit-test and no
 // pointer gesture resizes it on its own: these strips are that border. Each one
@@ -11,7 +11,7 @@
 //
 // `aria-hidden`, and no keyboard equivalent: a drag has none, and eight nameless
 // strips announced in a window driven by Esc and the arrows is worse than
-// silence. The size a drag produces is remembered (ADR-0018), so this is a
+// silence. The size a drag produces is remembered, so this is a
 // gesture performed once rather than on every summon.
 import { startResizeDragging, type ResizeDirection } from "@/lib/ipc";
 
@@ -30,7 +30,7 @@ const GRIPS: { direction: ResizeDirection; className: string }[] = [
 
 export function ResizeGrips() {
   return (
-    // Above the preview layer as well (ADR-0017 puts that at `z-50`): a window
+    // Above the preview layer as well (that sits at `z-50`): a window
     // is resizable while you are looking at a screenshot in it, which is when
     // the size matters most. `pointer-events-none` on the box so only the strips
     // themselves take the pointer — the rest of the card is still clickable

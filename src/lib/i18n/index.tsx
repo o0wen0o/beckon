@@ -1,6 +1,6 @@
-// The language, the way `theme.ts` is the theme: Rust owns the setting
-// (ADR-0003), this module only maps it onto what the window renders. Nothing is
-// remembered locally, so the three surfaces cannot drift apart (ADR-0015).
+// The language, the way `theme.ts` is the theme: Rust owns the setting,
+// this module only maps it onto what the window renders. Nothing is
+// remembered locally, so the three surfaces cannot drift apart.
 //
 // Unlike the theme, a language is not a class on the document — every string in
 // the tree changes — so this is a `Notifier` like the other stores rather than a
@@ -37,7 +37,7 @@ class I18nStore extends Notifier {
   }
 }
 
-/** One per window, like every other store: the window is created once (ADR-0007). */
+/** One per window, like every other store: the window is created once. */
 export const i18n = new I18nStore();
 
 /** The catalog to render from. Subscribes the component to language changes. */
@@ -51,7 +51,7 @@ export function useT(): Strings {
  * Awaited before a surface mounts, for the reason the theme is: a window that
  * paints English and then swaps to Chinese has told the user their setting did
  * not take. The subscription is never disposed — the windows live as long as the
- * process does (ADR-0007).
+ * process does.
  */
 export async function startLanguage(): Promise<void> {
   let language: Language = "en";

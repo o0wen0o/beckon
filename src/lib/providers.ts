@@ -1,9 +1,9 @@
 // Reading a provider row: the small derivations three surfaces need, in one
-// place (ADR-0021).
+// place.
 //
 // Every function here **mirrors a rule in Rust**, and each one names its
 // counterpart. That duplication is deliberate and bounded: Rust is authoritative
-// (ADR-0003) — it decides what goes on the wire and whether a turn runs — while
+// — it decides what goes on the wire and whether a turn runs — while
 // these decide what a pane *says*, which is a question no round trip should have
 // to answer per row while a list is being drawn. Nothing here changes a value;
 // they only read one.
@@ -106,9 +106,8 @@ export function actionsUsing<T extends { model: { provider: string | null } }>(
  * they had already drifted — one counted only `no-credential` where the others
  * counted anything that was not `present`. Mirrors the split in
  * `commands::require_api_key`: a local endpoint wants no `Authorization` header,
- * so nothing stored for one is a working setup rather than a fault (ADR-0021),
- * and the two remaining outcomes stay two different things all the way to the UI
- * (ADR-0005).
+ * so nothing stored for one is a working setup rather than a fault,
+ * and the two remaining outcomes stay two different things all the way to the UI.
  *
  * `null` while the status has not arrived: nothing is claimed before it is known.
  */
@@ -142,7 +141,7 @@ export function strandedModel(
 /**
  * Hosts that hold keys to *other* APIs and relay a request to one of them.
  * Mirrors `config::BROKERS` — **the two halves move together or a relaying row
- * stops disclosing** (ADR-0025).
+ * stops disclosing**.
  *
  * Duplicated for the same reason `isLocal` duplicates its own host list: this
  * answers what a pane *says* while drawing a row, not what goes on the wire.

@@ -1,9 +1,9 @@
 //! Making the three windows appear: sizes, placement, and the one window that
 //! is built on demand.
 //!
-//! Launcher and Popover are created hidden at startup and only shown/hidden
-//! (ADR-0007): WebView creation costs far too much to pay per keypress. ADR-0004
-//! is satisfied by destroying the *Exchange* on hide, which `hide_popover` does.
+//! Launcher and Popover are created hidden at startup and only shown/hidden:
+//! WebView creation costs far too much to pay per keypress. The Exchange is
+//! never persisted, so it is destroyed on hide instead, which `hide_popover` does.
 //!
 //! Settings is the exception: nothing about it is latency-sensitive, and a third
 //! live WebView is the most expensive thing in a resident tool. It is built on
@@ -56,14 +56,14 @@ pub(super) fn reveal(window: &WebviewWindow) {
 /// `outer_size()`. This runs on the hotkey thread, so `set_size` is dispatched
 /// to the event loop and an immediate read can still return the old rect —
 /// which would place a window the user has dragged short using the previous
-/// rect's bounds (ADR-0020).
+/// rect's bounds.
 pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, height: f64) {
     let size = LogicalSize::new(width, height);
     let _ = window.set_size(size);
 
     let app = window.app_handle();
     // Recorded before the placement can fail out: this is what tells the resize
-    // that follows apart from one the user dragged (ADR-0018).
+    // that follows apart from one the user dragged.
     *app.state::<AppState>()
         .popover_asked_size
         .lock()
@@ -82,8 +82,7 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
     let _ = window.set_position(PhysicalPosition::new(x, y));
 }
 
-/// A size the window reported, kept if the *user* is what produced it
-/// (ADR-0018).
+/// A size the window reported, kept if the *user* is what produced it.
 ///
 /// The Popover is undecorated, so the grips that drag it are markup and the
 /// resize itself is the window manager's; this is the only place the result of
@@ -92,7 +91,7 @@ pub(super) fn size_and_place_at_cursor(window: &WebviewWindow, width: f64, heigh
 /// rather than saved. Without that, a clamped or rounded echo of our own summon
 /// would be persisted as if the user had dragged to it.
 ///
-/// Through the config funnel like every other write (ADR-0003):
+/// Through the config funnel like every other write:
 /// [`crate::reload::write_config`] marks it as our own so the watcher swallows
 /// the echo, then re-reads and broadcasts.
 pub fn remember_popover_size(app: &AppHandle, width: f64, height: f64) -> Result<(), String> {

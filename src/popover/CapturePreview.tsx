@@ -1,4 +1,4 @@
-// One Capture, full size, over the whole Popover (ADR-0017).
+// One Capture, full size, over the whole Popover.
 //
 // Over the window rather than inside the scroller, because a 1920×1080 snip is
 // not legible at any size a 620px column can give it — the window is all the
@@ -32,7 +32,7 @@ export function CapturePreview({ items, index, onStep, onClose }: CapturePreview
   const t = useT();
   /**
    * How the Capture on screen is scaled — `null` is fitted, which is what every
-   * image opens at (ADR-0017).
+   * image opens at.
    *
    * Component state rather than the store's: a wheel notch is not something the
    * Exchange has an opinion about, and putting it in `ExchangeStore` would
@@ -47,7 +47,7 @@ export function CapturePreview({ items, index, onStep, onClose }: CapturePreview
   if (!capture) return null;
   const alone = items.length < 2;
 
-  // Clicking the scrim closes it (ADR-0017): the way out that does not need the
+  // Clicking the scrim closes it: the way out that does not need the
   // keyboard, on the two thirds of the layer that are ground rather than
   // control.
   //

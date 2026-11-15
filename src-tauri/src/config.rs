@@ -29,7 +29,7 @@ pub const DEFAULT_LAUNCHER_HOTKEY: &str = "Cmd+Shift+Space";
 pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
 pub const DEFAULT_MODEL: &str = "deepseek-v4-flash";
 /// The id of the row a fresh install gets, and therefore of `[defaults]
-/// provider` (ADR-0021). Also the account the pre-provider credential is
+/// provider`. Also the account the pre-provider credential is
 /// migrated onto — see [`crate::secrets::migrate_legacy`].
 pub const DEFAULT_PROVIDER_ID: &str = "deepseek";
 pub const DEFAULT_PROVIDER_LABEL: &str = "DeepSeek";
@@ -37,12 +37,12 @@ pub const DEFAULT_PROVIDER_LABEL: &str = "DeepSeek";
 /// constant in a command, because every provider has a different one.
 pub const DEFAULT_KEY_PAGE: &str = "https://platform.deepseek.com/api_keys";
 /// DeepSeek's own guidance for general conversation and translation. Was pinned
-/// for every request (ADR-0019); it is now one row's value, because it was only
+/// for every request; it is now one row's value, because it was only
 /// ever a fact about DeepSeek and a `temperature` DeepSeek likes is not one
-/// Ollama does (ADR-0021).
+/// Ollama does.
 pub const DEEPSEEK_TEMPERATURE: f64 = 1.3;
 
-/// The Popover's size out of the box, in logical pixels (ADR-0018). Mirrored in
+/// The Popover's size out of the box, in logical pixels. Mirrored in
 /// `tauri.conf.json` so the very first paint is not at the wrong size.
 pub const DEFAULT_POPOVER_W: f64 = 620.0;
 pub const DEFAULT_POPOVER_H: f64 = 500.0;
@@ -51,7 +51,7 @@ pub const DEFAULT_POPOVER_H: f64 = 500.0;
 ///
 /// The width floor is the composer's row — camera, box, Send — which wraps
 /// below it. The height floor is a composer plus one line of answer: with the
-/// hint window gone (ADR-0020) the product no longer sizes the Popover itself,
+/// hint window gone the product no longer sizes the Popover itself,
 /// so the floor only has to keep a hand-drag readable.
 pub const MIN_POPOVER_W: f64 = 380.0;
 pub const MIN_POPOVER_H: f64 = 200.0;
@@ -65,7 +65,7 @@ pub const MAX_POPOVER_H: f64 = 2160.0;
 pub struct Config {
     pub launcher_hotkey: String,
     pub autostart: bool,
-    /// Whether the automatic once-per-launch update check runs (ADR-0022).
+    /// Whether the automatic once-per-launch update check runs.
     ///
     /// Only the automatic one. The tray's own item is a click, and a click is
     /// never what this declines — turning it off means Beckon contacts nothing
@@ -118,7 +118,7 @@ pub enum Language {
     Zh,
 }
 
-/// How an endpoint is told **not** to think (ADR-0021).
+/// How an endpoint is told **not** to think.
 ///
 /// A property of the *endpoint*, never of the model: a DeepSeek-weighted model
 /// served by SiliconFlow speaks the plain OpenAI dialect, so no rule over model
@@ -179,7 +179,7 @@ pub enum Reasoning {
 }
 
 impl Reasoning {
-    /// The arm a pre-provider `[api] base_url` folds into (ADR-0021).
+    /// The arm a pre-provider `[api] base_url` folds into.
     ///
     /// A host guess, and the *only* one in the codebase: it runs once, on a file
     /// written before providers existed, whose `base_url` defaulted to DeepSeek's
@@ -196,7 +196,7 @@ impl Reasoning {
     }
 }
 
-/// How an endpoint is asked to **search the web** (ADR-0026).
+/// How an endpoint is asked to **search the web**.
 ///
 /// The same shape as [`Reasoning`] and for the same reason: a property of the
 /// *endpoint*, never of the model. What differs is the direction. Thinking is
@@ -209,7 +209,7 @@ impl Reasoning {
 /// round trip**. A built-in tool the client has to answer — Moonshot's
 /// `$web_search`, which replies with a `tool_calls` frame the caller must echo
 /// back — is a second turn, and `exchange/turn.rs` streams one; those hosts stay
-/// `None` until that is a feature rather than a field (ADR-0026).
+/// `None` until that is a feature rather than a field.
 ///
 /// Nothing detects these. `llm/detect.rs` probes a thinking dialect with a
 /// one-token request; a search probe would run a real search and bill for it, so
@@ -239,8 +239,7 @@ pub enum Search {
     /// `plugins: [{"id": "web"}]` — OpenRouter, which runs the search itself and
     /// folds the results into the same completion (checked 2026-08-25). A
     /// broker, so this is a search *about* the request rather than by the model
-    /// behind it, and it is billed per request on top of the tokens (ADR-0025,
-    /// ADR-0026).
+    /// behind it, and it is billed per request on top of the tokens.
     Openrouter,
     /// Nothing on the wire either way. This endpoint has no one-field switch, so
     /// `web_search = true` reaches it as nothing and its own behaviour stands.
@@ -249,16 +248,16 @@ pub enum Search {
 }
 
 impl Search {
-    /// Whether this endpoint's search field reaches a given model (ADR-0027).
+    /// Whether this endpoint's search field reaches a given model.
     ///
     /// `None` is "the vendor documents neither", and the switch stays offered on
     /// it: an arm that answered `false` for every id it had not heard of would
     /// grey out each new model the day it shipped. `Some(false)` is the vendor's
-    /// own word that this model does not take the field — the reason ADR-0027
-    /// exists, and the only thing that disables a switch.
+    /// own word that this model does not take the field, and the only thing that
+    /// disables a switch.
     ///
     /// Families rather than ids, deliberately. A list of exact model names is
-    /// the thing ADR-0026 refused to keep, and the vendor documents these by
+    /// a list that rots with every release, and the vendor documents these by
     /// tier; matching the tier ages at the speed the tier does.
     pub fn supports_model(self, model: &str) -> Option<bool> {
         let id = model.trim();
@@ -268,7 +267,7 @@ impl Search {
         match self {
             // The field is the endpoint's own and every model behind it reads
             // it: xAI runs Live Search before the model sees the turn, and
-            // OpenRouter is a broker running the search itself (ADR-0025).
+            // OpenRouter is a broker running the search itself.
             Search::Xai | Search::Openrouter => Some(true),
             // The one host with a documented split. Web search on the
             // OpenAI-compatible endpoint is the Qwen Plus and Flash tiers; the
@@ -282,10 +281,10 @@ impl Search {
                 // families. Alibaba's web-search page marks Qwen3.6-Plus and
                 // Qwen3.6-Flash "Supported only by the Responses API", so those
                 // get an offered switch whose field reaches nothing. Left wide
-                // on purpose: over-offering costs the feature silently
-                // (ADR-0026), while a wrong `Some(false)` greys a working model
+                // on purpose: over-offering costs the feature silently,
+                // while a wrong `Some(false)` greys a working model
                 // and tells the user, on Beckon's word, that it cannot search —
-                // the expensive half ADR-0027 exists for. Third-party lists
+                // the expensive half. Third-party lists
                 // contradict the vendor page here, so a real DashScope key is
                 // what settles it (`docs/register-audit-2026-08-25.md`).
                 //
@@ -311,7 +310,7 @@ impl Search {
 }
 
 /// One endpoint the user keeps: where requests go, what they carry, and which
-/// credential account they are signed with (ADR-0021).
+/// credential account they are signed with.
 ///
 /// There is no `active` row and no global switch. Which provider a turn goes to
 /// is an Action-level question with a default, exactly like `model` and
@@ -342,8 +341,8 @@ pub struct Provider {
     /// honoured at all is a fact about the endpoint. Actions still override it.
     pub thinking: bool,
     pub reasoning: Reasoning,
-    /// What this row inherits to an Action that says nothing about searching
-    /// (ADR-0026). `false` on every preset, because a search costs money and
+    /// What this row inherits to an Action that says nothing about searching.
+    /// `false` on every preset, because a search costs money and
     /// seconds on top of the turn and nobody asked for it by installing Beckon.
     pub web_search: bool,
     pub search: Search,
@@ -388,7 +387,7 @@ impl Provider {
         host_is_local(&host_of(&self.base_url))
     }
 
-    /// The broker this row relays through, if it does (ADR-0025).
+    /// The broker this row relays through, if it does.
     ///
     /// Derived rather than stored: a field would have to be filled in by whoever
     /// added the row, which means a hand-typed OpenRouter URL would disclose
@@ -447,7 +446,7 @@ fn host_is_local(host: &str) -> bool {
 ///     so the value the pane shows back is the value that goes on the wire.
 ///
 /// Runs inside [`Config::fold_legacy`], so it holds for a file the user
-/// hand-edited exactly as it does for a value a pane sent (ADR-0003, ADR-0021).
+/// hand-edited exactly as it does for a value a pane sent.
 fn normalise_base_url(base_url: &str) -> String {
     let trimmed = base_url.trim().trim_end_matches('/');
     // Nothing to fix and nothing to invent: an empty row is the blank a pane
@@ -480,8 +479,7 @@ fn normalise_base_url(base_url: &str) -> String {
     stripped.trim_end_matches('/').to_string()
 }
 
-/// Hosts that hold keys to *other* APIs and relay a request to one of them
-/// (ADR-0025).
+/// Hosts that hold keys to *other* APIs and relay a request to one of them.
 ///
 /// This was a ban list — no row was allowed to name one — and is now a
 /// **disclosure** list: a row may point at a broker, and the pane says so before
@@ -510,9 +508,9 @@ const BROKERS: [&str; 6] = [
 ///
 /// One normaliser for both host rules, so "does this look local" and "which
 /// dialect does a pre-provider file speak" cannot disagree about what they are
-/// reading. There used to be a third — `is_deepseek_host`, which decided whether
-/// the documented catalog described this endpoint. A row carries no catalog now
-/// (`docs/register-audit-2026-08-25.md`), so nothing asks.
+/// reading. There is no third: a row carries no catalog
+/// (`docs/register-audit-2026-08-25.md`), so nothing asks whether one describes
+/// this endpoint.
 fn host_of(base_url: &str) -> String {
     // Lowercased before the scheme is stripped, not after: a scheme is
     // case-insensitive, and `HTTP://` is a URL a person types.
@@ -532,14 +530,14 @@ pub struct ApiConfig {
     /// stay empty, and every reader gets its non-emptiness from the load path
     /// rather than from here.
     pub providers: Vec<Provider>,
-    /// The pre-provider single endpoint (ADR-0021). Read once, folded into a
+    /// The pre-provider single endpoint. Read once, folded into a
     /// row, and never written back — so it leaves the file on the next save,
-    /// the same way a withdrawn `[model]` key does (ADR-0019).
+    /// the same way a withdrawn `[model]` key does.
     #[serde(skip_serializing)]
     pub base_url: Option<String>,
 }
 
-/// "Add from preset": a filled-in row per first-party endpoint (ADR-0021).
+/// "Add from preset": a filled-in row per first-party endpoint.
 ///
 /// **Data, not code paths.** Every arm of this list produces an ordinary
 /// [`Provider`] the user can then edit or delete, so nothing downstream knows a
@@ -548,18 +546,17 @@ pub struct ApiConfig {
 ///
 /// ## What may be in this list
 ///
-/// Until ADR-0025 the rule was that the request had to **terminate** at the
-/// company whose key it carries — no aggregator, no gateway, no OpenRouter. That
-/// rule is now a disclosure instead of a ban: a row may relay, and
-/// [`Provider::relays`] is what makes it say so before a key is stored.
+/// A row may relay — an aggregator, a gateway, OpenRouter — provided it says so:
+/// [`Provider::relays`] is what makes it disclose that before a key is stored.
 ///
-/// The distinction the old rule drew is still the right one and still worth
-/// stating. It is not "does this company own the model": a hosted vLLM serves
+/// The distinction that disclosure draws is worth stating. It is not "does this
+/// company own the model": a hosted vLLM serves
 /// somebody else's open weights on its own GPUs — your key is theirs, the
 /// inference is theirs, and nothing is forwarded. A broker is different in kind,
 /// because it holds keys to *other* APIs and relays your request to one, so a
 /// third party ends up inside a relationship that was between you and a vendor.
-/// What changed is who gets to decide that is acceptable.
+/// Whether that is acceptable is the user's call, made with the disclosure in front
+/// of them.
 /// `every_relaying_preset_says_so` is what keeps the disclosure attached, because
 /// a broker satisfies the type and nothing else in the codebase would notice.
 ///
@@ -601,7 +598,7 @@ pub fn presets() -> Vec<Provider> {
         model: String::new(),
         thinking: false,
         reasoning: Reasoning::None,
-        // Off on every row, arm named per row below (ADR-0026).
+        // Off on every row, arm named per row below.
         web_search: false,
         search: Search::None,
         temperature: None,
@@ -650,8 +647,8 @@ pub fn presets() -> Vec<Provider> {
         // `search` is `None`, and the conclusion outlived the argument for it.
         // The reason on record was that Kimi's `$web_search` is a
         // `builtin_function` tool answered with a `tool_calls` frame the caller
-        // must echo back — two round trips, where `exchange/turn.rs` streams one
-        // (ADR-0026). Their current chat API page documents no web search at
+        // must echo back — two round trips, where `exchange/turn.rs` streams one.
+        // Their current chat API page documents no web search at
         // all, so `None` is right either way and the mechanism above is no
         // longer verifiable on the page it was read from (re-checked
         // 2026-08-25).
@@ -666,9 +663,9 @@ pub fn presets() -> Vec<Provider> {
         // `enabled` only; `kimi-k3` carries no `thinking` field and always
         // reasons, taking `reasoning_effort` of `low`/`high`/`max` with no
         // `none`. So the arm needs a per-model list and a *refusal* the way
-        // `ALWAYS_THINKING_MINIMAX` refuses — which narrows ADR-0021 and wants
-        // its footnote before the arm lands
-        // (`docs/register-audit-2026-08-25.md`).
+        // `ALWAYS_THINKING_MINIMAX` refuses — per-model knowledge inside a
+        // per-endpoint dialect, which needs its own justification before the arm
+        // lands (`docs/register-audit-2026-08-25.md`).
         //
         // Mainland China's host. `api.moonshot.ai` is the international one —
         // same API, different account, so it is an edit to `base_url` rather
@@ -704,7 +701,7 @@ pub fn presets() -> Vec<Provider> {
         // international half, whose value set is the disjoint one, is where the
         // 400 lives. And the whole thing is an entry in the `tools` array rather
         // than a top-level field, so it is not the shape [`Search`] carries:
-        // ADR-0026's arms are the endpoints whose search is *one field and one
+        // its arms are the endpoints whose search is *one field and one
         // round trip*, and this satisfies only the second half. That makes it a
         // question about `Search`'s definition, not about this row
         // (`docs/register-audit-2026-08-25.md`).
@@ -762,10 +759,10 @@ pub fn presets() -> Vec<Provider> {
         // reason: their web search is a server tool of the Messages API, and
         // this layer carries no field for it (checked 2026-08-25).
         //
-        // The row that used to be impossible. Its `/v1/models` is native, not
-        // compatible, and reads an `Authorization: Bearer` as an OAuth token —
-        // so the list came back `401` and no model could ever be chosen. Fixed
-        // in `llm/client::signed`, which now sends `x-api-key` beside the
+        // Its `/v1/models` is native, not compatible, and reads an
+        // `Authorization: Bearer` as an OAuth token — so a bearer alone gets a
+        // `401` and no model could be chosen. `llm/client::signed` therefore
+        // sends `x-api-key` beside the
         // bearer on every keyed request; that is a header, so the endpoints
         // that do not know it ignore it (probed 2026-08-25).
         row(
@@ -790,7 +787,7 @@ pub fn presets() -> Vec<Provider> {
             )
         },
         Provider {
-            // A broker, admitted knowingly (ADR-0025). `Provider::relays` is
+            // A broker, admitted knowingly. `Provider::relays` is
             // what makes the row say so; nothing here has to.
             reasoning: Reasoning::Openrouter,
             // The web plugin, which OpenRouter runs itself and folds into the
@@ -838,7 +835,7 @@ pub fn is_preset(id: &str) -> bool {
 ///
 /// One field, and it names a *row* rather than restating one: `model` and
 /// `thinking` moved onto [`Provider`], because which of them can be honoured is
-/// a fact about the endpoint (ADR-0021). An Action's `[model]` table overrides
+/// a fact about the endpoint. An Action's `[model]` table overrides
 /// the resolved row field-by-field; see
 /// [`ModelOverrides::merge_over`](crate::action::ModelOverrides).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -848,19 +845,19 @@ pub struct ModelDefaults {
     /// Action that names no provider falls back to.
     pub provider: String,
     /// Pre-provider `[defaults] model` / `thinking`, folded onto the row this
-    /// migration synthesises and then dropped from the file (ADR-0021).
+    /// migration synthesises and then dropped from the file.
     #[serde(skip_serializing)]
     pub model: Option<String>,
     #[serde(skip_serializing)]
     pub thinking: Option<bool>,
 }
 
-/// The size the Popover is summoned at, in logical pixels (ADR-0018).
+/// The size the Popover is summoned at, in logical pixels.
 ///
 /// It is config rather than window state because the window is created hidden at
-/// startup and re-sized on every trigger (ADR-0007): a size that lived only in
+/// startup and re-sized on every trigger: a size that lived only in
 /// the window would be overwritten by the next summon, so remembering a drag at
-/// all means writing it to the file ADR-0003 makes authoritative.
+/// all means writing it to the file, which is authoritative.
 ///
 /// Logical, not physical: the same file has to mean the same window on a 100%
 /// monitor and a 150% one, and it is what `set_size` takes.
@@ -953,18 +950,18 @@ impl Config {
     /// provider`.
     ///
     /// One accessor rather than the fallback re-spelled per caller — which row
-    /// an Action that says nothing inherits is the load-bearing rule of
-    /// ADR-0021, and a second spelling of it is a dropdown that disagrees with
+    /// an Action that says nothing inherits is the load-bearing rule of the
+    /// provider table, and a second spelling of it is a dropdown that disagrees with
     /// the wire. Borrowed, so a caller comparing ids allocates nothing.
     pub fn provider_id<'a>(&'a self, id: Option<&'a str>) -> &'a str {
         id.unwrap_or(&self.defaults.provider)
     }
 
-    /// Bring a pre-provider file up to date, in memory only (ADR-0021).
+    /// Bring a pre-provider file up to date, in memory only.
     ///
     /// The file itself is left as the user left it until something writes it —
-    /// silently rewriting a config on load is the data loss ADR-0003 warns
-    /// about — but the legacy keys never serialise, so the first save drops them.
+    /// silently rewriting a config on load is data loss — but the legacy keys
+    /// never serialise, so the first save drops them.
     ///
     /// Also the invariants everything downstream leans on: `providers` is never
     /// empty, every id is distinct, and `defaults.provider` always names a row
@@ -988,7 +985,7 @@ impl Config {
                     .unwrap_or_else(|| DEFAULT_MODEL.to_string()),
                 thinking: self.defaults.thinking.unwrap_or(false),
                 reasoning,
-                // The pinned 1.3 was DeepSeek's own guidance (ADR-0019), so it
+                // The pinned 1.3 was DeepSeek's own guidance, so it
                 // travels only where the dialect says DeepSeek. Anywhere else the
                 // value was already a guess about somebody's endpoint.
                 temperature: (reasoning == Reasoning::Deepseek).then_some(DEEPSEEK_TEMPERATURE),
@@ -1024,7 +1021,7 @@ impl Config {
 /// The result of loading `config.toml`.
 ///
 /// A corrupt config is *reported*, not overwritten — silently replacing a file
-/// the user was editing is the data loss ADR-0003 warns about.
+/// the user was editing is data loss.
 pub struct Loaded {
     pub config: Config,
     pub error: Option<String>,
@@ -1070,8 +1067,8 @@ pub fn load_or_create(path: &Path) -> Loaded {
 /// [`Loaded`] promises a corrupt config is reported, not overwritten — and the
 /// load keeps that promise, then hands back `Config::default()`, which is what
 /// state holds from then on. The next write is those defaults plus one change:
-/// a Settings toggle, or nothing more deliberate than the Popover being dragged
-/// (ADR-0018). That write is what replaced the file the user was half-way
+/// a Settings toggle, or nothing more deliberate than the Popover being dragged.
+/// That write is what replaced the file the user was half-way
 /// through editing, provider table and all.
 ///
 /// Set aside rather than refused: refusing would leave Settings unable to save
@@ -1138,7 +1135,7 @@ mod tests {
     }
 
     /// A file that declines the automatic check is honoured, and nothing else
-    /// about it moves (ADR-0022).
+    /// about it moves.
     #[test]
     fn the_update_check_can_be_declined() {
         let parsed = loaded("update_check = false");
@@ -1162,7 +1159,7 @@ mod tests {
     /// A pre-provider file: one `base_url`, one `[defaults] model`. It must keep
     /// working, and it must keep pointing at the same endpoint with the same
     /// model — a migration that silently changes where text goes is worse than
-    /// refusing to load (ADR-0021).
+    /// refusing to load.
     #[test]
     fn a_pre_provider_config_folds_into_one_row() {
         let config = loaded(
@@ -1181,7 +1178,7 @@ mod tests {
     /// The one host guess in the codebase, and why it is safe: a `base_url`
     /// pointed somewhere else was never speaking DeepSeek's dialect, so folding
     /// it in as `deepseek` would start sending a `thinking` object that endpoint
-    /// has always 400'd on. The pinned 1.3 goes with it (ADR-0019 → ADR-0021).
+    /// has always 400'd on. The pinned 1.3 is DeepSeek's, so it stays off too.
     #[test]
     fn a_pre_provider_config_pointed_elsewhere_folds_in_as_plain_openai() {
         let config = loaded("[api]\nbase_url = \"http://localhost:11434/v1\"\n");
@@ -1192,7 +1189,7 @@ mod tests {
     }
 
     /// Legacy keys are read and never written: the first save drops them, the
-    /// way a withdrawn `[model]` key does (ADR-0019).
+    /// way a withdrawn `[model]` key does.
     #[test]
     fn the_legacy_keys_leave_the_file_on_the_next_write() {
         let config = loaded("[api]\nbase_url = \"https://api.deepseek.com\"\n");
@@ -1265,7 +1262,7 @@ mod tests {
         assert!(config.provider(Some("nope")).is_none());
     }
 
-    /// Every preset ships with searching off (ADR-0026). A row whose arm can
+    /// Every preset ships with searching off. A row whose arm can
     /// reach the wire is exactly a row that would start billing per request the
     /// moment a user chose it, so the arm is the capability and this is the
     /// consent.
@@ -1276,7 +1273,7 @@ mod tests {
         }
     }
 
-    /// The model gate is the vendor's word or silence, never a guess (ADR-0027).
+    /// The model gate is the vendor's word or silence, never a guess.
     #[test]
     fn a_model_the_arm_has_not_heard_of_is_not_ruled_out() {
         // The whole endpoint reads the field, so every model behind it does.
@@ -1339,7 +1336,7 @@ mod tests {
     }
 
     /// The product decision, as a test: a preset that relays is *disclosed*,
-    /// and every hosted one is reached over TLS (ADR-0021, ADR-0025).
+    /// and every hosted one is reached over TLS.
     ///
     /// This used to assert that no preset named a broker at all. It now asserts
     /// the weaker, still load-bearing thing — that a broker in the list is one
@@ -1610,7 +1607,7 @@ mod tests {
         assert!(loaded.error.is_none());
         assert_eq!(loaded.config.popover.width, MIN_POPOVER_W);
         assert_eq!(loaded.config.popover.height, MAX_POPOVER_H);
-        // Clamping is ours, not a rewrite of the user's file (ADR-0003).
+        // Clamping is ours, not a rewrite of the user's file.
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
             "[popover]\nwidth = 12\nheight = 99999\n"

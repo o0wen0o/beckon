@@ -7,8 +7,7 @@
 //! The icon is **not** a macOS template image, which is the platform's default
 //! for a menu-bar item. A template is rendered from alpha alone, and the two
 //! states here are one silhouette that differs only in accent colour — so
-//! template mode would erase the error state and leave a black squircle
-//! (ADR-0013).
+//! template mode would erase the error state and leave a black squircle.
 
 use std::sync::atomic::Ordering;
 
@@ -46,7 +45,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    // One item with two labels (ADR-0022): with nothing pending it asks, and
+    // One item with two labels: with nothing pending it asks, and
     // with a version pending it offers that version by name. The handler
     // branches on the same value, so the label and what clicking it does cannot
     // disagree.
@@ -124,8 +123,8 @@ pub fn rebuild(app: &AppHandle) {
     }
 }
 
-/// Remember the version an update check found, and redraw the menu around it
-/// (ADR-0022). `None` clears it — a version installed by hand, or withdrawn.
+/// Remember the version an update check found, and redraw the menu around it.
+/// `None` clears it — a version installed by hand, or withdrawn.
 ///
 /// An unchanged value returns instead, because the common case is a no-op: the
 /// one quiet check per launch usually finds nothing and stores `None` over

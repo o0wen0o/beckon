@@ -1,4 +1,4 @@
-//! Filesystem watcher over the config directory (ADR-0003).
+//! Filesystem watcher over the config directory.
 //!
 //! Two things make a naive watcher misbehave:
 //!

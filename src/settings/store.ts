@@ -1,4 +1,4 @@
-// Settings is an *editor of files*, not their owner (ADR-0003): every change
+// Settings is an *editor of files*, not their owner: every change
 // commits to disk (debounced), and `config-changed` re-renders the form.
 //
 // This store owns what is global — the credential, the Launcher hotkey, the
@@ -12,7 +12,7 @@
 // arriving mid-keystroke. Spread across a dozen fields, one clobbering bug
 // becomes twelve.
 //
-// A module-level singleton: one Settings window, never destroyed (ADR-0007).
+// A module-level singleton: one Settings window, never destroyed.
 import {
   describeError,
   getConfig,
@@ -47,7 +47,7 @@ export type TestState = "idle" | "running" | "ok" | "failed";
 class SettingsStore extends Notifier {
   config: Config | null = null;
   /**
-   * One credential status per provider row (ADR-0021). A map, not a value: with
+   * One credential status per provider row. A map, not a value: with
    * an endpoint per Action, one row can be missing its key while every other one
    * works, so there is no such thing as "the" key status.
    */
@@ -70,7 +70,7 @@ class SettingsStore extends Notifier {
   inputPermission: InputPermission | null = null;
   route: SectionRoute = "connection";
 
-  // Transient, and therefore reset on every open (ADR-0007).
+  // Transient, and therefore reset on every open.
   keyDraft = "";
   keyMessage: string | null = null;
   /** Keyed by provider, so a failed test on one row does not colour another. */
@@ -96,7 +96,7 @@ class SettingsStore extends Notifier {
     return this.configSlot.error;
   }
 
-  // --- the provider table (ADR-0021) --------------------------------------
+  // --- the provider table --------------------------------------
 
   /** The row an Action that overrides nothing goes to. */
   get defaultProvider(): Provider | undefined {
@@ -119,8 +119,8 @@ class SettingsStore extends Notifier {
   }
 
   /**
-   * First run is "no key readable", never a file check (ADR-0005) — and asked of
-   * the **default row only** (ADR-0021). An endpoint no Action has been pointed
+   * First run is "no key readable", never a file check — and asked of
+   * the **default row only**. An endpoint no Action has been pointed
    * at yet is not what makes this a first run, and a local one wants no key at
    * all, so nothing stored for one is a working setup rather than a fault.
    */
@@ -149,7 +149,7 @@ class SettingsStore extends Notifier {
     this.notify();
   }
 
-  /** Open one endpoint's own screen, or go back to the inventory (ADR-0012). */
+  /** Open one endpoint's own screen, or go back to the inventory. */
   editProvider(id: string | null) {
     // Leaving a screen must not strand an unwritten edit, exactly as changing
     // section does not.
@@ -221,8 +221,8 @@ class SettingsStore extends Notifier {
 
   async refreshAll() {
     // Four independent reads, so they go out together rather than paying four
-    // round trips in series — this runs on every reveal of a reused window
-    // (ADR-0007), while the pane is still showing the last visit's contents.
+    // round trips in series — this runs on every reveal of a reused window,
+    // while the pane is still showing the last visit's contents.
     const [config, keyStatuses, startupErrors, inputPermission, presets] = await Promise.all([
       getConfig(),
       getKeyStatuses(),
@@ -325,7 +325,7 @@ class SettingsStore extends Notifier {
         const catalog = await getModels(providerId, true);
         this.#putModels(providerId, catalog, mode);
         // `get_models` never fails — it answers with the offline list and says
-        // why (ADR-0024). Which is right for a fetch nobody asked for, and
+        // why. Which is right for a fetch nobody asked for, and
         // silent for the one gesture that *was* a question: pressing Refresh
         // with no key stored left the same list on screen and no answer
         // anywhere. `asked` is how a caller says a person is waiting on it.
@@ -416,7 +416,7 @@ class SettingsStore extends Notifier {
   }
 
   /**
-   * The window is reused (ADR-0007), so a fresh open is an event and this is
+   * The window is reused, so a fresh open is an event and this is
    * where the last visit's leftovers go — including a typed-but-unsaved API
    * key sitting in a hidden window's DOM.
    */

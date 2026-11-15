@@ -33,7 +33,7 @@
 //!   object, so it was [`Thinking::Never`] until the 2026-08-24 pass found the
 //!   pricing table documenting the switch for it like the other two — the
 //!   difference between "the docs are silent" and "the docs say no". This table
-//!   records no image column: nothing is gated on one (ADR-0016).
+//!   records no image column: nothing is gated on one.
 //! - The changelog (<https://api-docs.deepseek.com/updates>) records V4-Pro and
 //!   V4-Flash arriving 2026-04-24, and the legacy names `deepseek-chat` /
 //!   `deepseek-reasoner` being **discontinued on 2026-07-24**. Those two stay in
@@ -48,8 +48,7 @@
 //! this table describes nothing that exists there.
 //!
 //! Without a live list there is no fallback, and the dropdown is **empty on
-//! purpose**. That used to be an edge case a shipped `model` field papered over;
-//! it is now the initial state of every row a user adds, so it is a state the
+//! purpose**. It is the initial state of every row a user adds, so it is a state the
 //! pane renders rather than an accident it hides. Offering `deepseek-v4-flash`
 //! for somebody's Ollama was the alternative, and a dropdown of ids that
 //! endpoint has never served is worse than saying there are none yet.
@@ -191,7 +190,7 @@ pub struct ModelOption {
     /// `None` for a model that is not in the catalog: we do not know, and
     /// guessing is the failure `deepseek` exists to prevent.
     pub thinking: Option<Thinking>,
-    /// Whether this endpoint's search field reaches this model (ADR-0027), from
+    /// Whether this endpoint's search field reaches this model, from
     /// [`Search::supports_model`] — so the pane can grey a switch the vendor
     /// says would do nothing. `None` is "not documented either way", and the
     /// switch stays offered on it.
@@ -257,8 +256,7 @@ fn push_unique(
 fn describe(id: &str, origin: Origin, language: Language, search: Search) -> ModelOption {
     let id = id.trim();
     // The endpoint's arm answers this, not the catalog: which models take the
-    // search field is a fact about the host, and the catalog is DeepSeek's
-    // (ADR-0027).
+    // search field is a fact about the host, and the catalog is DeepSeek's.
     let searches = search.supports_model(id);
     match find(id) {
         Some(entry) => ModelOption {
@@ -463,8 +461,8 @@ mod tests {
     }
 
     /// The dropdown carries the endpoint's answer about each model, so the pane
-    /// can grey a switch rather than offer one the vendor says does nothing
-    /// (ADR-0027). The arm answers, the catalog does not: these ids are not in
+    /// can grey a switch rather than offer one the vendor says does nothing.
+    /// The arm answers, the catalog does not: these ids are not in
     /// it at all.
     #[test]
     fn each_option_says_whether_this_endpoint_can_search_with_it() {

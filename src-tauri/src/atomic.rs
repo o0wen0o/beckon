@@ -1,6 +1,6 @@
 //! Atomic file writes.
 //!
-//! ADR-0003 makes the filesystem the source of truth for Actions, so a crash in
+//! The filesystem is the source of truth for Actions, so a crash in
 //! the middle of a save must never leave a truncated TOML behind. Write to a
 //! temp file in the *same directory* (so the rename stays on one volume) and
 //! rename over the target.

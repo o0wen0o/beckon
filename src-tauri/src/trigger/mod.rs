@@ -1,7 +1,7 @@
 //! The trigger flow: hotkey → grab → resolve `input_source` → show a window.
 //!
 //! Both paths share one grab, and the grab happens **before any window of ours
-//! is shown** (needs ADR-0006): once the Launcher has focus, the foreground
+//! is shown**: once the Launcher has focus, the foreground
 //! window is Beckon, and the copy shortcut sent then would reach the wrong
 //! process.
 //!
@@ -25,7 +25,9 @@ use crate::platform;
 use crate::platform::capture::Capture;
 use crate::state::{AppState, CaptureNotice, PopoverPhase, PopoverView};
 
-use self::foreground::{remember_foreground, restore_foreground_if_idle};
+use self::foreground::{
+    insert_target, remember_foreground, restore_foreground_if_idle, wait_for_foreground,
+};
 use self::window::{center_on_active_monitor, reveal, size_and_place_at_cursor};
 
 pub const WINDOW_LAUNCHER: &str = "launcher";
@@ -34,14 +36,14 @@ pub const WINDOW_SETTINGS: &str = "settings";
 
 /// The Popover's view changed: re-read it with `get_popover_view`.
 pub const EVENT_POPOVER_VIEW: &str = "popover:view";
-/// The attached Captures changed, and *only* that (ADR-0016). Its own event
+/// The attached Captures changed, and *only* that. Its own event
 /// rather than `popover:view`, because re-reading the view is how a new trigger
 /// is handled: it resets the conversation and remounts the composer, which is
 /// exactly wrong for a screenshot attached in the middle of typing.
 pub const EVENT_POPOVER_CAPTURE: &str = "popover:capture";
 /// The Launcher was summoned; payload says whether a Selection came with it.
 pub const EVENT_LAUNCHER_OPENED: &str = "launcher:opened";
-/// Settings was shown. The window is reused (ADR-0007), so a fresh open is an
+/// Settings was shown. The window is reused, so a fresh open is an
 /// event, not a mount — this is what clears the last visit's transient state.
 pub const EVENT_SETTINGS_OPENED: &str = "settings:opened";
 
@@ -156,10 +158,10 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
 
     let (phase, input) = match action.file.input_source {
         // The grab is ignored — it was taken before the Action was known, so
-        // whatever happened to be selected is not this Action's input (ADR-0020).
+        // whatever happened to be selected is not this Action's input.
         InputSource::Prompt => (PopoverPhase::NeedsInput, None),
-        // An empty grab is not an error (ADR-0002): fall through to the composer
-        // and let the user type. This is the only other arm (ADR-0020).
+        // An empty grab is not an error: fall through to the composer
+        // and let the user type. This is the only other arm.
         InputSource::Auto => match selection {
             Some(text) => (PopoverPhase::Running, Some(text)),
             None => (PopoverPhase::NeedsInput, None),
@@ -197,10 +199,10 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
     let _ = app.emit_to(WINDOW_POPOVER, EVENT_POPOVER_VIEW, ());
 
     if let Some(window) = app.get_webview_window(WINDOW_POPOVER) {
-        // Whatever size the user last left the window at, unconditionally
-        // (ADR-0018). The one phase that used to override it was the hint, which
+        // Whatever size the user last left the window at, unconditionally.
+        // The one phase that used to override it was the hint, which
         // could never grow; every surviving phase offers a composer, so there is
-        // no longer a size the product knows better than the user (ADR-0020).
+        // no longer a size the product knows better than the user.
         let size = state.config_snapshot().popover;
         size_and_place_at_cursor(&window, size.width, size.height);
         reveal(&window);
@@ -210,7 +212,7 @@ pub fn open_action(app: &AppHandle, action_id: &str, selection: Option<String>) 
 /// Start a turn for a Popover that was waiting for typed input.
 ///
 /// Attached Captures are taken here: a Capture belongs to the turn it was
-/// attached to, so sending consumes them (ADR-0016, ADR-0017).
+/// attached to, so sending consumes them.
 pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
     let state = app.state::<AppState>();
     // Only the identity is read from the view here. Cloning the whole thing
@@ -270,7 +272,7 @@ pub fn submit_input(app: &AppHandle, text: &str) -> Result<String, String> {
     Ok(exchange_id)
 }
 
-/// A follow-up turn inside the same Exchange (ADR-0004: full history resent).
+/// A follow-up turn inside the same Exchange (full history resent).
 ///
 /// Captures attached after the first answer belong to this turn, exactly as
 /// ones attached before the first did.
@@ -296,7 +298,7 @@ pub fn follow_up(app: &AppHandle, exchange_id: &str, text: &str) -> Result<(), S
 
 /// Resend a turn verbatim. A retry repeats the message that failed — the same
 /// words and the same Captures — so it does not go through the attach path,
-/// which would add whatever happens to be on the Popover *now* (ADR-0016), and
+/// which would add whatever happens to be on the Popover *now*, and
 /// it does not go through `begin_turn`, which would append the message a second
 /// time: it is already the last thing in the history.
 pub fn retry(app: &AppHandle, exchange_id: &str) -> Result<(), String> {
@@ -309,9 +311,63 @@ pub fn retry(app: &AppHandle, exchange_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The Popover's Insert: hand `text` to the app Beckon was summoned over, where
+/// the caret — or the Selection the Action ran on — still is.
+///
+/// It is a Copy followed by one keystroke, and the order is what makes every
+/// refusal reportable:
+///
+/// 1. Find the window to paste into. None remembered — Beckon was summoned over
+///    the desktop, or over itself — is refused with the Popover still up.
+/// 2. Write the clipboard. A user-requested write, so nothing is backed up and
+///    nothing is restored: that is the whole difference from an automatic
+///    write-back, whose race would be the restore.
+/// 3. Bring the window back **before** hiding ours. While the Popover is in
+///    front Beckon is the process allowed to hand the foreground on; and a
+///    window that is gone is found out here, while there is still a Popover to
+///    say so on. The text stays on the clipboard either way — a refused Insert
+///    has still copied.
+/// 4. Hide the Popover, which ends the Exchange. The answer has left
+///    through the one path that takes it somewhere, and the window it left for
+///    is the one the user is now looking at.
+/// 5. Off the event loop: wait for the foreground to actually arrive, then
+///    paste. Past this point there is no window of ours to report on, so a
+///    paste that cannot be sent is logged — and is still one Ctrl+V away.
+pub fn insert_answer(app: &AppHandle, text: &str) -> Result<(), String> {
+    let target =
+        insert_target(app).ok_or_else(|| "there is no window to insert into".to_string())?;
+
+    platform::selection::write_clipboard_text(text)?;
+
+    if !platform::focus::restore_foreground(target) {
+        return Err("the window Beckon was summoned over is gone".to_string());
+    }
+
+    hide_popover(app);
+
+    std::thread::spawn(move || {
+        // Held across the wait and the keystroke, the way a grab holds it: a
+        // hotkey pressed in this half second would send its copy shortcut into
+        // the window this paste is about to land in, and read the clipboard the
+        // paste is about to use. One already running wins instead — its window
+        // is about to take the foreground this paste was waiting for.
+        let Some(_trigger) = begin_trigger() else {
+            return;
+        };
+        if !wait_for_foreground(target) {
+            log::warn!("the window to insert into never took the foreground");
+            return;
+        }
+        if let Err(err) = platform::selection::send_paste() {
+            log::warn!("could not synthesise the paste shortcut: {err}");
+        }
+    });
+    Ok(())
+}
+
 /// One turn worth of content: the rendered text, plus whatever Captures were
 /// attached to it. The only place the two are joined, so "the images go with the
-/// words typed beside them" is a single rule (ADR-0016, ADR-0017).
+/// words typed beside them" is a single rule.
 ///
 /// The Captures arrive by value because every caller has just taken them out of
 /// the view: their base64 is megabytes, and it is moved onto the wire rather
@@ -324,7 +380,7 @@ fn user_content(text: &str, captures: Vec<Capture>) -> Content {
 /// come back with whatever it produced attached.
 ///
 /// Hiding is deliberately not [`hide_popover`], which discards the Exchange
-/// (ADR-0004) — a conversation has to survive a screenshot taken in the middle
+/// — a conversation has to survive a screenshot taken in the middle
 /// of it. So the *window* hides and nothing hands the foreground back: the snip
 /// tool takes the screen for itself, and we are coming straight back.
 ///
@@ -373,7 +429,7 @@ pub fn start_capture(app: &AppHandle) {
             let state = app.state::<AppState>();
             // Read after the snip, not before it: the user had up to 45 seconds
             // in the snip tool, and the sentence belongs in the language the
-            // config holds now (ADR-0015).
+            // config holds now.
             let language = state.config_snapshot().language;
             let mut slot = state.popover_view.lock().expect("popover view lock");
             if let Some(view) = slot.as_mut() {
@@ -386,7 +442,7 @@ pub fn start_capture(app: &AppHandle) {
             .store(false, Ordering::SeqCst);
 
         // Emit before revealing, as every other view change does: the window is
-        // reused (ADR-0007) and would paint its pre-snip self for a few frames.
+        // reused and would paint its pre-snip self for a few frames.
         emit_capture(&app);
         if let Some(window) = &window {
             reveal(window);
@@ -394,7 +450,7 @@ pub fn start_capture(app: &AppHandle) {
     });
 }
 
-/// One tile's remove button (ADR-0017).
+/// One tile's remove button.
 ///
 /// By index, because a Capture has no identity of its own — it is bytes, and two
 /// snips of the same region are equal. The list only ever grows at the end and

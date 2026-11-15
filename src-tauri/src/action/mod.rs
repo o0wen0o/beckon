@@ -1,4 +1,4 @@
-//! The Action: a preset prompt plus how it is triggered (ADR-0003).
+//! The Action: a preset prompt plus how it is triggered.
 //!
 //! An Action's **identity is its filename stem**; `name` is display only. `id`
 //! is therefore derived on load and never stored in the file — renaming the
@@ -20,13 +20,13 @@ pub const INPUT_PLACEHOLDER: &str = "{{input}}";
 #[serde(rename_all = "lowercase")]
 pub enum InputSource {
     /// Typed input only; any Selection is ignored. The arm that has to exist:
-    /// the grab lands before the Action is known (ADR-0006), so without it an
+    /// the grab lands before the Action is known, so without it an
     /// "ask anything" Action fired while text happens to be selected would send
-    /// that text (ADR-0020).
+    /// that text.
     Prompt,
     /// Selection if there is one, otherwise ask for typed input. The default,
     /// and now the only other arm — `selection` was a third that only ever
-    /// produced a hint where this one produces an input box (ADR-0020). The
+    /// produced a hint where this one produces an input box. The
     /// alias keeps a config that still names it loading, rather than failing the
     /// whole file on an unknown variant.
     #[default]
@@ -45,22 +45,22 @@ pub struct PromptSpec {
 /// The Action's `[model]` table. Unknown keys are tolerated deliberately, and
 /// no `deny_unknown_fields` may be added here: it is what lets an Action still
 /// naming the withdrawn `temperature` load and drop it on the next write rather
-/// than becoming a diagnostic (ADR-0019).
+/// than becoming a diagnostic.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ModelOverrides {
     /// Which endpoint this Action posts to — a
     /// [`Provider::id`](crate::config::Provider::id). Absent means
     /// `[defaults] provider`, exactly as absent means "inherit" for the two
-    /// below (ADR-0021).
+    /// below.
     ///
     /// This is what replaced a global switch: two endpoints can be live at once,
     /// so "where does my text go" is a question each Action answers.
     pub provider: Option<String>,
     pub model: Option<String>,
     pub thinking: Option<bool>,
-    /// Whether this Action's turns ask the endpoint to search the web
-    /// (ADR-0026). Absent means inherit, like the two above — and what it
+    /// Whether this Action's turns ask the endpoint to search the web.
+    /// Absent means inherit, like the two above — and what it
     /// inherits is `false` on every preset row, because a search is paid for
     /// per request and an Action that summarises a Selection wants none.
     pub web_search: Option<bool>,
@@ -87,7 +87,7 @@ impl ModelOverrides {
     /// It takes the whole [`Config`] rather than a defaults struct because the
     /// two values it falls back to now live on whichever row the *first* field
     /// resolves to: overriding `provider` changes what `model` and `thinking`
-    /// inherit, and that chain is the design (ADR-0021).
+    /// inherit, and that chain is the design.
     ///
     /// A provider id naming no row leaves the overrides standing on their own.
     /// Nothing is invented here — `turn.rs` reports the missing row, which is
@@ -111,7 +111,7 @@ impl ModelOverrides {
                 .unwrap_or(false),
             // The same chain, and the same `false` when no row answers: an
             // Action pointed at a provider id that names nothing must not start
-            // paying for searches on the strength of a typo (ADR-0026).
+            // paying for searches on the strength of a typo.
             web_search: self
                 .web_search
                 .or_else(|| row.map(|one| one.web_search))
@@ -274,7 +274,7 @@ thinking = true
         assert!(Action::parse("x.toml", text).is_ok());
     }
 
-    /// The key ADR-0021 added, and the absence that means "inherit".
+    /// The `provider` key, and the absence that means "inherit".
     #[test]
     fn a_provider_override_round_trips() {
         let text = "name = \"X\"\n[prompt]\nsystem = \"s\"\n[model]\nprovider = \"ollama\"\n";
@@ -294,8 +294,8 @@ thinking = true
         assert_eq!(action.file.input_source, InputSource::Auto);
     }
 
-    /// The arm ADR-0020 removed still has to load, or trimming the enum would
-    /// break every Action file written before it.
+    /// `input_source = "selection"` still has to load as `auto`, or Action files
+    /// that say it would stop parsing.
     #[test]
     fn the_retired_selection_arm_still_loads_as_auto() {
         let text = "name = \"X\"\ninput_source = \"selection\"\n[prompt]\nsystem = \"s\"\n";
@@ -308,7 +308,7 @@ thinking = true
             .contains("input_source = \"auto\""));
     }
 
-    /// Likewise the `[model]` key ADR-0019 removed: an unknown key is tolerated,
+    /// Likewise `temperature` under `[model]`: an unknown key is tolerated,
     /// so the file loads and the stale value is dropped on the next write.
     #[test]
     fn a_stale_temperature_key_is_ignored() {
@@ -372,7 +372,7 @@ thinking = true
     }
 
     /// The chain that is the whole design: overriding `provider` moves what the
-    /// two rows below it inherit (ADR-0021).
+    /// two rows below it inherit.
     #[test]
     fn overriding_the_provider_moves_what_model_and_thinking_inherit() {
         let merged = ModelOverrides {

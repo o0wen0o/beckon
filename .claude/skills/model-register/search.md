@@ -1,6 +1,6 @@
 # Adding a web-search dialect
 
-A `Search` arm says how an endpoint is **asked** to search the web (ADR-0026). The mirror of
+A `Search` arm says how an endpoint is **asked** to search the web. The mirror of
 [dialect.md](dialect.md) with the polarity flipped, and shorter by three steps, because nothing
 probes for one. Finish at *Not done until* in [SKILL.md](SKILL.md).
 
@@ -8,7 +8,7 @@ probes for one. Finish at *Not done until* in [SKILL.md](SKILL.md).
    exact field, whether the endpoint searches unless told not to, and the date it was checked.
 2. A `SearchWire` variant and its arm in `apply_search` and `search_wire` in
    [request.rs](../../../src-tauri/src/llm/request.rs).
-3. The arm in `Search::supports_model` in [config.rs](../../../src-tauri/src/config.rs) (ADR-0027) —
+3. The arm in `Search::supports_model` in [config.rs](../../../src-tauri/src/config.rs) —
    `Some(true)` where the endpoint searches with everything it serves, and a family match only where
    the vendor documents an exclusion. `None` for anything the vendor is silent about: that keeps the
    switch offered, and a `false` you guessed greys a working pairing out.
@@ -31,8 +31,8 @@ probes for one. Finish at *Not done until* in [SKILL.md](SKILL.md).
 
 - **A built-in tool the caller must answer.** Moonshot's `$web_search` replies with a `tool_calls`
   frame the caller echoes back before any answer arrives. That is a second request; `exchange/turn.rs`
-  streams one. Not an arm, and not a `TODO(register)` either — it needs an ADR, because it changes
-  what a turn is.
+  streams one. Not an arm, and not a `TODO(register)` either — it is a design change, because it
+  changes what a turn is.
 - **A field that is only real on some models.** OpenAI documents web search on `/chat/completions`
   for its search-specialised models, which search on every turn with no field to ask them to. The
   switch there is the model id, which the dropdown already offers. Not an arm.
@@ -57,14 +57,14 @@ question needed one or not, and the user asked for "search the web", not "search
 
 `thinking_wire` consults the model three times because a wrong answer there costs the turn. A model
 that ignores its host's search field costs the *feature*, so `search_wire` still reads only the row
-and no arm may be a hard error. What ADR-0027 added is one step earlier: `Search::supports_model`
+and no arm may be a hard error. One step earlier, `Search::supports_model`
 answers whether the vendor documents this pairing, the dropdown carries the answer, and Settings
 greys the switch where the answer is `false`.
 
 Three rules when you write an arm's answer:
 
-- **Families, not ids.** The vendor documents tiers; match the tier. A list of exact model names is
-  what ADR-0026 refused to keep and ADR-0027 did not bring back.
+- **Families, not ids.** The vendor documents tiers; match the tier. A list of exact model names goes
+  stale the day a vendor ships, so the register keeps none.
 - **Silence is `None`, not `false`.** Only the vendor's own exclusion greys a switch. An arm that
   says no to every id it has not heard of greys out each new model on the day it ships.
 - **The wire stays lenient.** Never make `search_wire` read the model. An Action file written before

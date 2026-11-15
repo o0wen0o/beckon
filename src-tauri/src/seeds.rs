@@ -64,8 +64,8 @@ mod tests {
         assert_eq!(translate.render_user("hello"), "Input: hello");
 
         // Both examples are `auto` (the default): a Selection is the input when
-        // there is one, and an empty grab still lands in the composer
-        // (ADR-0020), so neither seed has to spend the `prompt` arm to offer
+        // there is one, and an empty grab still lands in the composer,
+        // so neither seed has to spend the `prompt` arm to offer
         // typing. `prompt` is for an Action that must *never* read the
         // Selection, which neither of these is.
         let ask = Action::parse("ask.toml", ASK).unwrap();

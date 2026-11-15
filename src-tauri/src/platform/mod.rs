@@ -1,4 +1,4 @@
-//! Platform facade (ADR-0001, ADR-0013).
+//! Platform facade.
 //!
 //! Every Win32 call lives under `windows/` and every AppKit/CoreGraphics call
 //! under `macos/`. The rest of the app calls the functions re-exported here, so
@@ -32,8 +32,8 @@ mod fallback;
 #[cfg(not(any(windows, target_os = "macos")))]
 pub use self::fallback::{focus, permission, selection, snip};
 
-/// Whether the OS will let Beckon synthesise the copy keystroke ADR-0002 is
-/// built on.
+/// Whether the OS will let Beckon synthesise the copy keystroke the Selection
+/// grab is built on.
 ///
 /// Windows asks nobody, so it answers `NotRequired` rather than `Granted`: the
 /// UI has to be able to say nothing about a permission that does not exist.
@@ -54,7 +54,7 @@ pub enum InputPermission {
     Denied,
 }
 
-/// Rewrite a path into the form the OS watcher will report it in (ADR-0003).
+/// Rewrite a path into the form the OS watcher will report it in.
 ///
 /// macOS FSEvents resolves symlinks before it reports, so a config directory
 /// reached through one — `$TMPDIR`'s `/var` → `/private/var`, a symlinked home —
@@ -131,13 +131,13 @@ mod tests {
     };
 
     /// The Popover's out-of-the-box size (`config::DEFAULT_POPOVER_W` ×
-    /// `DEFAULT_POPOVER_H`) — the user can drag it to any other (ADR-0018),
+    /// `DEFAULT_POPOVER_H`) — the user can drag it to any other,
     /// which is exactly why this function takes the size rather than reading it.
     /// It is pure, so a stale number here would never fail a test; it would just
     /// quietly stop describing the app.
     const POPOVER: (i32, i32) = (620, 500);
-    /// A Popover dragged short. No phase produces one on its own any more
-    /// (ADR-0020), but the user can, and the placement has to follow the height
+    /// A Popover dragged short. No phase produces one on its own any more,
+    /// but the user can, and the placement has to follow the height
     /// it is given rather than the one it started at.
     const POPOVER_SHORT: (i32, i32) = (620, 220);
 

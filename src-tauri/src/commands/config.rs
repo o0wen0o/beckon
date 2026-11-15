@@ -23,7 +23,7 @@ pub fn get_config(state: State<AppState>) -> Config {
 ///
 /// A provider row leaving the table takes its credential with it: the account is
 /// `provider:{id}`, so a row deleted and later re-added under the same id would
-/// otherwise silently inherit the old key (ADR-0021). Done here rather than in
+/// otherwise silently inherit the old key. Done here rather than in
 /// `reload`, because it is a consequence of *this* edit and not of every re-read.
 #[tauri::command]
 pub fn save_config(
@@ -41,7 +41,7 @@ pub fn save_config(
     // The table's invariants are `fold_legacy`'s, so they hold at the *boundary*
     // and not merely on the way back in: a window is not where "never empty",
     // "ids are distinct" and "`defaults.provider` names a row" get enforced, and
-    // the resize path writes config through this funnel too (ADR-0018).
+    // the resize path writes config through this funnel too.
     config.fold_legacy();
 
     let removed: Vec<String> = before
@@ -72,7 +72,7 @@ pub fn save_config(
         }
     }
     // The cached model lists go with the credentials, for the same reason the
-    // credentials go at all (ADR-0021, ADR-0024): a row re-added later under the
+    // credentials go at all: a row re-added later under the
     // same id must not inherit either. `forget_all` rather than one call per row
     // because the cache write is an fsync, and removing several rows in one save
     // is still one edit.
@@ -93,7 +93,7 @@ pub fn reveal_config_dir(app: AppHandle, state: State<AppState>) -> Result<(), S
         .map_err(|e| e.to_string())
 }
 
-/// The filled-in rows "Add from preset" offers (ADR-0021).
+/// The filled-in rows "Add from preset" offers.
 ///
 /// A command rather than a table in the frontend: the value a preset exists to
 /// carry is `reasoning`, which is a wire fact, and a wrong one is a 400 on every

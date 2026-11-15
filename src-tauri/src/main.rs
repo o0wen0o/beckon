@@ -40,7 +40,7 @@ fn main() {
 
     let app = tauri::Builder::default()
         .manage(state)
-        // The first plugin on purpose (ADR-0023). Beckon is one process: a
+        // The first plugin on purpose. Beckon is one process: a
         // second launch reaches the running one, is told to open Settings, and
         // exits. Registered ahead of everything because plugin setups run in
         // order and `setup` runs after all of them, so a second instance dies
@@ -115,13 +115,14 @@ fn main() {
             commands::hide_launcher,
             commands::show_settings,
             commands::copy_to_clipboard,
+            commands::insert_answer,
             commands::open_link,
         ])
         .setup(move |app| setup(app, autostart_wanted))
         .on_window_event(|window, event| {
             match event {
-                // Hiding, never closing: the windows are created once and reused
-                // (ADR-0007). ADR-0004 is honoured by dropping the Exchange,
+                // Hiding, never closing: the windows are created once and reused.
+                // The Exchange is never persisted, so it is dropped here,
                 // which `hide_popover` does.
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
@@ -134,8 +135,8 @@ fn main() {
                     }
                 }
                 // A Launcher that outlives its focus is a bug: it is a picker,
-                // and nothing in it is editable (ADR-0003 puts that in
-                // Settings). The Popover instead stays until Esc, so a
+                // and nothing in it is editable (that is Settings' job). The
+                // Popover instead stays until Esc, so a
                 // follow-up survives a glance at another app.
                 WindowEvent::Focused(false) if window.label() == trigger::WINDOW_LAUNCHER => {
                     trigger::hide_launcher(window.app_handle());
@@ -150,7 +151,7 @@ fn main() {
         // No window is ever "the last window": Beckon lives in the tray and
         // quits only from the tray menu.
         //
-        // macOS is the exception, and deliberately so (ADR-0013). Tauri fits
+        // macOS is the exception, and deliberately so. Tauri fits
         // every macOS app with a default menu — which is the only reason Cmd+C
         // and Cmd+V work in Settings' text fields at all — and that menu owns
         // Cmd+Q. Every source of an exit request there is a person asking to
@@ -205,7 +206,7 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
 
     tray::build(&handle)?;
 
-    // ADR-0003: external edits must reach the UI, so the watcher is not
+    // The filesystem is authoritative: external edits must reach the UI, so the watcher is not
     // optional — but a watcher that fails to start must not stop the app.
     let watcher_handle = handle.clone();
     match watcher::spawn(
@@ -237,7 +238,7 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
 
     // The pre-provider credential moves onto the default row before anything
     // asks whether there is one, or an existing install would come back
-    // reporting no key and yanking the user to Settings (ADR-0021).
+    // reporting no key and yanking the user to Settings.
     // One snapshot for both questions: a `Config` clone carries the whole
     // provider table, and the row asked about is the same row either time.
     let config = handle.state::<AppState>().config_snapshot();
@@ -246,7 +247,7 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
         log::info!("moved the stored API key onto the \"{default_provider}\" endpoint");
     }
 
-    // First run is "no key readable", never a file check (ADR-0005). A read
+    // First run is "no key readable", never a file check. A read
     // error also lands here — the user has to be guided through it. Asked of the
     // *default* row only: an endpoint no Action has been pointed at yet is not
     // what makes this a first run, and a local one wants no key at all.
@@ -259,7 +260,7 @@ fn setup(app: &mut tauri::App, autostart_wanted: bool) -> Result<(), Box<dyn std
         trigger::show_settings(&handle);
     }
 
-    // One quiet check per launch (ADR-0022). Last, and on its own task: it is
+    // One quiet check per launch. Last, and on its own task: it is
     // network-bound, nothing else in `setup` waits on it, and a machine that is
     // offline at login must reach the end of this function anyway.
     update::check_on_startup(&handle);

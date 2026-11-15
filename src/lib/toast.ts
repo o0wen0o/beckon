@@ -4,7 +4,7 @@
 // The distinction is the whole reason this exists beside `Callout` and
 // `StatusBar` rather than replacing either. A Callout is about the pane and
 // stays as long as the condition does; the status bar is about the window and
-// the write protocol (ADR-0003). Neither fits "the endpoint answered" — an
+// the write protocol. Neither fits "the endpoint answered" — an
 // outcome with no field to sit under, which was being rendered as a sentence
 // growing sideways out of the button that caused it and pushing the row it
 // belonged to off its own line.
@@ -65,7 +65,7 @@ class ToastStore extends Notifier {
     this.notify();
   }
 
-  /** Every window is reused rather than destroyed (ADR-0007), so a reopened
+  /** Every window is reused rather than destroyed, so a reopened
    *  Settings would otherwise resume the last visit's outcomes as if they had
    *  just happened. Called from `resetTransient` with the rest of them. */
   clear() {

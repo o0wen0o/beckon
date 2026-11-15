@@ -1,6 +1,6 @@
 //! Re-reading disk into state and telling the windows about it.
 //!
-//! ADR-0003 makes the filesystem authoritative, so every path that changes
+//! The filesystem is authoritative, so every path that changes
 //! config or Actions — the watcher, a Settings edit, startup — funnels through
 //! here. The windows never patch their own copy; they re-render from the
 //! snapshot this module broadcasts.
@@ -17,7 +17,7 @@ use crate::tray;
 pub const EVENT_ACTIONS_CHANGED: &str = "actions-changed";
 pub const EVENT_CONFIG_CHANGED: &str = "config-changed";
 
-/// The one write path for `config.toml` (ADR-0003).
+/// The one write path for `config.toml`.
 ///
 /// Marked in `SelfWrites` before the write so the watcher swallows its own
 /// echo, then the one config-derived thing that is not markup is brought into
@@ -26,7 +26,7 @@ pub const EVENT_CONFIG_CHANGED: &str = "config-changed";
 /// the moment it lands.
 ///
 /// Every writer goes through here rather than repeating the sequence: a step
-/// added to it has to reach the resize path (ADR-0018) as well as Settings.
+/// added to it has to reach the resize path as well as Settings.
 pub fn write_config(app: &AppHandle, config: &config::Config) -> Result<(), String> {
     let state = app.state::<AppState>();
     let previous = state.config_snapshot();
@@ -81,7 +81,7 @@ pub fn reload_config(app: &AppHandle) {
 
     // Every per-Action diagnostic — a file that will not parse, a Direct Hotkey
     // that lost its conflict — was phrased in the *previous* language. They are
-    // derived state (ADR-0003), so re-deriving them is the whole fix.
+    // derived state, so re-deriving them is the whole fix.
     if language_changed {
         reload_actions(app);
     }
@@ -137,8 +137,8 @@ pub fn actions_snapshot(app: &AppHandle) -> RegistrySnapshot {
     registry.snapshot(hotkey_errors)
 }
 
-/// One event carrying the whole registry snapshot (ADR-0003 consequence: the
-/// frontend keeps no authoritative state, so partial updates would be a lie).
+/// One event carrying the whole registry snapshot (the frontend keeps no
+/// authoritative state, so partial updates would be a lie).
 pub fn emit_actions(app: &AppHandle) {
     let _ = app.emit(EVENT_ACTIONS_CHANGED, actions_snapshot(app));
 }

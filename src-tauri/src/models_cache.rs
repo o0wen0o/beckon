@@ -1,4 +1,4 @@
-//! The last model list each endpoint gave us, kept beside the config (ADR-0024).
+//! The last model list each endpoint gave us, kept beside the config.
 //!
 //! A provider row carries where to fetch and how to connect, never what to run
 //! (`docs/register-audit-2026-08-25.md`), so the list a user picks from comes
@@ -9,13 +9,13 @@
 //!
 //! ## Not config, and not an Exchange
 //!
-//! ADR-0003 makes `config.toml` and `actions/` the user's, watched, and
+//! `config.toml` and `actions/` are the user's, watched, and
 //! broadcast whole through `reload.rs`. This file is none of that: the user did
 //! not write it, editing it by hand would be meaningless, and a fetched list
 //! landing on the broadcast path would echo back at the window that caused the
-//! fetch and fight the save protocol. ADR-0004 says there is no storage layer;
-//! ADR-0024 is the carve-out, and it is narrow on purpose — ids, and the URL they
-//! were fetched from.
+//! fetch and fight the save protocol. Nothing else is stored: there is no
+//! storage layer for Exchanges, and this file is narrow on purpose — ids, and the
+//! URL they were fetched from.
 //!
 //! The watcher never reports it: it is recursive over the config root, but
 //! `is_ignored` drops anything that is not a `.toml`, which covers both this file
@@ -42,7 +42,7 @@
 //! Two callers drop an entry outright — `delete_api_key`, because a list fetched
 //! with a key that is gone has stopped being anything the endpoint vouches for,
 //! and `save_config`'s removed-row loop, which already deletes that row's
-//! credential so a row re-added under the same id cannot inherit it (ADR-0021).
+//! credential so a row re-added under the same id cannot inherit it.
 //!
 //! TODO(register): a key *replaced* by one on a different org or tier cannot be
 //! detected — `base_url` is unchanged and Beckon never sees the outgoing key — so

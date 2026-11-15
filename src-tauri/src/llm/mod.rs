@@ -33,11 +33,11 @@ pub enum Role {
 /// One image on the wire, as a `data:` URL.
 ///
 /// The provider also accepts an external URL and a Files API handle; a Capture
-/// exists only in memory (ADR-0004, ADR-0016), so this is the only form Beckon
+/// exists only in memory, so this is the only form Beckon
 /// can send.
 ///
 /// `Arc<str>` rather than `String`, and it is the only field in this module that
-/// is: the history is resent untruncated on every follow-up (ADR-0004), so the
+/// is: the history is resent untruncated on every follow-up, so the
 /// per-turn clone of it would otherwise `memcpy` every attached image again —
 /// megabytes per turn, growing with the conversation. It serialises as the same
 /// bare string.
@@ -60,7 +60,7 @@ pub enum Part {
 ///
 /// `untagged`, so a text-only message still serialises as a bare string: that
 /// is the shape every OpenAI-compatible endpoint accepts, and a `base_url` may
-/// point at one that has never heard of content parts (ADR-0016). Parts are
+/// point at one that has never heard of content parts. Parts are
 /// sent only when there is actually an image to send.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -71,7 +71,7 @@ pub enum Content {
 
 impl Content {
     /// Text plus the Captures attached to the turn, in the order they were taken
-    /// (ADR-0017) — the provider reads a parts array in order, so "the first
+    /// — the provider reads a parts array in order, so "the first
     /// one" in the note means the first tile in the composer.
     ///
     /// The text part is dropped when empty rather than sent blank — an Action
@@ -169,7 +169,7 @@ mod tests {
     }
 
     /// Several Captures are several parts after the one text part, in the order
-    /// they were taken (ADR-0017): a note saying "the second one" is only true
+    /// they were taken: a note saying "the second one" is only true
     /// if the wire keeps the composer's order.
     #[test]
     fn several_images_follow_the_text_in_order() {
@@ -186,7 +186,7 @@ mod tests {
     }
 
     /// Nothing attached is not an empty parts array: it is the bare string an
-    /// endpoint that predates content parts accepts (ADR-0016).
+    /// endpoint that predates content parts accepts.
     #[test]
     fn no_images_stays_a_bare_string() {
         let content = Content::with_images("just words", Vec::<Arc<str>>::new());

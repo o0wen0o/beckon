@@ -218,7 +218,7 @@ mod tests {
     }
 
     /// Every spelling of the Command/Super modifier parses on both platforms,
-    /// which is what makes a `config.toml` portable between them (ADR-0013).
+    /// which is what makes a `config.toml` portable between them.
     #[test]
     fn every_spelling_of_the_command_modifier_parses() {
         let cmd = parse("Cmd+Shift+Space").unwrap();

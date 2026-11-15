@@ -1,5 +1,5 @@
 //! Win32 implementations. Nothing outside this directory uses the `windows`
-//! crate (ADR-0001).
+//! crate.
 
 mod clipboard;
 pub mod focus;

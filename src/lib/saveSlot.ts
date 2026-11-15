@@ -1,4 +1,4 @@
-// The write half of "the filesystem is the source of truth" (ADR-0003), shared
+// The write half of "the filesystem is the source of truth", shared
 // by the two stores that edit files: `settings/store.ts` for `config.toml`,
 // `settings/actions.ts` for `actions\*.toml`.
 //
@@ -37,7 +37,7 @@ export function textFocusHeld(pane: HTMLElement | null): boolean {
 }
 
 /**
- * One debounced write target. ADR-0003 makes disk authoritative, so every edit
+ * One debounced write target. Disk is authoritative, so every edit
  * has to land there — but not on every keystroke. `busy` is the second half of
  * the suppression rule: it stops a snapshot already in flight from being
  * adopted back over a newer local value.

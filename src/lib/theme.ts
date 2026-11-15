@@ -1,4 +1,4 @@
-// The theme is config-derived state like everything else (ADR-0003): Rust owns
+// The theme is config-derived state like everything else: Rust owns
 // the setting, this module only maps it onto the document. Nothing is
 // remembered locally, so the three surfaces cannot drift apart.
 
@@ -13,7 +13,7 @@ const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)");
 let applied: Theme | null = null;
 
 // Registered once and left there: a no-op unless the theme is `system`, and the
-// windows outlive any reason to detach it (ADR-0007). `prefers-color-scheme`
+// windows outlive any reason to detach it. `prefers-color-scheme`
 // is the webview's own signal on both platforms, so nothing here is per-OS.
 systemIsDark.addEventListener("change", () => {
   if (applied === "system") paint("system");
@@ -45,7 +45,7 @@ function applyTheme(theme: Theme) {
  *
  * Awaited before a surface mounts so the window never paints one palette and
  * then flips. The subscription is never disposed: the windows live as long as
- * the process does (ADR-0007).
+ * the process does.
  */
 export async function startTheme(): Promise<void> {
   let theme: Theme = "light";

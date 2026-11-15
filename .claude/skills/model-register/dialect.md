@@ -39,7 +39,7 @@ that *was* detectable stop being one, say so in the report rather than shipping 
 
 ## Does every model behind that endpoint take the field?
 
-A dialect is the endpoint's property (ADR-0021) and the row still selects it — but `api.deepseek.com`
+A dialect is the endpoint's property and the row still selects it — but `api.deepseek.com`
 still answers to legacy ids that picked the mode through the id itself, and `api.openai.com` serves
 families that reject the effort floor. Where the host is mixed, have the arm consult a per-model list
 beside it (`CATALOG`, `EFFORT_NONE_FAMILIES`, `ALWAYS_THINKING_MINIMAX`) and make the unmatched case
@@ -52,7 +52,7 @@ Those per-model lists are the only shipped model ids this register permits, so a
 the same burden: it answers *how to connect* rather than *what to run*, a wrong value is a `400`
 rather than a worse model, and it holds ids only — no labels, no descriptions, no ordering, nothing a
 user ever sees. A list wanted for any other reason belongs in the endpoint's own fetched list. A new
-list also narrows ADR-0021 and gets recorded (its footnote, or a new ADR).
+list is also a design change, not a register edit: it puts per-model knowledge back.
 
 ## Two things to leave alone
 
@@ -60,7 +60,7 @@ list also narrows ADR-0021 and gets recorded (its footnote, or a new ADR).
   `none`, so a new arm is treated as throwable without an edit. Check that this is still true rather
   than assuming it.
 - `Reasoning::guess`. It runs on exactly one thing — a config file written before the provider table
-  existed (ADR-0021) — and a new dialect has no legacy files to migrate.
+  existed — and a new dialect has no legacy files to migrate.
 
 A dialect only ever sent in one direction is normal — express the asymmetry in `thinking_wire`, where
 it can carry a comment, rather than in `build_body`, which stays a dumb translation of the wire

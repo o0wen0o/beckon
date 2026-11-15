@@ -3,15 +3,22 @@
 // label column here and no hairline between turns — the gap separates them.
 //
 // Every state a turn can be in is rendered here, so the ones that must not look
-// alike sit side by side in one file. The answer is Markdown (ADR-0028) and
+// alike sit side by side in one file. The answer is Markdown and
 // everything else is plain text with preserved whitespace — the question is the
 // user's own words and the reasoning is not written to be formatted. Neither
 // path can inject anything into the WebView.
-import { CheckIcon, CopyIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ClipboardPasteIcon,
+  CopyIcon,
+  RotateCcwIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeFailure } from "@/lib/failures";
 import { useT } from "@/lib/i18n";
 import { showSettings } from "@/lib/ipc";
+import { COMMAND_MODIFIER, formatAccelerator } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { CaptureTile } from "./CaptureTile";
 import { Markdown } from "./Markdown";
@@ -29,14 +36,30 @@ const CLAMP_AT = 160;
 const CARD = "bg-muted max-w-4/5 rounded-lg border px-3 py-1.5 whitespace-pre-wrap text-quiet";
 
 /**
- * The three quiet buttons under a turn — reasoning disclosure, clamp toggle,
- * Copy — one step quieter than `ghost`'s grey, because they are labels *about*
- * the turn rather than part of it. The negative margin pulls each flush with
- * the text it belongs to; hover still takes them to full ink.
+ * The quiet buttons under a turn — reasoning disclosure, clamp toggle, and the
+ * row of Copy, Insert and Regenerate — one step quieter than `ghost`'s grey,
+ * because they are labels *about* the turn rather than part of it. The negative
+ * margin pulls each flush with the text it belongs to; hover still takes them
+ * to full ink.
  */
 const QUIET = "text-muted-quiet";
 
-export function TurnView({ turn, index }: { turn: Turn; index: number }) {
+/** The two window chords that act on the last turn, drawn once in the
+ *  platform's own spelling. `Popover.tsx` is what listens for them; they are
+ *  named here because the buttons they shortcut are. */
+const INSERT_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+Enter`);
+const REGENERATE_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+R`);
+
+interface TurnViewProps {
+  turn: Turn;
+  index: number;
+  /** Whether this is the turn the conversation currently ends on. Only that
+   *  one can be run again — Rust resends the *last* message (`retry_turn`) —
+   *  and only that one is what the window's chords act on. */
+  last: boolean;
+}
+
+export function TurnView({ turn, index, last }: TurnViewProps) {
   const t = useT();
   const captures = turn.captures;
   /** More than one is a grid of cropped tiles with one line of prose about the
@@ -53,6 +76,12 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
   const settled = isSettled(turn.status);
   const copied = exchange.copiedTurn === index;
   const copyFailed = exchange.copyFailedTurn === index;
+  const insertFailed = exchange.insertFailedTurn === index;
+  /** A settled answer can be asked for again, and so can a turn that settled
+   *  with none — stopped before the first token is the case most worth a second
+   *  try. A failed turn is not here: it has Retry, which is this with a filled
+   *  button, because there it is the thing to do rather than a thing one may. */
+  const regenerable = last && settled && exchange.canRetry;
 
   return (
     <div className="flex flex-col gap-2">
@@ -60,8 +89,8 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         // The toggle sits under the card rather than inside it: `ghost` hovers
         // to `--accent`, which is the same grey the card is filled with.
         <div className="flex flex-col items-end gap-1">
-          {/* The Captures go in the same card the words do, above them
-              (ADR-0016): what you sent is one object, and the images are the
+          {/* The Captures go in the same card the words do, above them:
+              what you sent is one object, and the images are the
               larger half of it. `line-clamp` cannot be on the card once there
               is an image in it — it would clip the picture rather than the
               prose — so the clamp moves onto the text. */}
@@ -72,7 +101,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
                     height: a column of whole images makes a two-screenshot
                     question taller than the answer to it, which inverts which
                     side of the turn reads as the subject. Whole is what the
-                    preview is for (ADR-0017). */}
+                    preview is for. */}
                 <div className={many ? "grid grid-cols-2 gap-1.5" : "contents"}>
                   {captures.map((capture, at) => (
                     <CaptureTile
@@ -194,31 +223,59 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
           </>
         ) : null}
 
-        {turn.answer && settled ? (
-          // Shrink-to-fit like every other quiet button here. A fixed width to
-          // stop the Copied swap reflowing is unnecessary — it is the last
-          // child of a left-aligned column — and leaves empty button under the
-          // pointer.
-          <Button
-            variant="ghost"
-            size="xs"
-            // The failure colours the button rather than raising anything: this
-            // window hosts no Toaster, and a clipboard write that was refused is
-            // a fact about the gesture, not a condition to act on. It clears
-            // itself on the same 1600ms as Copied does, so the two are one
-            // behaviour with two outcomes.
-            className={cn(copyFailed ? "text-destructive" : QUIET, "-ml-1.5")}
-            onClick={() => void exchange.copy(turn.answer, index)}
-          >
-            {copyFailed ? (
-              <TriangleAlertIcon />
-            ) : copied ? (
-              <CheckIcon />
-            ) : (
-              <CopyIcon />
-            )}
-            {copyFailed ? t.popover.copyFailed : copied ? t.popover.copied : t.popover.copy}
-          </Button>
+        {settled && (turn.answer || regenerable) ? (
+          // One row, in the order the answer is likely to be used: take it
+          // away, put it back where it came from, or ask again. Shrink-to-fit
+          // like every other quiet button here. A fixed width to stop the
+          // Copied swap reflowing would leave empty button under the pointer;
+          // the swap moves the two beside it by a word, for 1600ms.
+          <div className="-ml-1.5 flex flex-wrap items-center gap-x-1">
+            {turn.answer ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  // The failure colours the button rather than raising anything:
+                  // this window hosts no Toaster, and a clipboard write that was
+                  // refused is a fact about the gesture, not a condition to act
+                  // on. It clears itself on the same 1600ms as Copied does, so
+                  // the two are one behaviour with two outcomes.
+                  className={copyFailed ? "text-destructive" : QUIET}
+                  onClick={() => void exchange.copy(turn.answer, index)}
+                >
+                  {copyFailed ? <TriangleAlertIcon /> : copied ? <CheckIcon /> : <CopyIcon />}
+                  {copyFailed ? t.popover.copyFailed : copied ? t.popover.copied : t.popover.copy}
+                </Button>
+                {/* Copy plus the one keystroke that comes after it:
+                    the answer is pasted into the app Beckon was summoned over,
+                    and this window closes. Offered on every turn, as Copy is —
+                    the answer worth keeping is not always the last one. Only a
+                    refusal is reported, the way a failed Copy is: an Insert
+                    that worked has no window left to say so in. */}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className={insertFailed ? "text-destructive" : QUIET}
+                  title={t.popover.insertTooltip(last ? INSERT_ACCELERATOR : null)}
+                  onClick={() => void exchange.insert(turn.answer, index)}
+                >
+                  {insertFailed ? <TriangleAlertIcon /> : <ClipboardPasteIcon />}
+                  {insertFailed ? t.popover.insertFailed : t.popover.insert}
+                </Button>
+              </>
+            ) : null}
+            {regenerable ? (
+              <Button
+                variant="ghost"
+                size="xs"
+                className={QUIET}
+                title={t.popover.regenerateTooltip(REGENERATE_ACCELERATOR)}
+                onClick={() => void exchange.retry()}
+              >
+                <RotateCcwIcon /> {t.popover.regenerate}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </div>

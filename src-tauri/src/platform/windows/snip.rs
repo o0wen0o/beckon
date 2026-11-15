@@ -1,5 +1,4 @@
-//! Running the Windows snip tool and reading what it left on the clipboard
-//! (ADR-0016).
+//! Running the Windows snip tool and reading what it left on the clipboard.
 //!
 //! Step for step this is the Selection grab with two differences, and both are
 //! consequences of the snip being *interactive*:
@@ -7,14 +6,14 @@
 //! 1. Nothing is synthesised. `ms-screenclip:` is the shell verb Win+Shift+S
 //!    fires, so the tool that opens is the one the user already knows, and the
 //!    image lands on the clipboard because that is what it does — not because
-//!    we sent a keystroke (which is why ADR-0002's clipboard restore does not
+//!    we sent a keystroke (which is why the grab's clipboard restore does not
 //!    apply here: the write is the user's own).
 //! 2. The poll cap is [`SNIP_CAP`], not 300ms. A person is dragging a
 //!    rectangle; the wait is theirs, not the network's.
 //!
 //! The polling itself is [`clipboard::poll_until_written`], the same code the
 //! Selection grab runs — only the two constants and the reader differ, which is
-//! exactly what ADR-0016 means by "the way the Selection grab does".
+//! exactly what "the way the Selection grab does" means.
 //!
 //! `ms-screenclip:` reports nothing back — not whether it opened, not whether
 //! the user pressed Esc. A cancelled snip is therefore indistinguishable from a

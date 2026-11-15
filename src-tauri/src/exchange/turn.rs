@@ -26,7 +26,7 @@ pub fn spawn_turn(app: AppHandle, plan: TurnPlan) {
 async fn run_turn(app: AppHandle, plan: TurnPlan) {
     let state = app.state::<AppState>();
 
-    // The row is read here rather than carried in the plan (ADR-0021): a
+    // The row is read here rather than carried in the plan: a
     // `base_url` corrected in Settings while a Popover is open has to reach the
     // next follow-up, and the Exchange only ever held the id.
     let (provider, language) = {
@@ -46,8 +46,8 @@ async fn run_turn(app: AppHandle, plan: TurnPlan) {
         return;
     };
 
-    // The credential split lives in `commands::require_api_key` once (ADR-0005,
-    // ADR-0021): four outcomes, one of them "a local row wants no header". A
+    // The credential split lives in `commands::require_api_key` once: four
+    // outcomes, one of them "a local row wants no header". A
     // `Failure` is `{kind, message}`, which is exactly what `emit_error` takes,
     // so the Popover and Settings cannot come to disagree about the same row.
     let api_key = match crate::commands::require_api_key(

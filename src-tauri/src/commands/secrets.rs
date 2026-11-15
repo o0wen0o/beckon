@@ -1,7 +1,7 @@
 //! Credential commands, plus the one place "no credential", "read error" and
-//! "key rejected" are turned into three distinguishable [`Failure`]s (ADR-0005).
+//! "key rejected" are turned into three distinguishable [`Failure`]s.
 //!
-//! Every one of them names a provider (ADR-0021): with an endpoint per Action,
+//! Every one of them names a provider: with an endpoint per Action,
 //! one row can be missing its key while every other one works, so a status is
 //! never "the key" — it is always *whose*.
 
@@ -67,7 +67,7 @@ pub fn set_api_key(provider_id: String, key: String) -> Result<KeyStatus, String
     Ok(secrets::status(&provider_id))
 }
 
-/// Also drops this row's cached model list (ADR-0024): a list fetched with a key
+/// Also drops this row's cached model list: a list fetched with a key
 /// that is gone has stopped being something the endpoint vouches for, and
 /// offering it afterwards is the "the list has to stop being live when the key
 /// that fetched it is gone" rule the audit's §4.3 states.
@@ -97,9 +97,9 @@ pub(super) fn require_provider(app: &AppHandle, provider_id: &str) -> Result<Pro
 /// The stored key for one row, or why there is none.
 ///
 /// `Ok(None)` is a real answer: a local endpoint wants no `Authorization` header,
-/// so nothing stored for one is a working setup rather than a fault (ADR-0021).
+/// so nothing stored for one is a working setup rather than a fault.
 /// On a remote host the two failing outcomes stay two different things all the
-/// way to the UI (ADR-0005), so the split lives here once; callers supply only
+/// way to the UI, so the split lives here once; callers supply only
 /// the sentence that varies.
 pub(crate) fn require_api_key(
     provider: &Provider,
@@ -130,7 +130,7 @@ pub struct ConnectionReport {
 }
 
 /// "Test connection": one minimal request to one row, reporting a rejected key
-/// separately from an unreachable API (ADR-0005) — and, on a row no preset
+/// separately from an unreachable API — and, on a row no preset
 /// filled in, learning its dialect while it is already talking to the endpoint.
 #[tauri::command]
 pub async fn test_connection(

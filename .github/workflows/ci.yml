@@ -1,4 +1,4 @@
-# Both platforms, every push (ADR-0013).
+# Both platforms, every push.
 #
 # The macOS half of `src-tauri/src/platform/` cannot be compiled on a Windows
 # machine, so without this job the AppKit and CoreGraphics code would be
@@ -61,7 +61,7 @@ jobs:
   # than `check`, and nothing above it exercises the icon set or Info.plist, so
   # it runs on demand rather than on every push.
   #
-  # Not a release: `release.yml` does that from a tag (ADR-0022). This is the
+  # Not a release: `release.yml` does that from a tag. This is the
   # smoke test for the bundlers, and it needs the signing key for the same
   # reason a local `tauri build` does — `createUpdaterArtifacts` is on, so an
   # unsigned bundle is an error rather than an artifact. A fork without the

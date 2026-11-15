@@ -1,5 +1,5 @@
-// What the Action *is*: its name, what it is for, and what it says to the model
-// (ADR-0012). The main screen is the other half — how it fires and what it fires
+// What the Action *is*: its name, what it is for, and what it says to the model.
+// The main screen is the other half — how it fires and what it fires
 // at — and these four are the only configurations on the pane that are typed
 // rather than chosen. A typed field cannot right-align against its own name, so
 // every field here is `stacked`.
@@ -13,7 +13,7 @@
 // there is one card, nothing to line up against, and the two prompts are the
 // longest strings in the app.
 //
-// No Save button here either (ADR-0003): these commit as you type, like the rest
+// No Save button here either: these commit as you type, like the rest
 // of the pane. The store is the same one the main screen writes through.
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

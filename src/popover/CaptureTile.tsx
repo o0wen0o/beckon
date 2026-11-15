@@ -1,4 +1,4 @@
-// One Capture as a clickable thumbnail (ADR-0017).
+// One Capture as a clickable thumbnail.
 //
 // The rail above the composer and a sent turn's card draw the same control at
 // three sizes, and the affordance is the rule rather than the size: a bordered

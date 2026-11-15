@@ -1,6 +1,6 @@
 //! Loading the Actions directory.
 //!
-//! ADR-0003: a file that fails to parse is skipped and reported, never fatal.
+//! A file that fails to parse is skipped and reported, never fatal.
 //! `load` therefore returns *both* the good Actions and the per-file errors.
 
 use std::collections::HashMap;
@@ -49,7 +49,7 @@ impl Registry {
     /// `actions/` yet, and seeding it is a separate decision (README).
     ///
     /// `language` is spent only on the errors: a file that cannot be read is
-    /// reported rather than dropped (ADR-0003), and that report is read by a
+    /// reported rather than dropped, and that report is read by a
     /// person in Settings.
     pub fn load(dir: &Path, language: Language) -> Self {
         let mut registry = Registry::default();
@@ -106,7 +106,7 @@ impl Registry {
 
     /// Resolve Direct Hotkeys. Two Actions claiming the same accelerator: the
     /// first by filename wins, the loser is flagged — same "skip and flag"
-    /// treatment ADR-0003 gives unparseable files.
+    /// treatment unparseable files get.
     pub fn hotkey_plan(&self, language: Language) -> HotkeyPlan {
         let mut plan = HotkeyPlan::default();
         let mut claimed: HashMap<String, String> = HashMap::new();

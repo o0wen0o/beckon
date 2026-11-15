@@ -1,10 +1,10 @@
-// The preview's viewport: one Capture, fitted or zoomed (ADR-0017).
+// The preview's viewport: one Capture, fitted or zoomed.
 //
 // Two states, and what differs is which box the image is in:
 //
-// - **fitted** (`scale === null`) is the layout ADR-0017 argues for — capped on
-//   both axes, whole, and re-fitted for nothing when the window is resized
-//   (ADR-0018), because the fitted state names no number to recompute;
+// - **fitted** (`scale === null`) is the default layout — capped on
+//   both axes, whole, and re-fitted for nothing when the window is resized,
+//   because the fitted state names no number to recompute;
 // - **zoomed** is an explicit pixel size in a scrolling box. Fit is what "the
 //   whole image" means, but a full-screen snip fitted into a 620px window is a
 //   third of its real size, and the text in it is usually the thing being asked
@@ -15,7 +15,7 @@
 // picture, and a zoom widget on top of that is more chrome than image. The cursor
 // says which gesture is live, and the title bar reads back the percentage.
 //
-// Pointer-only, like the window's own resize grips (ADR-0018): a wheel and a drag
+// Pointer-only, like the window's own resize grips: a wheel and a drag
 // have no keyboard equivalent, and the preview is opened by clicking a thumbnail
 // in the first place. Esc still closes the whole layer, which is what makes an
 // unfamiliar zoom safe to try.
@@ -42,8 +42,8 @@ interface CaptureZoomProps {
    *  notches inside one frame, and reading `scale` out of the render closure
    *  would spend them all on the same starting value. */
   onScale: React.Dispatch<React.SetStateAction<number | null>>;
-  /** A click on the box itself rather than on the image closes the preview
-   *  (ADR-0017); the image has its own meaning for a click. */
+  /** A click on the box itself rather than on the image closes the preview;
+   *  the image has its own meaning for a click. */
   onScrim: (event: React.MouseEvent) => void;
 }
 
@@ -56,14 +56,14 @@ export function CaptureZoom({ capture, alt, scale, onScale, onScrim }: CaptureZo
   /** The listener that eats the click a pan ends with, while it is armed. */
   const swallow = React.useRef<((event: MouseEvent) => void) | null>(null);
 
-  /** A Capture whose dimensions did not survive normalisation (ADR-0016) has no
+  /** A Capture whose dimensions did not survive normalisation has no
    *  fit to compute and no pixel size to state — a `width` of 0 would collapse
    *  it — so it stays fitted, which for the caps below means "as big as fits". */
   const zoomable = capture.width > 0 && capture.height > 0;
 
   /** The scale at which the image is exactly fitted — the floor every zoom is
-   *  clamped to. Measured rather than remembered: the window is resizable
-   *  (ADR-0018), so this changes without anything here being told. Measuring is
+   *  clamped to. Measured rather than remembered: the window is resizable,
+   *  so this changes without anything here being told. Measuring is
    *  also why the scrollbar is hidden rather than merely unwanted: a bar that
    *  took layout space would make the fit while zoomed differ from the fit the
    *  fitted state lays out.

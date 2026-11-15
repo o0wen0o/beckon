@@ -10,7 +10,7 @@ key is theirs, the inference is theirs, nothing is forwarded. A broker holds key
 relays to one of them, so a third party ends up inside a relationship that was between the user and a
 vendor, and Beckon cannot say what it does with the text.
 
-That used to be a ban. Since **ADR-0025** it is a **disclosure**: a broker may be a preset, provided
+The rule is a **disclosure**, not a ban: a broker may be a preset, provided
 `Provider::relays` recognises its host, so the row says so on the identity line before any key is
 stored. `every_relaying_preset_says_so` asserts that weaker, load-bearing thing — not that no row
 relays, but that none relays *silently*. So a broker whose host is missing from `BROKERS` satisfies

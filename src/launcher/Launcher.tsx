@@ -1,6 +1,6 @@
 // The Launcher: the universal entry point to every Action, and only that.
 // Picking is keyboard only and the window dies with its focus, which is what
-// keeps authoring in Settings (ADR-0003) — a form inside a picker could not
+// keeps authoring in Settings — a form inside a picker could not
 // survive a click elsewhere.
 //
 // The window is the query, the ranked list and the keys. One row is
@@ -62,8 +62,8 @@ export function Launcher() {
     const subscriptions = new Subscriptions();
     subscriptions.add(onActionsChanged((next) => actionStore.adoptActions(next))).add(
       onLauncherOpened((chars) => {
-        // A fresh summon starts from a clean slate: the window is reused
-        // (ADR-0007), so the last visit's query is still sitting in it.
+        // A fresh summon starts from a clean slate: the window is reused,
+        // so the last visit's query is still sitting in it.
         setSelectionChars(chars);
         setQuery("");
         setWanted(null);
@@ -176,7 +176,7 @@ export function Launcher() {
         <Kbd>{t.launcher.escape}</Kbd>
       </div>
 
-      {/* The rows are cards (ADR-0014), so the list is a gutter holding them
+      {/* The rows are cards, so the list is a gutter holding them
           rather than a run of full-bleed rows: `p-1.5` insets every frame from
           the window's own edge, and the gap is what keeps two adjacent frames
           from doubling into one 2px line.

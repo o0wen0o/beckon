@@ -1,5 +1,5 @@
-//! One API key **per provider**, in the OS credential store (ADR-0005,
-//! ADR-0013, ADR-0021): the Windows Credential Manager, or the login Keychain on
+//! One API key **per provider**, in the OS credential store: the Windows
+//! Credential Manager, or the login Keychain on
 //! macOS. `keyring` picks the backend per target and the service/account pair is
 //! the same on both, so nothing above this module knows which store it is
 //! talking to.
@@ -15,7 +15,7 @@
 //! at the credential store, and neither may ever be shown as "your key is
 //! invalid".
 //!
-//! Since ADR-0021 there is a fourth reading, and it is *not* an outcome of this
+//! There is a fourth reading, and it is *not* an outcome of this
 //! module: nothing stored for a **local** endpoint is a working setup rather than
 //! a fault, because a local server wants no `Authorization` header at all. This
 //! module reports what is stored; `Provider::is_local` decides whether its
@@ -37,10 +37,10 @@ pub fn account(provider_id: &str) -> String {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum KeyStatus {
-    /// A key is stored. Only the tail is echoed back — ADR-0005 asks for enough
+    /// A key is stored. Only the tail is echoed back — enough
     /// to identify the key, not enough to read it off the screen.
     Present { last4: String },
-    /// Nothing stored: this is the first-run condition (README, ADR-0005).
+    /// Nothing stored: this is the first-run condition (README).
     NoCredential,
     /// The credential store itself failed.
     ReadError { message: String },
@@ -59,7 +59,7 @@ pub fn status(provider_id: &str) -> KeyStatus {
 }
 
 /// `Ok(None)` means "no credential"; `Err` means the store failed. Conflating
-/// the two is the mistake ADR-0005 calls out.
+/// the two would tell a user with a broken store to go and get a key.
 pub fn read(provider_id: &str) -> Result<Option<String>, String> {
     read_account(&account(provider_id))
 }
@@ -89,8 +89,7 @@ pub fn delete(provider_id: &str) -> Result<(), String> {
     }
 }
 
-/// Copy the pre-provider credential onto the default provider's account, once
-/// (ADR-0021).
+/// Copy the pre-provider credential onto the default provider's account, once.
 ///
 /// Runs at startup, before the first-run check, so an existing install does not
 /// come back reporting no key and yanking the user to Settings.
@@ -105,7 +104,7 @@ pub fn delete(provider_id: &str) -> Result<(), String> {
 ///
 /// A store that cannot be read is not an error worth surfacing here: the very
 /// next thing that happens is a per-provider status read, which reports it in
-/// the terms ADR-0005 asks for.
+/// the terms the three credential outcomes need.
 pub fn migrate_legacy(provider_id: &str) -> bool {
     if !matches!(read(provider_id), Ok(None)) {
         return false;
@@ -146,7 +145,7 @@ mod tests {
 
     /// The account is derived from the row's id, and it is namespaced: a row a
     /// user calls `api-key` must not collide with the pre-provider account the
-    /// migration reads (ADR-0021).
+    /// migration reads.
     #[test]
     fn accounts_are_namespaced_per_provider() {
         assert_eq!(account("deepseek"), "provider:deepseek");

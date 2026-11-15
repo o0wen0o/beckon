@@ -1,4 +1,4 @@
-// One configuration, one card (ADR-0012). The name and its explanation on the
+// One configuration, one card. The name and its explanation on the
 // left, the control at the card's right edge; the card's own edge is what closes
 // the row, so nothing on the pane draws a hairline any more. Centralised so a
 // field added later cannot invent its own spacing or forget `aria-describedby`.
@@ -36,7 +36,7 @@ const MEASURE = { field: "max-w-control", wide: "max-w-control-wide" } as const;
 
 /**
  * A row whose value may be inherited rather than owned — an Action's `[model]`
- * keys, absent from the file until overridden (ADR-0011).
+ * keys, absent from the file until overridden.
  *
  * The control is live either way and shows the *effective* value, so touching
  * it is what overrides: one gesture for a select and a switch alike.
@@ -64,7 +64,7 @@ interface FieldProps {
   /**
    * No card of its own: no edge, no padding, no hover. For the one screen that
    * holds a single card of related fields, where four boxes inside a box would
-   * be four enclosures of the same thing (ADR-0012).
+   * be four enclosures of the same thing.
    */
   bare?: boolean;
   /** The permanent explanation under the name. */

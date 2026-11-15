@@ -1,7 +1,7 @@
 //! Shared application state.
 //!
-//! Rust owns every authoritative value here; the windows are views over it
-//! (ADR-0003). Locks are plain `std` ones and are never held across an `await` —
+//! Rust owns every authoritative value here; the windows are views over it.
+//! Locks are plain `std` ones and are never held across an `await` —
 //! read what you need, drop the guard, then do the slow thing.
 
 use std::path::PathBuf;
@@ -23,9 +23,9 @@ use crate::platform::capture::{self, Capture, Fault, Outcome};
 /// The Beckon directory and the paths inside it (README): `%APPDATA%\Beckon\`
 /// on Windows, `~/Library/Application Support/Beckon/` on macOS.
 ///
-/// Two of the three are the user's, watched and broadcast whole (ADR-0003). The
+/// Two of the three are the user's, watched and broadcast whole. The
 /// third, `models_cache`, is Beckon's own and is neither — see
-/// [`crate::models_cache`] and ADR-0024.
+/// [`crate::models_cache`].
 #[derive(Debug, Clone)]
 pub struct Paths {
     pub root: PathBuf,
@@ -56,7 +56,7 @@ impl Paths {
     ///
     /// Each platform names one place a resident tool's editable config belongs,
     /// and it is the place its users already know to look — so this is a lookup
-    /// per platform, not one path with substitutions (ADR-0013).
+    /// per platform, not one path with substitutions.
     fn root() -> Result<PathBuf, String> {
         #[cfg(windows)]
         {
@@ -97,24 +97,22 @@ pub struct PopoverView {
     /// The input that was sent, for display above the answer.
     pub input: Option<String>,
     pub exchange_id: Option<String>,
-    /// The Captures the user has attached and not yet sent, oldest first
-    /// (ADR-0016, ADR-0017).
+    /// The Captures the user has attached and not yet sent, oldest first.
     ///
     /// The view is where they live, not a second slot beside it: the request is
     /// built in Rust from these bytes and the window draws its thumbnails from
     /// the same ones, so one owner means the two can never disagree about what
-    /// is attached (ADR-0003).
+    /// is attached.
     ///
     /// Append-only until something removes one by index, and only the Popover
-    /// removes: that is what makes an index a safe thing for the window to name
-    /// (ADR-0017).
+    /// removes: that is what makes an index a safe thing for the window to name.
     pub captures: Vec<Capture>,
     /// What the last snip had to say, if it had anything.
     pub capture_notice: Option<CaptureNotice>,
 }
 
 /// What one run of the snip tool left to say, once it has been said in a
-/// language (ADR-0016).
+/// language.
 ///
 /// One field rather than a `bool` beside an `Option`: a run either attached a
 /// Capture, produced nothing, or produced bytes that cannot be sent, so the two
@@ -140,13 +138,13 @@ pub enum CaptureNotice {
 /// How many Captures one turn may carry.
 ///
 /// The per-image ceiling is 8 MiB ([`capture::MAX_BYTES`]) inside a 48 MiB body,
-/// so the wire would take six; the binding constraint is ADR-0004 instead — the
+/// so the wire would take six; the binding constraint is the Exchange instead — the
 /// history is resent untruncated on every follow-up, so each attachment is paid
 /// for again by every later turn in the Exchange.
 pub const MAX_CAPTURES: usize = 4;
 
 /// The two capture fields are only ever moved through these, because the
-/// difference between the three moves is the whole subtlety (ADR-0016): a snip
+/// difference between the three moves is the whole subtlety: a snip
 /// that produced nothing must leave the attached Captures alone, while sending
 /// them must not leave them attached to be sent twice. Field-by-field at the
 /// call sites is how one of the two drifts.
@@ -199,7 +197,7 @@ impl PopoverView {
 ///
 /// The kind is a contract string the frontend catalogs key on; the message is
 /// either Beckon's own sentence in the reader's language or a cause quoted
-/// verbatim from a decoder that does not speak it (ADR-0015). `platform/` hands
+/// verbatim from a decoder that does not speak it. `platform/` hands
 /// up the fact precisely so this choice is made where the language is known.
 fn describe_fault(language: Language, fault: Fault) -> Failure {
     match fault {
@@ -215,8 +213,8 @@ fn describe_fault(language: Language, fault: Fault) -> Failure {
 #[serde(rename_all = "kebab-case")]
 pub enum PopoverPhase {
     /// `prompt`, or `auto` with an empty grab: ask for typed input. An empty
-    /// grab is a phase, never an error (ADR-0002) — and since ADR-0020 removed
-    /// the `selection` Input Source, it is always *this* phase.
+    /// grab is a phase, never an error — and with no `selection` Input Source,
+    /// it is always *this* phase.
     NeedsInput,
     /// A request is in flight; the streaming states come from events.
     Running,
@@ -230,7 +228,7 @@ pub struct AppState {
     pub hotkeys: Mutex<HotkeyState>,
     pub self_writes: Arc<SelfWrites>,
     pub http: reqwest::Client,
-    /// The last list each endpoint served (ADR-0024). Behind a `Mutex` because
+    /// The last list each endpoint served. Behind a `Mutex` because
     /// it is the one writer of its file: `write_atomic` uses a fixed temp path,
     /// and opening Settings primes every row at once.
     pub models_cache: Mutex<ModelsCache>,
@@ -244,14 +242,14 @@ pub struct AppState {
 
     /// Kept alive for the process lifetime; dropping it stops the watcher.
     pub watcher: Mutex<Option<WatcherGuard>>,
-    /// A snip is running (ADR-0016). One at a time: the button and its shortcut
+    /// A snip is running. One at a time: the button and its shortcut
     /// can both land before the window is even hidden, and two snip tools
     /// fighting over one clipboard is not a state worth defining.
     pub capturing: AtomicBool,
     /// The startup hotkey-failure balloon fires once only (README).
     pub balloon_shown: AtomicBool,
-    /// The version the update endpoint is offering, once a check has found one
-    /// (ADR-0022). Not config and not derived from disk: it is what the tray
+    /// The version the update endpoint is offering, once a check has found one.
+    /// Not config and not derived from disk: it is what the tray
     /// menu's one variable item is labelled from, and the only thing that can
     /// act on it is that item.
     pub pending_update: Mutex<Option<String>>,
@@ -259,7 +257,7 @@ pub struct AppState {
     /// `capturing` is: the menu stays clickable throughout, and two installers
     /// writing the same files is not a state worth defining.
     pub updating: AtomicBool,
-    /// The size the Popover window was last *told* to be (ADR-0018).
+    /// The size the Popover window was last *told* to be.
     ///
     /// Every resize reports itself, ours included, and the two have to be told
     /// apart: the `set_size` at the start of each trigger would otherwise be
@@ -344,7 +342,7 @@ mod tests {
     }
 
     /// Snips append, so the order on the wire is the order they were taken
-    /// (ADR-0017) — a note saying "the second one" depends on it.
+    /// — a note saying "the second one" depends on it.
     #[test]
     fn captures_attach_in_the_order_they_were_taken() {
         let mut view = view();
@@ -362,7 +360,7 @@ mod tests {
     }
 
     /// A cancelled snip must leave what is already attached alone: the user
-    /// pressed Esc in the snip tool, not in the Popover (ADR-0016).
+    /// pressed Esc in the snip tool, not in the Popover.
     #[test]
     fn a_cancelled_snip_keeps_what_was_attached() {
         let mut view = view();
@@ -412,7 +410,7 @@ mod tests {
     }
 
     /// Sending empties the tray: leaving them attached would send them again
-    /// with the next follow-up (ADR-0016).
+    /// with the next follow-up.
     #[test]
     fn sending_consumes_the_whole_tray() {
         let mut view = view();

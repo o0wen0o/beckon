@@ -1,4 +1,4 @@
-// There is no Save button and there never will be (ADR-0003), so this line is
+// There is no Save button and there never will be, so this line is
 // where that promise is kept visible — and the one place a failed write is
 // reported, rather than a banner competing with the form above it.
 import { CheckIcon, LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";

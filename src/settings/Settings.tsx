@@ -1,6 +1,6 @@
 // The shell: the subscriptions and the focus signal, and nothing else. Every
 // piece of state and every write lives in a store — the global config in
-// store.ts, the Actions in actions.ts (ADR-0003).
+// store.ts, the Actions in actions.ts.
 import * as React from "react";
 import { fill, useT } from "@/lib/i18n";
 import { onActionsChanged, onConfigChanged, onSettingsOpened, Subscriptions } from "@/lib/ipc";
@@ -80,7 +80,7 @@ export function Settings() {
       .add(
         onSettingsOpened(() => {
           settings.resetTransient();
-          // The window is reused (ADR-0007), so a fresh open must not resume
+          // The window is reused, so a fresh open must not resume
           // whatever Action the last visit left open in the editor.
           actionStore.close();
           void settings.refreshAll();
@@ -91,7 +91,7 @@ export function Settings() {
     // The window can be hidden mid-edit; a blur is the last chance to write.
     window.addEventListener("blur", flush);
     // Coming back is the signal that the Accessibility switch may have moved:
-    // it is thrown in System Settings, and nothing tells us when (ADR-0013).
+    // it is thrown in System Settings, and nothing tells us when.
     // Only macOS has a switch, so nowhere else pays for the listener.
     const recheckPermission = () => void settings.refreshInputPermission();
     if (IS_MAC) window.addEventListener("focus", recheckPermission);
@@ -105,12 +105,12 @@ export function Settings() {
   const pendingDelete = actions.pendingDelete;
   const Pane = PANES[store.route];
   /** What is on screen, which is the route except inside Actions, where opening
-   *  a file — and then one of that Action's screens (ADR-0012) — is a view
+   *  a file — and then one of that Action's screens — is a view
    *  change the route does not see. */
   const editing = actions.editing;
   const paneKey = [
     store.route,
-    // Connection's second layer (ADR-0021), the same way Actions' two are here:
+    // Connection's second layer, the same way Actions' two are here:
     // opening an endpoint is a view change the route does not see.
     store.editingProvider ?? "",
     editing?.file ?? "",

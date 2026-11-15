@@ -80,7 +80,7 @@ pub fn settings_window_title(language: Language) -> &'static str {
     }
 }
 
-// --- updates (ADR-0022) -------------------------------------------------------
+// --- updates -------------------------------------------------------
 
 /// The update item with nothing pending. It asks; it does not promise.
 pub fn tray_check_updates(language: Language) -> &'static str {
@@ -165,7 +165,7 @@ Try again later from the {}.",
 }
 
 /// A refusal, not a delay: installing ends this process, and the Exchange in an
-/// open Popover is not on disk anywhere to come back to (ADR-0004).
+/// open Popover is not on disk anywhere to come back to.
 pub fn update_busy_title(language: Language) -> &'static str {
     match language {
         Language::En => "Beckon cannot update right now",
@@ -310,7 +310,7 @@ pub fn test_needs_key(language: Language) -> &'static str {
     }
 }
 
-// --- the provider row (ADR-0021) ------------------------------------------
+// --- the provider row ------------------------------------------
 
 /// An Action, or `[defaults]`, naming a row that is not in the table. A
 /// hand-edit, or a row removed while a Popover was open. Named rather than
@@ -330,7 +330,7 @@ pub fn provider_missing(language: Language, id: &str) -> String {
 
 /// The turn's own version of "no credential", naming which endpoint wants one.
 /// With a provider per Action, one Action can be broken while every other one
-/// works, so the sentence has to say *whose* key is missing (ADR-0021).
+/// works, so the sentence has to say *whose* key is missing.
 pub fn turn_needs_key(language: Language, label: &str) -> String {
     match language {
         Language::En => {
@@ -355,7 +355,7 @@ pub fn turn_needs_model(language: Language, label: &str) -> String {
 
 // --- the Capture ----------------------------------------------------------
 
-/// A screenshot over Beckon's ceiling (ADR-0016). Beckon's own prose with
+/// A screenshot over Beckon's ceiling. Beckon's own prose with
 /// Beckon's own advice, so it belongs here rather than in `platform/`, which
 /// hands up the two numbers and has no `Language` in reach.
 ///
@@ -375,7 +375,7 @@ pub fn capture_too_large(language: Language, bytes: usize, max: usize) -> String
     }
 }
 
-/// A screenshot taken with the tray already full (ADR-0017). Says the ceiling
+/// A screenshot taken with the tray already full. Says the ceiling
 /// and what to do about it, because the bytes are being dropped either way.
 pub fn capture_too_many(language: Language, max: usize) -> String {
     match language {

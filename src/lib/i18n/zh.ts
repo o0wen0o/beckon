@@ -6,7 +6,7 @@
 // “浮窗”，Direct Hotkey 作“专属热键”，Input Source 作“输入来源”。
 //
 // 文风跟随 en.ts 的那条：只说读者能据此行动的话，说完就停。线上字段名、HTTP 头、
-// 请求路径都属于实现细节，需要它们的读者去看 ADR。仍然写长的只有两处 —— 转发行的
+// 请求路径都属于实现细节，读者用不上。仍然写长的只有两处 —— 转发行的
 // 隐私说明，以及两句“无法撤销”。
 import { IS_MAC } from "../platform";
 import { kb } from "./units";
@@ -89,6 +89,12 @@ export const ZH: Strings = {
     copy: "复制",
     copied: "已复制",
     copyFailed: "无法复制",
+    insert: "插入",
+    insertTooltip: (accelerator: string | null) =>
+      accelerator ? `粘贴到唤起前所在的应用（${accelerator}）` : "粘贴到唤起前所在的应用",
+    insertFailed: "无法插入",
+    regenerate: "重新生成",
+    regenerateTooltip: (accelerator: string) => `重新回答一次（${accelerator}）`,
 
     captureTooltip: (accelerator: string) => `截图（${accelerator}）`,
     removeCapture: "移除截图",

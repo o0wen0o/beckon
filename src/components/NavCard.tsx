@@ -1,4 +1,4 @@
-// A card that opens a screen instead of holding a control (ADR-0012). Same
+// A card that opens a screen instead of holding a control. Same
 // geometry as `Field`, so a navigating card and a configuring card sit in one
 // column without a seam; the chevron is the only thing that says which is which.
 //

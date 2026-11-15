@@ -33,7 +33,7 @@ report of a preset that `400`s.
    second is loud, and only for the users who turned it on. Read any `TODO(register)` about a search
    field while you are there — one is open on `zhipu` (see [search.md](search.md)).
 5. Re-read `Search::supports_model` against the same pages: which tiers the vendor documents the field
-   for, and which it excludes (ADR-0027). A family name that aged out fails silently *and* visibly —
+   for, and which it excludes. A family name that aged out fails silently *and* visibly —
    the switch is greyed and Settings tells the user their model cannot search, on Beckon's word
    rather than the vendor's — so a stale `Some(false)` is the worse half of this row to leave.
 6. Bump the checked date in every doc comment carrying one — today `CATALOG`, `presets()`,

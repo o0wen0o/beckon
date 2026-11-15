@@ -1,4 +1,4 @@
-// Action authoring lives in Settings (ADR-0003), the Launcher is the picker and
+// Action authoring lives in Settings, the Launcher is the picker and
 // nothing more, so running one and authoring one do not share a gesture.
 //
 // Everything editable is held here rather than in the components: a save is
@@ -7,7 +7,7 @@
 // machinery is `src/lib/saveSlot.ts`; the defaults an override inherits from
 // and the model catalog are read off `store.ts` rather than fetched again.
 //
-// A module-level singleton: one Settings window, never destroyed (ADR-0007).
+// A module-level singleton: one Settings window, never destroyed.
 import {
   createAction,
   deleteAction as deleteActionFile,
@@ -25,7 +25,7 @@ import { toasts } from "../lib/toast";
 import type { Action, ActionFile, RegistrySnapshot } from "../lib/types";
 
 /**
- * Which screen of an Action's editor is open (ADR-0012). The four text fields
+ * Which screen of an Action's editor is open. The four text fields
  * are one card that opens its own screen, so the editor is two views, not one
  * long form — and which one is showing is state like any other, not a `useState`
  * inside a component the shell re-keys.

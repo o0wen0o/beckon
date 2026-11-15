@@ -1,12 +1,12 @@
-// The Action form. There is no Save button and there must never be one
-// (ADR-0003): every field commits to disk, debounced, and the `actions-changed`
+// The Action form. There is no Save button and there must never be one:
+// every field commits to disk, debounced, and the `actions-changed`
 // echo re-renders the list behind it.
 //
 // The endpoint an override inherits from, and that endpoint's model catalog,
 // come from the window's other store — the Connection pane already loads both,
 // and a second copy could only drift from it.
 //
-// The `Overrides` group is where ADR-0021's design question landed. Three rows,
+// The `Overrides` group: three rows,
 // each either inheriting or overriding, and changing the first changes what the
 // other two inherit: `provider` resolves to a row, and that row is what `model`
 // and `thinking` fall back to. Nothing new was built for it — `Field`'s own
@@ -78,8 +78,8 @@ export function ActionEditor({ action }: ActionEditorProps) {
   // holds the inherited value — and a select whose value is missing from its own
   // options silently rewrites it.
   const effectiveModel = draft?.model.model ?? provider?.model ?? "";
-  // This endpoint's catalog, not "the" catalog: there is one list per row
-  // (ADR-0021). It is keyed on the resolved provider, so overriding the row
+  // This endpoint's catalog, not "the" catalog: there is one list per row.
+  // It is keyed on the resolved provider, so overriding the row
   // above re-reads the list here.
   const catalog = provider ? (settings.models[provider.id] ?? null) : null;
   const modelOverrideOptions = React.useMemo(
@@ -118,7 +118,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
     modelOverrideOptions.find((option) => option.id === effectiveModel)?.description ?? "";
   const effectiveThinking = draft.model.thinking ?? provider?.thinking ?? false;
   const thinkingHint = thinkingWarning(provider, effectiveModel, effectiveThinking, catalog, t);
-  // The same shape one row down (ADR-0026), and since ADR-0027 it reads the
+  // The same shape one row down, and it reads the
   // model too: an endpoint with no search field, or a model the vendor says
   // does not take that field, greys the switch instead of accepting a `true`
   // that reaches nothing. Both stay amber rather than errors — a search that
@@ -168,8 +168,8 @@ export function ActionEditor({ action }: ActionEditorProps) {
         </Callout>
       ) : null}
 
-      {/* What the Action is, behind one card that opens its own screen
-          (ADR-0012): the four fields there are the only ones written rather
+      {/* What the Action is, behind one card that opens its own screen:
+          the four fields there are the only ones written rather
           than chosen, and stacking them ahead of the choices buried the
           choices. It sits above the first group head because it is not one of a
           set — it is the other half of this Action. */}
@@ -222,11 +222,11 @@ export function ActionEditor({ action }: ActionEditorProps) {
           `Field`'s `override`: a dot in the label's gutter and a revert control,
           on an overridden row only, with the head's note covering the rest. This
           was three bordered boxes indented into the value column, and the only
-          thing on the pane that was not a row of its own (ADR-0011). */}
+          thing on the pane that was not a row of its own. */}
       {keyMissing && provider ? (
         // The per-Action version of "no credential". It belongs here rather than
         // only on the Connection pane: with an endpoint per Action, one Action
-        // can be broken while every other one works (ADR-0021).
+        // can be broken while every other one works.
         <Callout tone="warn">
           <p>{t.settings.actions.needsKey(provider.label)}</p>
         </Callout>
@@ -348,7 +348,7 @@ export function ActionEditor({ action }: ActionEditorProps) {
 
       {/* What a turn would actually carry, in one place. With an endpoint per
           Action, "where did this go" is no longer answerable from one global
-          setting, so it is answered here (ADR-0021). */}
+          setting, so it is answered here. */}
       {provider ? (
         <FieldGroup title={t.settings.actions.sends}>
           <div className="text-muted-foreground grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 font-mono text-meta">
@@ -358,8 +358,8 @@ export function ActionEditor({ action }: ActionEditorProps) {
             <span className="text-foreground">{effectiveModel || "—"}</span>
             {/* Only when it is on, and only where it reaches a field: a row
                 reading "web search off" on every Action is noise, and one
-                reading "on" at an endpoint that has none would be a lie
-                (ADR-0026). */}
+                reading "on" at an endpoint that has none would be a lie.
+                */}
             {effectiveWebSearch && canWebSearch(provider) ? (
               <>
                 <span>search</span>

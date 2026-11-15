@@ -13,8 +13,8 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ModelParams } from "@/lib/types";
 
-/** The title bar's box, shared with the preview layer that covers it
- *  (ADR-0017): the preview's close button only lands on top of the one
+/** The title bar's box, shared with the preview layer that covers it:
+ *  the preview's close button only lands on top of the one
  *  underneath it while the two bars are the same height and padding. */
 export const TITLE_BAR = "flex h-8.5 flex-none items-center gap-2 border-b pr-1 pl-3";
 
@@ -44,7 +44,7 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
           say about the one line naming what the window is for. */}
       <span className="truncate font-medium">{actionName}</span>
       <span className="flex-1" />
-      {/* The endpoint as well as the model, always (ADR-0021). Since a provider
+      {/* The endpoint as well as the model, always. Since a provider
           is an Action-level override, two Actions on the same hotkey away from
           each other can go to different hosts — so "where did this go" is no
           longer answerable from a settings pane, and a line that only sometimes
@@ -62,7 +62,7 @@ export function PopoverHeader({ actionName, model, onClose }: PopoverHeaderProps
         </Badge>
       ) : null}
       {/* The same chip for the same reason, and it earns its place twice over:
-          this is the switch a turn is billed per request for (ADR-0026). */}
+          this is the switch a turn is billed per request for. */}
       {model?.web_search ? (
         <Badge variant="outline" className={CAPABILITY_CHIP}>
           {t.popover.webSearch}

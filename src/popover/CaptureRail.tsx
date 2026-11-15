@@ -1,5 +1,5 @@
 // The Captures attached to the turn being composed, as one rail of equal square
-// tiles (ADR-0017).
+// tiles.
 //
 // Sideways rather than wrapped, and one line of prose about the *set* rather
 // than a line per image: the composer must not grow taller as more is attached,

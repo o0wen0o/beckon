@@ -102,7 +102,7 @@ export function ModelSelect({
           twelve-character model id in a box visibly narrower than every other
           control on the pane. The card right-aligns it either way, so the edge
           the column keeps is the trigger's right one. The ceiling is still
-          `Field`'s own token. (ADR-0011, ADR-0012.)
+          `Field`'s own token..
 
           The floor came down with the type: the 12px register is the control's
           own, in ui/select.tsx, and at 12px a twelve-character id and the

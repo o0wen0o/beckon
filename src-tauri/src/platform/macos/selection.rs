@@ -1,4 +1,4 @@
-//! Grabbing the Selection by simulating Cmd+C (ADR-0002, ADR-0013).
+//! Grabbing the Selection by simulating Cmd+C.
 //!
 //! Step for step this is the Windows grab with three substitutions —
 //! `CGEventPost` for `SendInput`, `NSPasteboard` for the Win32 clipboard, and
@@ -11,14 +11,19 @@
 //!    live flags would arrive as Cmd+Shift+C or worse. The physically-held
 //!    non-Command modifiers are released as well, because a target app can read
 //!    the hardware state rather than the event's.
-//! 2. Back up the pasteboard, plain text only (ADR-0002 accepts losing rich
-//!    text and images).
+//! 2. Back up the pasteboard, plain text only (losing rich text and images is
+//!    accepted).
 //! 3. Read `changeCount`, then post Cmd+C.
 //! 4. **Poll** `changeCount` rather than sleeping a fixed interval.
 //! 5. Read the text, restore the backup, and drop the backup immediately.
 //! 6. Timeout or an empty result is `None`, not an error. Without Accessibility
 //!    trust macOS drops the event silently and this is the path that runs —
 //!    which is why `permission::input_permission` exists to say so out loud.
+//!
+//! The other direction lives here too: [`send_paste`] is Cmd+V
+//! through the same `CGEventPost` and after the same modifier release, and it
+//! is the *whole* of the write-back. There is no backup and no restore around
+//! it — an Insert is a Copy the user asked for, followed by one keystroke.
 
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -30,6 +35,8 @@ use objc2_foundation::NSString;
 
 /// `kVK_ANSI_C`, fixed by the platform.
 const KEY_C: CGKeyCode = 8;
+/// `kVK_ANSI_V`, likewise.
+const KEY_V: CGKeyCode = 9;
 /// `kVK_Shift`, `kVK_RightShift`, `kVK_Control`, `kVK_RightControl`,
 /// `kVK_Option`, `kVK_RightOption`. Command is absent on purpose: it is the one
 /// modifier the synthetic event asserts.
@@ -61,7 +68,7 @@ pub fn grab_selection() -> Option<String> {
     let backup = read_clipboard_text();
     let before = change_count();
 
-    if let Err(err) = send_command_c() {
+    if let Err(err) = send_command(KEY_C) {
         log::warn!("could not synthesise Cmd+C: {err}");
         return None;
     }
@@ -71,7 +78,7 @@ pub fn grab_selection() -> Option<String> {
     // Restore before returning, and let the backup drop at the end of this
     // scope — no long-lived copy of the user's clipboard.
     //
-    // Only if the copy shortcut wrote something. What ADR-0002 restores is the
+    // Only if the copy shortcut wrote something. What the restore undoes is the
     // pollution the grab caused, and a grab with nothing selected causes none:
     // the pasteboard is still exactly what the user left there. "Restoring"
     // over that replaced it with its own plain-text half — and when it held no
@@ -84,7 +91,7 @@ pub fn grab_selection() -> Option<String> {
 }
 
 /// A user-requested clipboard write (the Popover's Copy). Not restored, by
-/// design: the user asked for it (ADR-0002).
+/// design: the user asked for it.
 pub fn write_clipboard_text(text: &str) -> Result<(), String> {
     let pasteboard = NSPasteboard::generalPasteboard();
     let _ = pasteboard.clearContents();
@@ -97,9 +104,24 @@ pub fn write_clipboard_text(text: &str) -> Result<(), String> {
     }
 }
 
+/// Cmd+V into whatever is frontmost. The caller has already put the
+/// text on the pasteboard and the target app in front; this is the keystroke
+/// and nothing else.
+///
+/// The non-Command modifiers are released first for the reason the grab
+/// releases them: the Popover's Insert chord is still physically down, and
+/// Cmd+Shift+V is "paste and match style" in one app and nothing in the next.
+/// Without Accessibility trust the event is dropped silently, exactly as the
+/// grab's is — and the text is on the pasteboard either way.
+pub fn send_paste() -> Result<(), String> {
+    release_held_modifiers();
+    sleep(MODIFIER_SETTLE);
+    send_command(KEY_V)
+}
+
 /// The pasteboard's own change counter — the exact analogue of Win32's
 /// clipboard sequence number, and the reason neither platform has to sleep.
-/// `pub(super)` because the Capture grab reads the same counter (ADR-0016).
+/// `pub(super)` because the Capture grab reads the same counter.
 pub(super) fn change_count() -> isize {
     NSPasteboard::generalPasteboard().changeCount()
 }
@@ -163,9 +185,11 @@ fn release_held_modifiers() {
     }
 }
 
-fn send_command_c() -> Result<(), String> {
-    post(KEY_C, true, CGEventFlags::CGEventFlagCommand)?;
-    post(KEY_C, false, CGEventFlags::CGEventFlagCommand)?;
+/// Command plus one key, down and up. One function for both directions: the
+/// copy and the paste differ by a key code.
+fn send_command(key: CGKeyCode) -> Result<(), String> {
+    post(key, true, CGEventFlags::CGEventFlagCommand)?;
+    post(key, false, CGEventFlags::CGEventFlagCommand)?;
     Ok(())
 }
 
@@ -191,6 +215,14 @@ mod tests {
     fn the_clipboard_wait_is_polled_not_slept() {
         assert!(POLL_INTERVAL < POLL_CAP);
         assert!(POLL_CAP <= Duration::from_millis(500));
+    }
+
+    /// The two key codes are fixed by the platform (`kVK_ANSI_C`, `kVK_ANSI_V`)
+    /// and adjacent on the keyboard, not in the alphabet.
+    #[test]
+    fn the_copy_and_paste_keys_are_c_and_v() {
+        assert_eq!(KEY_C, 8);
+        assert_eq!(KEY_V, 9);
     }
 
     /// Command is the one modifier the grab asserts, so releasing it here would

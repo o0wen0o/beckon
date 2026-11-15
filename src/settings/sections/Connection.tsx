@@ -1,4 +1,4 @@
-// The endpoints you keep (ADR-0021).
+// The endpoints you keep.
 //
 // This pane used to be a switch — one `base_url`, one key. It is not one any
 // more: with `provider` an Action-level override, nothing here decides where a
@@ -15,8 +15,8 @@
 //   text go" for free; this design has to earn that answer back, and this column
 //   is where it does. A local row says so out loud.
 //
-// A row opens its own screen rather than a dialog (ADR-0012), and the screen has
-// no Save button and must never have one (ADR-0003): every field commits to disk
+// A row opens its own screen rather than a dialog, and the screen has
+// no Save button and must never have one: every field commits to disk
 // debounced, and the `config-changed` echo re-renders the list behind it. The one
 // exception is the key, which goes to the OS credential store and cannot be read
 // back — so that one field alone carries a commit button.
@@ -84,8 +84,8 @@ import { settings } from "../store";
  *
  *  Mirrors `config::Search`, and the ordering is what makes it a list rather
  *  than a plain array of the union: the `Record` makes `tsc` name any arm added
- *  to `Search` that nobody placed here, so a new dialect cannot ship unselectable
- *  (ADR-0026). */
+ *  to `Search` that nobody placed here, so a new dialect cannot ship unselectable.
+ *  */
 const SEARCH_ORDER: Record<Search, number> = { xai: 0, dashscope: 1, openrouter: 2, none: 3 };
 const SEARCH_WIRES = (Object.keys(SEARCH_ORDER) as Search[]).sort(
   (a, b) => SEARCH_ORDER[a] - SEARCH_ORDER[b],
@@ -124,7 +124,7 @@ function Inventory() {
   const usersByProvider = actionsByProvider(actions, config.defaults.provider);
 
   /** Rows the config does not already hold. Adding one is an ordinary config
-   *  write — a preset is data, not a code path (ADR-0021). */
+   *  write — a preset is data, not a code path. */
   const unused = store.presets.filter((one) => !providers.some((row) => row.id === one.id));
 
   function add(provider: Provider) {
@@ -318,7 +318,7 @@ function RemoveButton({
     settings.editProvider(null);
     // The default that just left is *not* repointed here: `save_config` folds
     // the table at the boundary, which is where "`defaults.provider` names a row
-    // that exists" lives (ADR-0021), and `store.defaultProvider` covers the one
+    // that exists" lives, and `store.defaultProvider` covers the one
     // frame before the echo. Nor is the credential map re-read — the row is
     // gone, so its stale entry has nothing left to draw.
   }
@@ -385,7 +385,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
   // Nothing to pick, which is the initial state of every row a user adds: a row
   // ships no model and the endpoint has not answered yet. A sentence naming what
   // to do rather than an empty select — and a different one for a local row,
-  // which wants no key at all (ADR-0021). Read off the memo above rather than
+  // which wants no key at all. Read off the memo above rather than
   // through `modelOption`, which would rebuild the same list to search it.
   const modelInfo =
     options.length === 0
@@ -395,7 +395,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
       : (options.find((one) => one.id === provider.model)?.description ?? "");
   // Whose word the list is, said once: a cached list is this endpoint's own ids
   // but not its answer today, and `listNotice` may be sitting beneath it saying
-  // why (ADR-0024). A lookup rather than a ternary chain, because `source` is
+  // why. A lookup rather than a ternary chain, because `source` is
   // already the one field that decides.
   const listSource = catalog
     ? { live: t.settings.connection.live, cached: t.settings.connection.cached, none: null }[
@@ -403,7 +403,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
       ]
     : null;
   const thinkingHint = thinkingWarning(provider, provider.model, provider.thinking, catalog, t);
-  // The row's default, read against the row's own model (ADR-0027). What an
+  // The row's default, read against the row's own model. What an
   // Action pointed at another model does is that Action's editor.
   const { warning: searchHint, offOnly: searchOffOnly } = webSearchState(
     provider,
@@ -491,7 +491,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
     } catch (error) {
       settings.setTest(provider.id, "failed");
       // Verbatim, as everywhere: a rejected key, a missing credential and an
-      // unreachable API stay three different sentences (ADR-0005).
+      // unreachable API stay three different sentences.
       toasts.show("danger", describeFailure(describeError(error), t));
     }
     // A test that failed on the credential may have found it changed. This
@@ -536,8 +536,8 @@ function EndpointScreen({ provider }: { provider: Provider }) {
 
       {/* A relaying row says so before a key is stored, and says it on the
           identity line rather than in a banner: this is a property of the URL
-          directly above it, and a Callout is the shape a reader learns to skip
-          (ADR-0025). Derived from the host, so a hand-typed broker URL discloses
+          directly above it, and a Callout is the shape a reader learns to skip.
+          Derived from the host, so a hand-typed broker URL discloses
           as loudly as the preset does. */}
       {relay ? (
         <div className="mb-6.5 -mt-3 flex items-start gap-2 text-note">
@@ -621,7 +621,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
                   onKeyDown={(event) => event.key === "Enter" && void saveKey()}
                 />
                 {/* The one green thing in the window. Everything else on the
-                    pane is written to a TOML file as you type (ADR-0003), so
+                    pane is written to a TOML file as you type, so
                     nothing else needs — or may have — a commit button. This one
                     does: the key goes to the OS credential store, it is cleared
                     from the field the moment it lands, and there is no way to
@@ -643,7 +643,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
               </div>
 
               {/* The three key states stay three distinguishable outcomes all
-                  the way to the UI (ADR-0005) — and since ADR-0021 there is a
+                  the way to the UI — and there is a
                   fourth reading of the second: nothing stored for a *local*
                   endpoint is a working setup, not a fault, so it is not amber. */}
               {key?.kind === "present" ? (
@@ -829,7 +829,7 @@ function EndpointScreen({ provider }: { provider: Provider }) {
 
         {/* Chosen, where the field above is read. Nothing probes a search
             dialect — a probe would run a real search and be billed for it
-            (ADR-0026) — so a row nobody presets has to be asked, and the wrong
+            — so a row nobody presets has to be asked, and the wrong
             answer costs a 400 only on the turns that asked to search. A preset
             row is left alone for the same reason as above: the vendor's own
             docs already answered. */}

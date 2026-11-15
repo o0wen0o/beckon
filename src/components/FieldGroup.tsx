@@ -1,5 +1,5 @@
-// A tracked micro-label and the cards under it. The head carries no hairline
-// (ADR-0012): every card already has an edge, so a rule under the label would be
+// A tracked micro-label and the cards under it. The head carries no hairline:
+// every card already has an edge, so a rule under the label would be
 // the only line on the pane that closes nothing.
 //
 // This is where the pane's air lives — cards inside a group are 10px apart, and

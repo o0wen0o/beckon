@@ -31,7 +31,7 @@ const SECTIONS: { id: SectionRoute; icon: typeof PlugIcon }[] = [
  * Go to a section, at its **first layer**.
  *
  * Two sections have anything under them — Connection opens one endpoint's own
- * screen, Actions opens one file and then a screen inside that (ADR-0012) — and
+ * screen, Actions opens one file and then a screen inside that — and
  * a nav click resets both, whichever one it lands on. So the nav row is always
  * the way back out, and coming back to a section never resumes a screen the user
  * left minutes ago in another part of the window.
@@ -55,7 +55,7 @@ export function SettingsNav() {
   const tests = Object.values(store.test);
   const catalogs = Object.values(store.models);
   // Every row's credential verdict, through the one reader that knows a local
-  // endpoint wants no key: any row can be the one an Action posts to (ADR-0021),
+  // endpoint wants no key: any row can be the one an Action posts to,
   // so any row's problem belongs on this dot.
   const problems = (store.config?.api.providers ?? []).map((provider) =>
     keyProblem(provider, store.keyStatuses[provider.id]),
@@ -81,7 +81,7 @@ export function SettingsNav() {
     actions: actions.flagged ? "bad" : null,
     // A denied Accessibility permission belongs here for the same reason a
     // hotkey that would not register does: the hotkey fires and nothing
-    // happens, and this is the only pane that explains why (ADR-0013).
+    // happens, and this is the only pane that explains why.
     triggering:
       store.startupErrors.length > 0 || store.inputPermission === "denied" ? "bad" : null,
     appearance: null,

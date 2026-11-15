@@ -2,7 +2,7 @@
 // list uses: name over description, Input Source, Direct Hotkey. The columns are
 // fixed here so every Input Source parks at the same x in both lists.
 //
-// The row is a card, not a ruled row (ADR-0014); the fill still belongs to the
+// The row is a card, not a ruled row; the fill still belongs to the
 // keyboard cursor alone. The treatment is on `ROW` below.
 //
 // Hover does *not* select. The pointer once drove the cursor, which made the two
@@ -13,7 +13,7 @@ import { highlight } from "@/lib/fuzzy";
 import type { Action } from "@/lib/types";
 
 /** The card carries `--background` because the list under it does not: it sits on
- *  a `--muted` well (ADR-0014), which is what makes a frame at rest read as an
+ *  a `--muted` well, which is what makes a frame at rest read as an
  *  object rather than as a rule around nothing.
  *
  *  So hover is the *edge*, not the ground — `--muted` is the well now and a card
@@ -71,7 +71,7 @@ export function ActionRow({ action, conflict, query, selected, onRun, ref }: Act
   );
 }
 
-/** A file that does not parse is reported, never dropped (ADR-0003). It cannot
+/** A file that does not parse is reported, never dropped. It cannot
  *  be run, and the raw editor that repairs it is in Settings — so this row is a
  *  way there rather than a dead entry. */
 export function BrokenRow({ file, message, onOpen }: BrokenRowProps) {

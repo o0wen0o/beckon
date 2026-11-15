@@ -1,5 +1,4 @@
-//! What a Capture is, and the part of getting one that is not platform code
-//! (ADR-0016).
+//! What a Capture is, and the part of getting one that is not platform code.
 //!
 //! The platform halves under `windows/` and `macos/` do two things only: run the
 //! OS snip tool, and hand back whatever bytes the clipboard ended up holding.
@@ -10,14 +9,14 @@
 //!   macOS a TIFF — and the provider takes PNG, JPEG, GIF or WebP
 //!   (<https://api-docs.deepseek.com/guides/vision/>);
 //! - the request carries the image as a `data:` URL, because a Capture never
-//!   reaches disk and so has no URL of its own (ADR-0004);
+//!   reaches disk and so has no URL of its own;
 //! - a snip of a 6K display is a real image, so there is a size ceiling and it
 //!   is checked before a request is built rather than after one is refused.
 //!
 //! What is deliberately *not* here is the sentence a person reads about a
 //! [`Fault`]: this module has no `Language` in reach, and English prose written
 //! one layer below the one that does is how a Chinese reader ends up reading
-//! half a message (ADR-0015). A Fault carries the *fact*; `trigger` phrases it.
+//! half a message. A Fault carries the *fact*; `trigger` phrases it.
 
 use std::io::Cursor;
 

@@ -5,7 +5,7 @@ description: "Use when shipping a Beckon version or publishing one already built
 
 # Releasing Beckon
 
-A tag is the only thing that ships (ADR-0022). Pushing `vX.Y.Z` makes
+A tag is the only thing that ships. Pushing `vX.Y.Z` makes
 [release.yml](../../../.github/workflows/release.yml) build both platforms and leave a **draft**. A
 draft is invisible to the updater endpoint, so nothing reaches a user until step 6 — that hand step
 exists so step 5 can catch a bad build first.
@@ -143,10 +143,10 @@ user sees the update on their next launch, or when they ask.
 
 ## Not part of this flow
 
-- **Code signing the installer.** Neither platform's installer is signed or notarized (ADR-0013).
+- **Code signing the installer.** Neither platform's installer is signed or notarized.
   SmartScreen warns on Windows; macOS needs `xattr -dr com.apple.quarantine
   /Applications/Beckon.app` on first run. `release.yml`'s `releaseBody` says both. The signature
-  ADR-0022 makes mandatory is a different one, over a different artifact — the updater manifest.
+  the updater requires is a different one, over a different artifact — the updater manifest.
 - **Local bundling.** `npm run build:signed` (or `pwsh scripts/build-signed.ps1` on macOS) builds
   with the key set for that one process. Useful for testing a bundle; it ships nothing.
 - **Release notes.** `release.yml` writes `releaseBody` itself, the same text every release. Editing

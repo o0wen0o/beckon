@@ -2,12 +2,12 @@
 // `field-sizing-content` with a floor and a ceiling, which is the browser doing
 // what a resize handler used to. It is mounted only when there is something to
 // type into, so a fresh mount is also the reset: the window is reused
-// (ADR-0007) and a draft must not survive into the next trigger.
+// and a draft must not survive into the next trigger.
 //
 // No label. The turns above it are sided rather than labelled, so a label
 // column here would be the only one in the window.
 //
-// The screenshot button lives here rather than in the title bar (ADR-0016): a
+// The screenshot button lives here rather than in the title bar: a
 // Capture is something you attach to what you are about to send, so it belongs
 // beside the box you are typing it in — and Send stays the one thing that sends.
 import * as React from "react";
@@ -28,7 +28,7 @@ const CAPTURE_ACCELERATOR = formatAccelerator(`${COMMAND_MODIFIER}+Shift+S`);
 
 interface ComposerProps {
   placeholder: string;
-  /** Attached and not yet sent, oldest first (ADR-0017). */
+  /** Attached and not yet sent, oldest first. */
   captures: Capture[];
   /** What the last snip had to say, if it had anything. */
   captureNotice: CaptureNotice | null;

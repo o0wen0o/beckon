@@ -112,7 +112,7 @@ export function HotkeyInput({ value, clearable = false, onChange }: HotkeyInputP
 }
 
 /** `noModifiers` is passed in rather than looked up: this is a pure function
- *  outside the tree, and the sentence is the catalog's (ADR-0015). */
+ *  outside the tree, and the sentence is the catalog's. */
 function toAccelerator(
   event: React.KeyboardEvent,
   setError: (message: string) => void,

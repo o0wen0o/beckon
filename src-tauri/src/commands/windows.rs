@@ -48,21 +48,21 @@ pub fn retry_exchange(app: AppHandle, exchange_id: String) -> Result<(), String>
     trigger::retry(&app, &exchange_id)
 }
 
-/// The Popover screenshot button (ADR-0016). Returns immediately: the snip runs
+/// The Popover screenshot button. Returns immediately: the snip runs
 /// on its own thread and the window re-appears with the result attached.
 #[tauri::command]
 pub fn start_capture(app: AppHandle) {
     trigger::start_capture(&app);
 }
 
-/// One tile's remove button, by position in the attached list (ADR-0017).
+/// One tile's remove button, by position in the attached list.
 #[tauri::command]
 pub fn discard_capture(app: AppHandle, index: usize) {
     trigger::discard_capture(&app, index);
 }
 
-/// The Popover reporting its own size after a drag on one of its grips
-/// (ADR-0018). Logical pixels, debounced by the window: a drag reports every
+/// The Popover reporting its own size after a drag on one of its grips.
+/// Logical pixels, debounced by the window: a drag reports every
 /// pixel and each report that is not ours is a write to `config.toml`.
 #[tauri::command]
 pub fn set_popover_size(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
@@ -84,14 +84,23 @@ pub fn show_settings(app: AppHandle) {
     trigger::show_settings(&app);
 }
 
-/// The Popover's Copy button. A user-requested write, so it is *not* restored
-/// (ADR-0002) — this is the only way a result leaves Beckon.
+/// The Popover's Copy button. A user-requested write, so it is *not* restored.
+/// Every way a result leaves Beckon goes through this write: Insert
+/// is this plus one keystroke.
 #[tauri::command]
 pub fn copy_to_clipboard(text: String) -> Result<(), String> {
     platform::selection::write_clipboard_text(&text)
 }
 
-/// A link in an answer, clicked (ADR-0028). Opens in the system browser: the
+/// The Popover's Insert: the answer goes to the clipboard as Copy
+/// sends it, the Popover closes, and the paste shortcut is sent to the window
+/// Beckon was summoned over. An `Err` means the Popover is still up to say so.
+#[tauri::command]
+pub fn insert_answer(app: AppHandle, text: String) -> Result<(), String> {
+    trigger::insert_answer(&app, &text)
+}
+
+/// A link in an answer, clicked. Opens in the system browser: the
 /// Popover's webview never navigates, because it is the app.
 ///
 /// Unlike `open_key_page`, this URL *does* come from the webview — it is text a

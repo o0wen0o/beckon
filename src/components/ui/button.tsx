@@ -30,7 +30,7 @@ const buttonVariants = cva(
           "border border-destructive/50 text-destructive shadow-xs hover:bg-destructive dark:hover:bg-destructive/60 hover:text-white hover:border-destructive focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         // Beckon's addition, and the one chromatic control on the surface:
         // storing a credential is the pane's single commit, the one control
-        // that does not follow "written as you type" (ADR-0003). Outlined
+        // that does not follow "written as you type". Outlined
         // rather than filled because it shares its line with Remove, and two
         // solid buttons there would each read as the thing to press.
         "success-outline":
@@ -58,8 +58,8 @@ const buttonVariants = cva(
         xs: "h-6 gap-1.5 rounded-md px-1.5 text-note [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
         // Beckon's addition, and `xs`'s boxed sibling: the same 12px register,
-        // still carrying a box. The Settings panes read one register down since
-        // ADR-0019/ADR-0020, so a 36px 14px button beside those controls read as
+        // still carrying a box. The Settings panes read one register down, so a
+        // 36px 14px button beside those controls read as
         // the thing to press on a pane whose point is the rows above it. The
         // weight is part of the size, not the call site's business: `outline`
         // and `ghost` drop to 400, and at 12px that is thinner than the label

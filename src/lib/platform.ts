@@ -3,14 +3,14 @@
 // accelerator is drawn. A per-component `isMac` test is how those drift.
 //
 // The platform-specific *words* moved to `lib/i18n/` when the second language
-// arrived (ADR-0015): "Keychain" against "Windows Credential Manager" is one
+// arrived: "Keychain" against "Windows Credential Manager" is one
 // choice, but each of them then has a Chinese form, and a `const` can only hold
 // one dimension. `IS_MAC` is exported for the catalogs to branch on.
 //
 // The test is the user agent rather than an IPC call: this decides labels that
 // are rendered on the first frame, and the webview already knows the answer
 // synchronously. Rust stays the source of truth for everything that is *state*
-// (ADR-0013) — the input permission is a command, not a guess.
+// — the input permission is a command, not a guess.
 
 import type * as React from "react";
 

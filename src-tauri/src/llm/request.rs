@@ -1,7 +1,7 @@
 //! Turning a resolved [`Provider`] row plus an Action's effective values into
 //! one request body. The only place a wire divergence between endpoints lives.
 //!
-//! ## The dialect is the endpoint's, not the model's (ADR-0021)
+//! ## The dialect is the endpoint's, not the model's
 //!
 //! Every OpenAI-compatible endpoint agrees about `model`, `messages` and
 //! `stream`. They disagree about exactly one thing Beckon needs: how you say
@@ -38,7 +38,7 @@
 //! error: the endpoint's own default stands, Settings says so in amber, and an
 //! Action repointed at Ollama keeps working rather than refusing to run.
 //!
-//! ## Web search (ADR-0026)
+//! ## Web search
 //!
 //! The same idea with the polarity reversed. Thinking is what endpoints do
 //! unless stopped, so [`Reasoning`] names off-switches and the interesting
@@ -56,15 +56,15 @@
 //!
 //! A per-row `Option`, absent meaning send nothing and let the endpoint decide.
 //! The 1.3 that used to ride every request was DeepSeek's own guidance
-//! (ADR-0019) and now lives on the DeepSeek row, because it was never a fact
-//! about anybody else's endpoint (ADR-0021).
+//! and now lives on the DeepSeek row, because it was never a fact
+//! about anybody else's endpoint.
 //!
 //! ## Images
 //!
 //! A Capture goes on the wire as an OpenAI-style content part and is never
 //! gated on the model: Beckon cannot keep a per-model image table true across
 //! every endpoint a `base_url` may point at, so the endpoint's own error is the
-//! only authority on what it reads (ADR-0016).
+//! only authority on what it reads.
 
 use serde_json::{json, Value};
 
@@ -121,7 +121,7 @@ pub fn build_body(
     Ok(body)
 }
 
-/// Write one endpoint's web-search field onto a body (ADR-0026).
+/// Write one endpoint's web-search field onto a body.
 ///
 /// The twin of [`apply_thinking`], and deliberately not folded into it: the two
 /// switches share no field on any endpoint, and one host takes one of them and
@@ -136,8 +136,8 @@ pub fn build_body(
 /// models that disagree about searching, the disagreement is that the field is
 /// ignored — DashScope's older tiers read `enable_search` and do nothing — which
 /// costs the feature and not the turn. A per-model list would rot for a wrong
-/// nothing (ADR-0021's footnote, ADR-0026), and since ADR-0027 the vendor's own
-/// exclusions grey the *control* rather than changing what goes out here.
+/// nothing, and the vendor's own exclusions grey the *control* rather than
+/// changing what goes out here.
 ///
 /// Asking a [`Search::None`] endpoint to search is therefore not an error
 /// either. It is the same trade [`thinking_wire`] makes in the on-direction: the
@@ -275,8 +275,8 @@ pub(super) fn build_dialect_probe(reasoning: Reasoning, model: &str) -> Option<V
 /// **Checked 2026-08-25.** Prefixes, matched case-insensitively: a family's dated
 /// snapshots take the same parameter set as the alias that names them.
 ///
-/// This is per-*model* knowledge inside a per-endpoint dialect, which ADR-0021
-/// otherwise keeps out — and it is here for the same reason
+/// This is per-*model* knowledge inside a per-endpoint dialect, which the
+/// provider table otherwise keeps out — and it is here for the same reason
 /// [`Reasoning::Deepseek`] consults [`models::find`]: one host serves models that
 /// disagree about the field. `api.openai.com` also serves `gpt-4o`, which rejects
 /// `reasoning_effort` outright, and `o3`, whose floor is `low`; `"none"` is a
@@ -436,7 +436,7 @@ mod tests {
         }
     }
 
-    /// The same, with the web-search switch thrown (ADR-0026).
+    /// The same, with the web-search switch thrown.
     fn searching(model: &str) -> ModelParams {
         ModelParams {
             web_search: true,
@@ -642,9 +642,8 @@ mod tests {
         }
     }
 
-    /// Omitted `temperature` means the endpoint's own default. The 1.3 that used
-    /// to be on every request was a fact about DeepSeek, never about a local
-    /// llama.cpp (ADR-0019 → ADR-0021).
+    /// Omitted `temperature` means the endpoint's own default. The 1.3 is a fact
+    /// about DeepSeek, never about a local llama.cpp.
     #[test]
     fn a_row_without_a_temperature_sends_none() {
         let body = build_body(
@@ -766,8 +765,7 @@ mod tests {
     }
 
     /// A v4 id newer than the catalog still maps, because the row said what the
-    /// endpoint speaks. This used to be a special case over the model id; it is
-    /// now the ordinary path.
+    /// endpoint speaks — the ordinary path, not a special case over the model id.
     #[test]
     fn an_uncatalogued_model_follows_the_rows_dialect() {
         assert_eq!(
@@ -799,7 +797,7 @@ mod tests {
     }
 
     /// No model is gated on images, catalogued or not, on any endpoint: whether
-    /// it reads one is the endpoint's answer to give (ADR-0016).
+    /// it reads one is the endpoint's answer to give.
     #[test]
     fn any_model_on_any_endpoint_may_be_sent_an_image() {
         for row in [deepseek(), provider(Reasoning::None, None)] {
@@ -810,7 +808,7 @@ mod tests {
         }
     }
 
-    /// A row that can search, asked to (ADR-0026). One field, on the same body,
+    /// A row that can search, asked to. One field, on the same body,
     /// in the shape that endpoint documents — and nothing about thinking, which
     /// this row does not speak.
     #[test]

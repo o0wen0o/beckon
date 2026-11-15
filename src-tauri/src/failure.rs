@@ -2,13 +2,13 @@
 //!
 //! At the crate root rather than inside `commands/`, because two different
 //! layers produce one: a command that refused, and a Capture that cannot be
-//! sent (ADR-0016). Both are read by the same `describeFailure` in the
+//! sent. Both are read by the same `describeFailure` in the
 //! frontend, so they have to be the same shape — and a second struct shaped
 //! *like* this one is how the two drift.
 //!
 //! The kind is a contract string the frontend catalogs key on; the message is
 //! either Beckon's own sentence in the reader's language or a cause quoted
-//! verbatim from something that does not speak it (ADR-0015).
+//! verbatim from something that does not speak it.
 
 use serde::Serialize;
 

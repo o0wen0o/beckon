@@ -11,21 +11,21 @@ A preset prompt together with how it is triggered. This is the basic unit users 
 _Avoid_: Skill, Command, Preset, feature
 
 **Input Source**:
-A property of an Action declaring where its input comes from — `auto` (use the Selection if there is one, otherwise ask for typed input) or `prompt` (typed input only; the Selection is ignored). Two values, not three: `selection` was retired by ADR-0020 and still loads as `auto`.
+A property of an Action declaring where its input comes from — `auto` (use the Selection if there is one, otherwise ask for typed input) or `prompt` (typed input only; the Selection is ignored). A file that says `selection` loads as `auto`.
 _Avoid_: input mode, mode
 
 **Provider**:
 One endpoint requests can go to: a row of `[[api.providers]]` holding a `base_url`, a model, how that
 endpoint is told not to think, and the id its stored key is filed under. Every Action names one or
 inherits `[defaults] provider`, so several can be in use at once — which is why there is no "active"
-provider and no global switch to describe (ADR-0021). A row is always the user's own file: never a
+provider and no global switch to describe. A row is always the user's own file: never a
 Rust enum of vendors, and never an aggregator standing in for one.
 _Avoid_: active provider, current provider, backend, vendor, API (the API is the protocol, a Provider
 is one host that speaks it), model (a Provider serves models; it is not one)
 
 **Web Search**:
 An Action asking its endpoint to read the live web before answering, off unless the Action says
-otherwise (ADR-0026). A switch on a turn, never a step Beckon performs: Beckon issues no search of
+otherwise. A switch on a turn, never a step Beckon performs: Beckon issues no search of
 its own and reads no page — it sets the field that endpoint documents, and the endpoint searches.
 Where a row has no such field, the switch reaches nothing and the pane says so.
 _Avoid_: browsing, grounding, online mode, RAG, retrieval, live search (xAI's name for their own
@@ -39,7 +39,7 @@ _Avoid_: highlighted text, selected region, text grab
 An image of part of the screen, taken with the platform's own snip tool from the Popover and read
 off the clipboard. A peer of the Selection, not a kind of it: the Selection is text the user had
 already highlighted, a Capture is made on request. A turn carries up to four of them, in the order
-they were taken (ADR-0017). In UI strings it is called a *screenshot* — "Capture" is the word for
+they were taken. In UI strings it is called a *screenshot* — "Capture" is the word for
 code, comments and commit messages.
 _Avoid_: snip, screen grab, attachment, image (all three are what it is made of, not what it is)
 
@@ -63,9 +63,16 @@ _Avoid_: result window, floating window, toast, panel
 The multi-turn conversation opened by one Action trigger, with a lifetime equal to that of the Popover. Discarded when the window closes; never persisted.
 _Avoid_: session, Session, Conversation, history
 
+**Insert**:
+Handing an answer back to the program Beckon was summoned over: Copy, close the Popover, and send
+that program one paste keystroke. The inverse of grabbing the Selection, and always a
+gesture the user makes after reading — never something an Action does on its own. It *replaces* only
+when the Selection is still highlighted there, which is why it is not called that.
+_Avoid_: replace, write-back, paste back, apply, auto-paste
+
 ### The same words in Chinese
 
-Beckon ships in English and Simplified Chinese (ADR-0015), so each term above has exactly one
+Beckon ships in English and Simplified Chinese, so each term above has exactly one
 Chinese form, and `src/lib/i18n/zh.ts` is where it is kept. A second rendering of one of these is
 the same failure as a synonym in English.
 
@@ -79,5 +86,6 @@ the same failure as a synonym in English.
 | Direct Hotkey | 专属热键 | _Avoid_: 快捷键 alone, which is any hotkey |
 | Popover | 浮窗 | _Avoid_: 弹窗, which is a dialog |
 | Exchange | 对话 | Only ever the one a Popover holds |
+| Insert | 插入 | The button beside 复制. _Avoid_: 替换 (only true while the Selection is still highlighted), 回填, 粘贴回去 |
 | Web Search | 联网搜索 | The switch on an Action. _Avoid_: 网络搜索, 联网, 搜索 alone |
 | Provider | 端点 | The row, and what Settings calls the section. _Avoid_: 服务商 (a company, not a row — two rows can point at one company), 后端, 供应商 |

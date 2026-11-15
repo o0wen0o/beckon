@@ -2,7 +2,7 @@
 //! pixels, so the Popover can be clamped on-screen at any DPI.
 //!
 //! Both come from Tauri rather than from each platform's own API, and that is
-//! the one part of this layer that is *not* per-platform on purpose (ADR-0013).
+//! the one part of this layer that is *not* per-platform on purpose.
 //! tao already normalises macOS's bottom-left, Y-up screen space into the
 //! top-left, Y-down space `set_position` takes; deriving that flip a second
 //! time here would be a second place for it to be wrong. Using one path also

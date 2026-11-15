@@ -4,7 +4,7 @@
     password into the user environment.
 
 .DESCRIPTION
-    Since ADR-0022 `tauri build` refuses to bundle without a signing key:
+    `tauri build` refuses to bundle without a signing key:
     createUpdaterArtifacts is on, so an unsigned bundle is an error rather than
     an artifact. The two variables the bundler reads are
     TAURI_SIGNING_PRIVATE_KEY_PATH and TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
@@ -48,7 +48,7 @@ $keyPath = Join-Path $HOME '.tauri/beckon.key'
 $passPath = Join-Path $HOME '.tauri/beckon.pass'
 
 if (-not (Test-Path $keyPath)) {
-    throw "No signing key at $keyPath. Generate one with: npx tauri signer generate -w $keyPath -- or point this script at the maintainer's key. Without it, tauri build cannot produce updater artifacts (ADR-0022)."
+    throw "No signing key at $keyPath. Generate one with: npx tauri signer generate -w $keyPath -- or point this script at the maintainer's key. Without it, tauri build cannot produce updater artifacts."
 }
 
 if ($Forget -and (Test-Path $passPath)) {

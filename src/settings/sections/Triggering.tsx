@@ -44,7 +44,7 @@ export function Triggering() {
       {/* The one thing a hotkey can be registered for and still do nothing:
           macOS drops the synthetic copy silently without Accessibility trust,
           so an Action reading the Selection returns an empty grab and looks
-          broken (ADR-0013). `not-required` — every Windows run — says nothing
+          broken. `not-required` — every Windows run — says nothing
           at all, and neither does `null`, which is only "not asked yet". */}
       {store.inputPermission === "denied" ? (
         <Callout tone="danger">
@@ -104,7 +104,7 @@ export function Triggering() {
           {/* Here rather than on a pane of its own: the two settings on this
               pane that are not the hotkey are both about the resident process
               rather than about a request, and a fifth nav item for one switch is
-              more chrome than the switch (ADR-0022). What it governs is the
+              more chrome than the switch. What it governs is the
               automatic check only — the tray item beside it is a click. */}
           <FieldGroup title={t.settings.triggering.updates}>
             <Field

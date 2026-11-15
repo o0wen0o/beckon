@@ -1,4 +1,4 @@
-// A file that fails to parse is never dropped (ADR-0003) — it is reported and
+// A file that fails to parse is never dropped — it is reported and
 // stays editable as text, which is the only way back from a bad hand-edit.
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

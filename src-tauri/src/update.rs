@@ -1,5 +1,4 @@
-//! Self-update: ask the manifest, verify its signature, replace this binary
-//! (ADR-0022).
+//! Self-update: ask the manifest, verify its signature, replace this binary.
 //!
 //! Beckon is never launched deliberately — it starts with the machine and lives
 //! in the tray — so it is never *replaced* deliberately either. Nothing in the
@@ -15,7 +14,7 @@
 //!
 //! Nothing here touches config or the Registry, so this module is outside the
 //! reload path entirely: an available update is neither config nor an Action,
-//! and the filesystem has no opinion about it (ADR-0003). The tray is the only
+//! and the filesystem has no opinion about it. The tray is the only
 //! surface that renders it.
 
 use std::sync::atomic::Ordering;
@@ -100,7 +99,7 @@ async fn run_check(app: &AppHandle, voice: Voice) {
 pub fn install(app: &AppHandle) {
     // Installing ends this process — on Windows the NSIS installer needs the
     // files it replaces closed, and on macOS the swapped bundle has to be
-    // relaunched — and an Exchange is never on disk to come back to (ADR-0004).
+    // relaunched — and an Exchange is never on disk to come back to.
     // So a Popover on screen is a refusal, not a race to win.
     if popover_is_visible(app) {
         let language = app.state::<AppState>().config_snapshot().language;
@@ -139,10 +138,10 @@ pub fn install(app: &AppHandle) {
                 //
                 // Back to the main thread first — the teardown `restart` does
                 // walks the windows and the tray, which is AppKit's thread and
-                // nobody else's (ADR-0013).
+                // nobody else's.
                 let restarting = app.clone();
                 let _ = app.run_on_main_thread(move || {
-                    // Hand the single-instance claim back first (ADR-0023).
+                    // Hand the single-instance claim back first.
                     // `restart` spawns the successor and only then exits, and
                     // `cleanup_before_exit` does not reach plugins — so without
                     // this the new copy can find the old one still listening,
@@ -174,7 +173,7 @@ enum Installed {
 /// The one place the channel's errors are flattened, so both paths phrase them
 /// alike: an unreachable endpoint, a manifest that does not parse and a
 /// signature that does not verify are each quoted verbatim to the reader, the
-/// way `describeFailure` quotes a cause it did not write (ADR-0015).
+/// way `describeFailure` quotes a cause it did not write.
 async fn fetch_update(app: &AppHandle) -> Result<Option<Update>, String> {
     let updater = app.updater().map_err(|err| err.to_string())?;
     updater.check().await.map_err(|err| err.to_string())

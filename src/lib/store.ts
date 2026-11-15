@@ -1,9 +1,9 @@
 // The reactivity primitive the stores are built on. It exists so they stay
 // plain classes: every rule about when a snapshot may be adopted lives in the
-// store, and no field component acquires an opinion about the disk (ADR-0003).
+// store, and no field component acquires an opinion about the disk.
 //
 // `useSyncExternalStore` over component state because each window is created
-// once and never destroyed (ADR-0007), so a module-level singleton outlives
+// once and never destroyed, so a module-level singleton outlives
 // every render — which is what lets `settings:opened` reset it from outside the
 // React tree.
 

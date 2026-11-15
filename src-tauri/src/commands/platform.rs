@@ -1,6 +1,6 @@
 //! What the OS will and will not let Beckon do, and the way to the switch.
 //!
-//! Only macOS has anything to answer here (ADR-0013); Windows reports
+//! Only macOS has anything to answer here; Windows reports
 //! `not-required` and Settings says nothing at all. Both commands exist on both
 //! platforms so the frontend has one question to ask rather than a platform
 //! test — and both are delegates, so the `#[cfg]` stays under `platform/`.
