@@ -13,6 +13,7 @@ mod foreground;
 pub mod window;
 
 use std::sync::atomic::Ordering;
+use std::sync::{Mutex, MutexGuard, TryLockError};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -44,8 +45,36 @@ pub const EVENT_LAUNCHER_OPENED: &str = "launcher:opened";
 /// event, not a mount — this is what clears the last visit's transient state.
 pub const EVENT_SETTINGS_OPENED: &str = "settings:opened";
 
+/// One grab at a time, across both hotkey entry points.
+///
+/// Each press runs on a thread of its own (`main`), and a grab is ~15–315ms of
+/// clipboard polling during which no Beckon window is up yet — so a second
+/// press inside that window passed every "is it already showing" test and
+/// grabbed as well. Two interleaved grabs read each other's clipboard: the
+/// second backs up the Selection the first one's copy just put there, then
+/// "restores" it over what the user actually had, and may send the first one's
+/// restored text to an endpoint as if it had been selected.
+///
+/// A press that finds a grab running is dropped, not queued: it was aimed at a
+/// screen that is about to change.
+static TRIGGERING: Mutex<()> = Mutex::new(());
+
+/// The guard for [`TRIGGERING`], or `None` if a grab is already running.
+fn begin_trigger() -> Option<MutexGuard<'static, ()>> {
+    match TRIGGERING.try_lock() {
+        Ok(guard) => Some(guard),
+        // Nothing is protected but the turn itself, so a panic that poisoned
+        // it must not disable every hotkey for the life of the process.
+        Err(TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
+
 /// Global hotkey: toggle the Launcher, grabbing the Selection on the way up.
 pub fn launcher_hotkey(app: &AppHandle) {
+    let Some(_trigger) = begin_trigger() else {
+        return;
+    };
     let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) else {
         return;
     };
@@ -75,6 +104,9 @@ pub fn launcher_hotkey(app: &AppHandle) {
 
 /// Direct Hotkey: straight to the result, zero interaction.
 pub fn action_hotkey(app: &AppHandle, action_id: &str) {
+    let Some(_trigger) = begin_trigger() else {
+        return;
+    };
     remember_foreground(app);
     let selection = platform::selection::grab_selection();
     open_action(app, action_id, selection);
@@ -253,18 +285,25 @@ pub fn follow_up(app: &AppHandle, exchange_id: &str, text: &str) -> Result<(), S
         // answer that cannot be wrong if it ever does.
         .map(PopoverView::take_captures)
         .unwrap_or_default();
-    // Straight into `retry`, which is exactly "begin this content and spawn the
-    // turn" — the only difference between the two is where the content is from.
-    retry(app, exchange_id, user_content(text, captures))
+    let plan = app
+        .state::<AppState>()
+        .exchanges
+        .begin_turn(exchange_id, user_content(text, captures))
+        .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
+    exchange::spawn_turn(app.clone(), plan);
+    Ok(())
 }
 
 /// Resend a turn verbatim. A retry repeats the message that failed — the same
-/// words and the same Captures — so it does not go through the attach path.
-pub fn retry(app: &AppHandle, exchange_id: &str, content: Content) -> Result<(), String> {
+/// words and the same Captures — so it does not go through the attach path,
+/// which would add whatever happens to be on the Popover *now* (ADR-0016), and
+/// it does not go through `begin_turn`, which would append the message a second
+/// time: it is already the last thing in the history.
+pub fn retry(app: &AppHandle, exchange_id: &str) -> Result<(), String> {
     let state = app.state::<AppState>();
     let plan = state
         .exchanges
-        .begin_turn(exchange_id, content)
+        .retry_turn(exchange_id)
         .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
     exchange::spawn_turn(app.clone(), plan);
     Ok(())

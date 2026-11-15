@@ -78,13 +78,46 @@ impl ExchangeManager {
         let mut map = self.inner.lock().expect("exchange lock");
         let entry = map.get_mut(id)?;
         entry.exchange.messages.push(Message::user(content.into()));
+        Some(Self::plan(id, entry))
+    }
+
+    /// Run the last user turn again, verbatim — the same words and the same
+    /// Captures — because the turn that failed is the one worth repeating, and
+    /// repeating it without its image would answer a different question.
+    ///
+    /// Nothing is appended: the message is already in the history. Appending it
+    /// again sent `[…, user X, user X]`, once more per Retry — the tokens and
+    /// the Captures twice, and a `400` from every chat template that insists on
+    /// alternating roles, which made Retry the one button that could not work
+    /// against a local model.
+    ///
+    /// Whatever the failed attempt left *after* that message is dropped. A
+    /// stream that died with an error may have committed partial text, and the
+    /// Popover clears that answer when Retry is pressed; the history has to
+    /// match what is on screen, for the reason `commit_assistant` records
+    /// partial text in the first place.
+    pub fn retry_turn(&self, id: &str) -> Option<TurnPlan> {
+        let mut map = self.inner.lock().expect("exchange lock");
+        let entry = map.get_mut(id)?;
+        let last_user = entry
+            .exchange
+            .messages
+            .iter()
+            .rposition(|message| message.role == crate::llm::Role::User)?;
+        entry.exchange.messages.truncate(last_user + 1);
+        Some(Self::plan(id, entry))
+    }
+
+    /// What a runner needs for the history as it now stands. The fresh
+    /// cancellation token is installed here, once, for both ways a turn starts.
+    fn plan(id: &str, entry: &mut Entry) -> TurnPlan {
         entry.cancel = CancellationToken::new();
-        Some(TurnPlan {
+        TurnPlan {
             exchange_id: id.to_string(),
             params: entry.exchange.params.clone(),
             messages: entry.exchange.messages.clone(),
             cancel: entry.cancel.clone(),
-        })
+        }
     }
 
     /// Record what the assistant produced. Partial text from an interrupted
@@ -115,20 +148,6 @@ impl ExchangeManager {
             entry.cancel.cancel();
         }
         map.clear();
-    }
-
-    /// The last thing the user sent, Capture included. A retry resends exactly
-    /// that — the turn that failed is the one worth repeating, and repeating it
-    /// without its image would answer a different question.
-    pub fn last_user_message(&self, id: &str) -> Option<Content> {
-        let map = self.inner.lock().expect("exchange lock");
-        map.get(id)?
-            .exchange
-            .messages
-            .iter()
-            .rev()
-            .find(|message| message.role == crate::llm::Role::User)
-            .map(|message| message.content.clone())
     }
 }
 
@@ -191,12 +210,9 @@ mod tests {
             second.messages[1].content,
             Content::with_images("what is this?", ["data:image/png;base64,AA"])
         );
-        // The retry path resends this one verbatim, so it is the follow-up and
-        // carries no image of its own.
-        assert_eq!(
-            manager.last_user_message(&id),
-            Some(Content::from("and the button?"))
-        );
+        // The follow-up carries no image of its own: the Capture belongs to the
+        // turn it was attached to.
+        assert_eq!(second.messages[3].content, Content::from("and the button?"));
     }
 
     #[test]
@@ -207,7 +223,7 @@ mod tests {
 
         manager.discard_all();
         assert!(plan.cancel.is_cancelled());
-        assert!(manager.last_user_message(&id).is_none());
+        assert!(manager.retry_turn(&id).is_none());
         assert!(manager.begin_turn(&id, "two").is_none());
     }
 
@@ -222,13 +238,64 @@ mod tests {
         assert_eq!(next.messages.len(), 3);
     }
 
+    /// A turn that failed before any text came back is still the last message.
+    /// Retrying must send the history as it stands — pushing the same message
+    /// again is what made every retry one copy longer than the last.
     #[test]
-    fn a_retry_resends_the_last_user_message() {
+    fn a_retry_resends_the_turn_rather_than_appending_it() {
         let manager = ExchangeManager::default();
         let id = manager.create("s", params());
         manager.begin_turn(&id, "one").unwrap();
         manager.commit_assistant(&id, "answer");
-        manager.begin_turn(&id, "two").unwrap();
-        assert_eq!(manager.last_user_message(&id), Some(Content::from("two")));
+        let failed = manager.begin_turn(&id, "two").unwrap();
+
+        let first = manager.retry_turn(&id).unwrap();
+        let second = manager.retry_turn(&id).unwrap();
+        assert_eq!(first.messages, failed.messages);
+        assert_eq!(second.messages, failed.messages);
+        assert_eq!(second.messages[3].content, Content::from("two"));
+    }
+
+    /// The Capture rides along, because it is part of the message being resent.
+    #[test]
+    fn a_retry_keeps_the_captures_of_the_turn_it_repeats() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        manager.begin_turn(
+            &id,
+            Content::with_images("what is this?", ["data:image/png;base64,AA"]),
+        );
+
+        let retried = manager.retry_turn(&id).unwrap();
+        assert_eq!(retried.messages.len(), 2);
+        assert_eq!(
+            retried.messages[1].content,
+            Content::with_images("what is this?", ["data:image/png;base64,AA"])
+        );
+    }
+
+    /// An error after partial output commits that text, and the Popover clears
+    /// it when Retry is pressed — so the history drops it too.
+    #[test]
+    fn a_retry_drops_the_partial_answer_it_replaces() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        manager.begin_turn(&id, "one").unwrap();
+        manager.commit_assistant(&id, "half an ans");
+
+        let retried = manager.retry_turn(&id).unwrap();
+        assert_eq!(retried.messages.len(), 2);
+        assert_eq!(retried.messages[1].content, Content::from("one"));
+    }
+
+    #[test]
+    fn a_retry_gets_a_fresh_cancellation_token() {
+        let manager = ExchangeManager::default();
+        let id = manager.create("s", params());
+        let first = manager.begin_turn(&id, "one").unwrap();
+        manager.cancel(&id);
+        assert!(first.cancel.is_cancelled());
+
+        assert!(!manager.retry_turn(&id).unwrap().cancel.is_cancelled());
     }
 }

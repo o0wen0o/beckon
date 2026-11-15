@@ -49,7 +49,10 @@ from the Launcher, or bind it to its own hotkey and skip the Launcher entirely.
 - **Selection** — the platform copy shortcut is simulated to grab it, and your clipboard is put
   back afterwards. Nothing selected is not an error: the Popover just gives you a box to type in.
 - **Popover** — takes focus, streams, accepts follow-up turns. Drag any edge or corner to resize;
-  the size sticks for next time. `Esc` cancels a running request, then closes.
+  the size sticks for next time. `Esc` cancels a running request, then closes. The answer is
+  rendered as Markdown — lists, tables, and code blocks with a Copy of their own — while Copy on the
+  turn still hands you the source. A link opens in your browser; an image is shown as a link rather
+  than fetched, and HTML in an answer is just text.
 - **Screenshot** — the button in the Popover runs your OS snip tool and attaches the result, up to
   four per turn. It is attached, then sent — never captured-and-sent. Whether the model reads
   images is between you and your endpoint.
@@ -88,6 +91,10 @@ Settings covers all of it, but the files are yours to edit — a watcher reloads
 is neither: it is the last model list each endpoint told Beckon it serves, so that a fresh launch has
 something to offer before you ask again. Deleting it costs one fetch. Nothing in it is a prompt, an
 answer or a screenshot.
+
+A `config.toml` that stops parsing — a typo mid-edit — is never written over in place: Beckon runs
+on defaults until it is fixed, and if it has to write the file in the meantime it first keeps yours
+beside it as `config.toml.broken`.
 
 The whole directory copies between platforms unchanged: `Ctrl`, `Alt`, `Shift` and `Cmd`/`Super`
 all parse on both, and only the defaults differ.
@@ -223,5 +230,5 @@ will accept. See [CLAUDE.md](./CLAUDE.md) for the four gates CI enforces.
 ## Reading further
 
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary, one name per concept, English and Chinese.
-- [docs/adr/](./docs/adr/) — 22 decisions, each with what was rejected and why.
+- [docs/adr/](./docs/adr/) — 28 decisions, each with what was rejected and why.
 - [docs/macos-testing.md](./docs/macos-testing.md) — the behaviour no compiler checks.

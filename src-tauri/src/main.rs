@@ -115,6 +115,7 @@ fn main() {
             commands::hide_launcher,
             commands::show_settings,
             commands::copy_to_clipboard,
+            commands::open_link,
         ])
         .setup(move |app| setup(app, autostart_wanted))
         .on_window_event(|window, event| {

@@ -1,6 +1,6 @@
 # Beckon
 
-Beckon is a tool that lives in the background on Windows: press a hotkey to summon it, send a preset prompt plus your current input to an OpenAI-compatible endpoint — DeepSeek by default — and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
+Beckon is a tool that lives in the background on Windows and macOS: press a hotkey to summon it, send a preset prompt plus your current input to an OpenAI-compatible endpoint — DeepSeek by default — and get the result streamed back in a popover next to your cursor. The name comes from "beckoning" — you wave, it comes.
 
 ## Language
 

@@ -108,6 +108,12 @@ export const hidePopover = () => invoke<void>("hide_popover");
 export const hideLauncher = () => invoke<void>("hide_launcher");
 export const showSettings = () => invoke<void>("show_settings");
 export const copyToClipboard = (text: string) => invoke<void>("copy_to_clipboard", { text });
+/**
+ * A link in an answer, opened in the system browser (ADR-0028). Rust refuses
+ * anything that is not `http`/`https`: the URL is the model's text, and the
+ * check belongs on the side that did not render it.
+ */
+export const openLink = (url: string) => invoke<void>("open_link", { url });
 
 // --- the Popover's own size (ADR-0018) ------------------------------------
 /**

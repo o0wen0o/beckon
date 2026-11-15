@@ -31,15 +31,31 @@ pub fn write_config(app: &AppHandle, config: &config::Config) -> Result<(), Stri
     let state = app.state::<AppState>();
     let previous = state.config_snapshot();
     let path = state.paths.config_file.clone();
+    // Before the write, because the write is what would destroy it: a file that
+    // does not parse loaded as defaults (`config::load_or_create`), so `config`
+    // here is those defaults plus one change, about to replace everything the
+    // user typed. The copy is not a `.toml`, so the watcher never sees it.
+    if let Some(kept) = config::set_aside_if_unparsable(&path) {
+        log::warn!(
+            "config.toml did not parse; kept the old file as {}",
+            kept.display()
+        );
+    }
     state.self_writes.mark(&path);
     config::save(&path, config)?;
 
-    if config.autostart != previous.autostart {
-        sync_autostart(app, config.autostart)?;
-    }
+    // Applied, then reported *after* the reload. The file is already written
+    // and already marked as ours, so returning here would leave `AppState` on
+    // the old config with no watcher echo coming to correct it — disk and
+    // memory disagreeing until some unrelated reload.
+    let autostart = if config.autostart != previous.autostart {
+        sync_autostart(app, config.autostart)
+    } else {
+        Ok(())
+    };
 
     reload_config(app);
-    Ok(())
+    autostart
 }
 
 pub fn reload_config(app: &AppHandle) {

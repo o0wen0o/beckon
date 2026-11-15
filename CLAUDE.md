@@ -17,7 +17,7 @@ Read before non-trivial work:
 - [CONTEXT.md](./CONTEXT.md) — the vocabulary. Action, Provider, Input Source, Selection, Capture,
   Launcher, Direct Hotkey, Popover, Exchange each have one name, a list of banned synonyms, and one
   Chinese form. Use those words in code, comments, UI strings and commit messages.
-- [docs/adr/](./docs/adr/) — 27 accepted ADRs. Comments cite them by number; a comment saying
+- [docs/adr/](./docs/adr/) — 28 accepted ADRs. Comments cite them by number; a comment saying
   "(ADR-0007)" means the ADR explains why the code looks wrong-but-isn't.
 
 ## Commands
@@ -151,6 +151,11 @@ before the first paint.
 - **Errors**: failures arrive as `{kind, message}`; `describeFailure` names the kind in the reader's
   language and quotes the cause verbatim. A rejected key, a missing credential and an unreachable
   API are distinct kinds and stay distinct.
+- **The answer is Markdown** (ADR-0028), drawn by [src/popover/Markdown.tsx](src/popover/Markdown.tsx)
+  and nothing else is: the question card and the reasoning stay plain text. Three properties are
+  load-bearing there — no raw HTML, no fetched image, and a link that goes to Rust's `open_link`
+  rather than navigating the webview — so a new element is a new entry in that file's component
+  map, never a `rehype` plugin that widens what an answer can make the window do.
 - **Overlays**: Radix portals into the pane, not `document.body`
   ([src/lib/pane.tsx](src/lib/pane.tsx)) — from the body, opening a dropdown reads as "the user left
   the form" to the save protocol.
@@ -251,6 +256,11 @@ never translated in either direction.
   disclosure, because the risk it named did not change, only who decides to accept it. The host match
   `Provider::relays` performs is not a hole in 0021's "no host guess": that rule exists because a
   wrong dialect is a `400` on every turn, and a wrong broker match costs a warning nobody needed.
+  ADR-0028 supersedes nothing: the answer becoming Markdown replaces a comment that called plain
+  text "acceptable for the MVP", not a decision. It *keeps* the half of that comment that was a
+  requirement — nothing in an answer can inject into the WebView — and adds two of the same kind:
+  nothing is fetched, and a link leaves through `open_link`, the one command whose URL comes from
+  the webview and which therefore takes `http`/`https` and nothing else.
 - **Styling**: shadcn/ui (new-york, base colour `neutral`) + Tailwind v4, tokens in
   [src/globals.css](src/globals.css). Components read tokens and name no colour, size or duration.
   The accent is inversion, not a hue; `--brand` has one consumer. That file's header documents each

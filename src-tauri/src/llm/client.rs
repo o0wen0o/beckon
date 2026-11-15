@@ -139,7 +139,7 @@ fn redirect_verdict(previous: &[reqwest::Url], next: &reqwest::Url) -> Redirect 
     // arm below is the only one that can stop a request.
     let same_host = previous
         .last()
-        .map_or(true, |from| from.host_str() == next.host_str());
+        .is_none_or(|from| from.host_str() == next.host_str());
     if !same_host {
         Redirect::Stop
     } else if previous.len() > MAX_REDIRECTS {
@@ -183,6 +183,26 @@ pub fn build_http_client() -> reqwest::Client {
         .expect("HTTP client")
 }
 
+/// How much of a body that never parsed is kept to quote. An error message is a
+/// sentence; `status_error` trims what it is handed to 300 characters anyway.
+const UNPARSED_CAP: usize = 2048;
+
+/// A successful status over a body with no events in it, as the failure it is.
+///
+/// Through `status_error`, so a JSON `error.message` is quoted in the vendor's
+/// own words exactly as it would be under a `4xx`. An empty body has no words
+/// to quote, and "HTTP 200:" followed by nothing would read as a rendering bug.
+fn not_a_stream(status: u16, body: &[u8]) -> LlmError {
+    let body = String::from_utf8_lossy(body);
+    if body.trim().is_empty() {
+        return status_error(
+            status,
+            "the endpoint closed the response without sending anything",
+        );
+    }
+    status_error(status, &body)
+}
+
 /// Stream one completion. `on_event` is called on the calling task, so it may
 /// emit Tauri events directly.
 pub async fn stream_chat(
@@ -216,6 +236,10 @@ pub async fn stream_chat(
     let mut parser = SseParser::new();
     let mut received_any = false;
     let mut saw_done = false;
+    // The start of the body, kept only until the first event parses. A `200`
+    // that is not a stream has to be quoted from somewhere, and by the time
+    // that is known the bytes have been through the parser and dropped.
+    let mut unparsed: Vec<u8> = Vec::new();
 
     'stream: loop {
         let chunk = tokio::select! {
@@ -235,6 +259,11 @@ pub async fn stream_chat(
             }
         })?;
 
+        if !received_any && unparsed.len() < UNPARSED_CAP {
+            let room = UNPARSED_CAP - unparsed.len();
+            unparsed.extend_from_slice(&chunk[..chunk.len().min(room)]);
+        }
+
         for event in parser.push(&chunk) {
             match handle_event(event, &mut on_event)? {
                 Flow::Continue => received_any = true,
@@ -248,10 +277,20 @@ pub async fn stream_chat(
 
     if !saw_done {
         for event in parser.finish() {
-            if let Flow::Done = handle_event(event, &mut on_event)? {
-                saw_done = true;
+            match handle_event(event, &mut on_event)? {
+                Flow::Continue => received_any = true,
+                Flow::Done => saw_done = true,
             }
         }
+    }
+
+    // Success on the status line and not one event in the body: a gateway that
+    // answers `200` with a JSON error, an endpoint that ignored `stream: true`
+    // and sent a whole completion, or a connection closed after the headers.
+    // Falling through to `Ok` drew that as a finished, empty answer — the one
+    // outcome that says nothing went wrong and shows nothing.
+    if !saw_done && !received_any {
+        return Err(not_a_stream(status.as_u16(), &unparsed));
     }
 
     // The server closed without `[DONE]`: partial output, mark interrupted.
@@ -513,5 +552,31 @@ mod tests {
         assert!(headers.get("x-api-key").is_none());
         // Not even the version: nothing about this request is Anthropic's.
         assert!(headers.get("anthropic-version").is_none());
+    }
+
+    /// A gateway that answers `200` with a JSON error body. The vendor's own
+    /// sentence is what reaches the Popover, the way it would under a `4xx`.
+    #[test]
+    fn a_success_status_over_a_json_error_quotes_the_error() {
+        let err = not_a_stream(200, br#"{"error":{"message":"quota exceeded"}}"#);
+        assert_eq!(
+            err,
+            LlmError::Http {
+                status: 200,
+                message: "quota exceeded".to_string(),
+            }
+        );
+    }
+
+    /// Nothing to quote is said in words, not left as "HTTP 200:" and a blank.
+    #[test]
+    fn a_success_status_over_an_empty_body_still_says_something() {
+        for body in [&b""[..], b"  \r\n"] {
+            let LlmError::Http { status, message } = not_a_stream(200, body) else {
+                panic!("an empty 200 is an HTTP failure");
+            };
+            assert_eq!(status, 200);
+            assert!(!message.trim().is_empty());
+        }
     }
 }

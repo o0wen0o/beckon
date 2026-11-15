@@ -1,7 +1,7 @@
 //! Everything the three surfaces ask of the trigger layer: showing and hiding
 //! themselves, and driving the Exchange the Popover renders.
 
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 use crate::state::{AppState, PopoverView};
 use crate::{hotkey, platform, trigger};
@@ -42,18 +42,10 @@ pub fn cancel_exchange(state: State<AppState>, exchange_id: String) {
     state.exchanges.cancel(&exchange_id);
 }
 
-/// Retry after an error: resend the last user message as a new turn.
+/// Retry after an error: run the last user turn again, as it stands.
 #[tauri::command]
 pub fn retry_exchange(app: AppHandle, exchange_id: String) -> Result<(), String> {
-    let last_user = app
-        .state::<AppState>()
-        .exchanges
-        .last_user_message(&exchange_id)
-        .ok_or_else(|| "this Exchange is gone; trigger the Action again".to_string())?;
-    // Straight to the Exchange rather than through `follow_up`: the message is
-    // already built, Capture included, and re-rendering it would attach
-    // whatever happens to be on the Popover *now* (ADR-0016).
-    trigger::retry(&app, &exchange_id, last_user)
+    trigger::retry(&app, &exchange_id)
 }
 
 /// The Popover screenshot button (ADR-0016). Returns immediately: the snip runs
@@ -97,4 +89,77 @@ pub fn show_settings(app: AppHandle) {
 #[tauri::command]
 pub fn copy_to_clipboard(text: String) -> Result<(), String> {
     platform::selection::write_clipboard_text(&text)
+}
+
+/// A link in an answer, clicked (ADR-0028). Opens in the system browser: the
+/// Popover's webview never navigates, because it is the app.
+///
+/// Unlike `open_key_page`, this URL *does* come from the webview — it is text a
+/// model wrote, and the model may have been steered by the Selection it was
+/// handed. So the command is as narrow as a link can be: a web scheme and
+/// nothing else, checked here rather than in the window, because the window is
+/// the side that rendered the untrusted text. `file:`, `ms-settings:` and every
+/// other handler the shell would happily launch stay unreachable.
+#[tauri::command]
+pub fn open_link(app: AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    if !is_web_url(&url) {
+        return Err("only http and https links can be opened".to_string());
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Whether `url` is something a browser, and only a browser, will take.
+///
+/// A prefix test rather than a parse: the question is which *handler* the shell
+/// picks, and that is decided by the scheme alone. Whitespace and control
+/// characters are refused outright — a real link has neither, and they are what
+/// an argument smuggled past a shell looks like.
+fn is_web_url(url: &str) -> bool {
+    let scheme = url
+        .get(..8)
+        .is_some_and(|head| head.eq_ignore_ascii_case("https://"))
+        || url
+            .get(..7)
+            .is_some_and(|head| head.eq_ignore_ascii_case("http://"));
+    scheme && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_web_url;
+
+    #[test]
+    fn web_links_open() {
+        assert!(is_web_url("https://example.com/a?b=c#d"));
+        assert!(is_web_url("http://localhost:11434/"));
+        assert!(is_web_url("HTTPS://EXAMPLE.COM"));
+    }
+
+    #[test]
+    fn nothing_but_a_web_scheme_reaches_the_shell() {
+        for url in [
+            "",
+            "file:///C:/Windows/System32/calc.exe",
+            "ms-settings:privacy",
+            "javascript:alert(1)",
+            "mailto:someone@example.com",
+            r"C:\Windows\System32\calc.exe",
+            "//example.com",
+            "https:/example.com",
+            " https://example.com",
+        ] {
+            assert!(!is_web_url(url), "{url:?} must be refused");
+        }
+    }
+
+    #[test]
+    fn a_link_carries_no_whitespace_or_control_characters() {
+        assert!(!is_web_url("https://example.com/ --flag"));
+        assert!(!is_web_url("https://example.com/\n"));
+        assert!(!is_web_url("https://example.com/\u{0}"));
+    }
 }

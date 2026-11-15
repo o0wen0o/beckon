@@ -74,6 +74,14 @@ export interface Turn {
 /** How often the "waiting" counter reads the clock. */
 const TICK = 250;
 
+/**
+ * How many events are held for an Exchange this window has not adopted yet.
+ * What is being caught is the handful a turn emits before the window learns its
+ * id — a refusal, a first token — so the ceiling is only there to bound what a
+ * superseded stream can leave behind before the next adoption clears it.
+ */
+const EARLY_CAP = 64;
+
 /** Failures the user can actually do something about in Settings. */
 export function settlesInSettings(kind: string | undefined) {
   return kind === "no-credential" || kind === "read-error" || kind === "auth" || kind === "config";
@@ -132,6 +140,25 @@ class ExchangeStore extends Notifier {
   /** Zero unless a turn is waiting for its first token. */
   #waitingSince = 0;
   #waited = 0;
+
+  /**
+   * Events that arrived for an Exchange this window did not know yet, oldest
+   * first, to be replayed when it learns the id.
+   *
+   * Rust starts the turn and *then* says the view changed (`open_action`), and
+   * the window learns the id only when `getPopoverView` — or `submitInput` —
+   * comes back. A turn that fails at once (no key stored, a provider row that
+   * is gone, no model picked) emits its `exchange:error` inside that gap. It
+   * used to be dropped as "not the Exchange on screen", and then `load` drew a
+   * turn waiting for a first token that had already been refused: a counter
+   * that climbs for ever over the one failure the user most needs to read,
+   * because it is the one that says to open Settings.
+   */
+  #early: Array<{ exchangeId: string; apply: (turn: Turn) => void }> = [];
+
+  /** Bumped by every `load`, so one overtaken by a newer trigger while it was
+   *  waiting for the view can tell, and leave the adoption to that one. */
+  #loads = 0;
 
   /**
    * Which set is being looked at full size, and where in it — never the images
@@ -209,7 +236,12 @@ class ExchangeStore extends Notifier {
       )
       .add(
         onFirstToken((payload) =>
-          this.#forCurrent(payload.exchange_id, (turn) => this.#markStreaming(turn)),
+          this.#forCurrent(payload.exchange_id, (turn) => {
+            // Only out of waiting. Esc lands here first and Rust's token a
+            // moment later, and a cancelled turn marked streaming again has no
+            // event coming to settle it — the Stop bar would stay up over it.
+            if (turn.status === "waiting-first-token") this.#markStreaming(turn);
+          }),
         ),
       )
       .add(
@@ -273,7 +305,13 @@ class ExchangeStore extends Notifier {
    * survives a hide has to be cleared here.
    */
   async load() {
-    this.view = await getPopoverView();
+    const load = ++this.#loads;
+    const view = await getPopoverView();
+    // A newer trigger asked while this one was waiting. Its `load` reads the
+    // same view and adopts it; doing it here as well would replay the early
+    // events onto a turn that one is about to replace.
+    if (load !== this.#loads) return;
+    this.view = view;
     this.copiedTurn = null;
     this.copyFailedTurn = null;
     this.epoch += 1;
@@ -289,10 +327,12 @@ class ExchangeStore extends Notifier {
     this.#preview = null;
     if (!this.view) {
       this.turns = [];
+      this.#early = [];
       this.notify();
       return;
     }
     this.turns = this.view.phase === "running" ? [this.#newTurn(this.view.input ?? "")] : [];
+    this.#adoptEarly();
     this.notify();
   }
 
@@ -375,6 +415,8 @@ class ExchangeStore extends Notifier {
         // only ever read by `load`, which replaces the whole view with Rust's
         // own (ADR-0003), so nulling them here would be a write nothing reads.
         this.view = { ...this.view, phase: "running", exchange_id: exchangeId, input: text };
+        // The turn was already running while the id was on its way back.
+        this.#adoptEarly();
         this.notify();
       }
     } catch (error) {
@@ -494,13 +536,40 @@ class ExchangeStore extends Notifier {
     this.#waitingSince = 0;
   }
 
-  /** Apply an event only if it belongs to the Exchange on screen. */
+  /** Apply an event only if it belongs to the Exchange on screen — and hold it
+   *  if it belongs to one this window may be about to adopt (`#early`). */
   #forCurrent(exchangeId: string, fn: (turn: Turn) => void) {
-    if (!this.view || this.view.exchange_id !== exchangeId) return;
+    if (!this.view || this.view.exchange_id !== exchangeId) {
+      // Not known to be stale: an id this window has not seen is either a
+      // superseded Exchange still draining or the next one arriving early, and
+      // the two look the same from here. Adoption tells them apart.
+      this.#early.push({ exchangeId, apply: fn });
+      if (this.#early.length > EARLY_CAP) this.#early.shift();
+      return;
+    }
     const turn = this.current;
     if (!turn) return;
     fn(turn);
     this.notify();
+  }
+
+  /**
+   * The window has just learned which Exchange it is showing: replay what that
+   * Exchange already said, in order, and forget the rest. Everything else held
+   * belonged to an Exchange that is gone (ADR-0004), so it is dropped here
+   * rather than kept against an id that will never be adopted.
+   *
+   * The caller publishes; this only applies.
+   */
+  #adoptEarly() {
+    const held = this.#early;
+    this.#early = [];
+    const exchangeId = this.view?.exchange_id;
+    const turn = this.current;
+    if (!exchangeId || !turn) return;
+    for (const event of held) {
+      if (event.exchangeId === exchangeId) event.apply(turn);
+    }
   }
 
   /** The one place a failure lands on a turn, whether it arrived as an event

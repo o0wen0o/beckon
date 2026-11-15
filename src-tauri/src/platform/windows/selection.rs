@@ -67,9 +67,18 @@ pub fn grab_selection() -> Option<String> {
     let grabbed =
         clipboard::poll_until_written(before, POLL_CAP, POLL_INTERVAL, read_clipboard_text);
 
-    // Restore before returning, whatever happened, and let the backup drop at
-    // the end of this scope — no long-lived copy of the user's clipboard.
-    restore_clipboard(backup);
+    // Restore before returning, and let the backup drop at the end of this
+    // scope — no long-lived copy of the user's clipboard.
+    //
+    // Only if the copy shortcut wrote something. What ADR-0002 restores is the
+    // pollution the grab caused, and a grab with nothing selected causes none:
+    // the clipboard is still exactly what the user left there. "Restoring" over
+    // that replaced it with its own plain-text half — and when it held no text
+    // at all, a file copied in Explorer or a screenshot, with an empty string.
+    // That was every Launcher summon with nothing selected.
+    if clipboard::sequence_number() != before {
+        restore_clipboard(backup);
+    }
 
     grabbed.filter(|text| !text.trim().is_empty())
 }

@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -1064,6 +1064,31 @@ pub fn load_or_create(path: &Path) -> Loaded {
     }
 }
 
+/// Keep a copy of `config.toml` beside itself if it would not load, and say
+/// where. Called by the one write path, immediately before it writes.
+///
+/// [`Loaded`] promises a corrupt config is reported, not overwritten — and the
+/// load keeps that promise, then hands back `Config::default()`, which is what
+/// state holds from then on. The next write is those defaults plus one change:
+/// a Settings toggle, or nothing more deliberate than the Popover being dragged
+/// (ADR-0018). That write is what replaced the file the user was half-way
+/// through editing, provider table and all.
+///
+/// Set aside rather than refused: refusing would leave Settings unable to save
+/// anything until a TOML typo is found by someone who may not know what TOML
+/// is. One name, overwritten each time, so a file that stays broken across
+/// several writes leaves one copy rather than a pile — and the name does not
+/// end in `.toml`, so the watcher ignores it (`watcher::is_ignored`).
+pub fn set_aside_if_unparsable(path: &Path) -> Option<PathBuf> {
+    let text = fs::read_to_string(path).ok()?;
+    if toml::from_str::<Config>(&text).is_ok() {
+        return None;
+    }
+    let kept = path.with_extension("toml.broken");
+    fs::write(&kept, text).ok()?;
+    Some(kept)
+}
+
 pub fn save(path: &Path, config: &Config) -> Result<(), String> {
     let text = toml::to_string_pretty(config).map_err(|e| e.to_string())?;
     write_atomic(path, &text).map_err(|e| e.to_string())
@@ -1654,5 +1679,36 @@ key_page = "https://platform.deepseek.com/api_keys"
         assert!(loaded.error.is_some());
         assert_eq!(loaded.config, Config::default());
         assert_eq!(fs::read_to_string(&path).unwrap(), "launcher_hotkey = ");
+    }
+
+    /// The other half of the promise above. The load leaves the file alone and
+    /// hands back defaults; the *next write* is what used to destroy it.
+    #[test]
+    fn an_unparsable_file_is_set_aside_before_the_write_that_replaces_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "launcher_hotkey = ").unwrap();
+
+        let kept = set_aside_if_unparsable(&path).expect("a copy is kept");
+        save(&path, &Config::default()).unwrap();
+
+        assert_eq!(kept, dir.path().join("config.toml.broken"));
+        assert_eq!(fs::read_to_string(&kept).unwrap(), "launcher_hotkey = ");
+        assert!(load_or_create(&path).error.is_none());
+        // Not a `.toml`: the watcher must not take the copy for a config edit.
+        assert!(crate::action::watcher::is_ignored(&kept));
+    }
+
+    /// The ordinary case is every write, so it has to cost one read and leave
+    /// nothing behind — including when there is no file yet.
+    #[test]
+    fn a_file_that_loads_is_not_copied() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        assert_eq!(set_aside_if_unparsable(&path), None);
+
+        save(&path, &Config::default()).unwrap();
+        assert_eq!(set_aside_if_unparsable(&path), None);
+        assert!(!dir.path().join("config.toml.broken").exists());
     }
 }

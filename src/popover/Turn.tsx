@@ -3,9 +3,10 @@
 // label column here and no hairline between turns — the gap separates them.
 //
 // Every state a turn can be in is rendered here, so the ones that must not look
-// alike sit side by side in one file. Output is plain text with preserved
-// whitespace: acceptable for the MVP, and it cannot inject anything into the
-// WebView.
+// alike sit side by side in one file. The answer is Markdown (ADR-0028) and
+// everything else is plain text with preserved whitespace — the question is the
+// user's own words and the reasoning is not written to be formatted. Neither
+// path can inject anything into the WebView.
 import { CheckIcon, CopyIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeFailure } from "@/lib/failures";
@@ -13,6 +14,7 @@ import { useT } from "@/lib/i18n";
 import { showSettings } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { CaptureTile } from "./CaptureTile";
+import { Markdown } from "./Markdown";
 import { exchange, isSettled, settlesInSettings, totalBytes, type Turn } from "./exchange";
 
 /** Long enough that the clamp is doing something, i.e. worth offering to undo. */
@@ -157,15 +159,7 @@ export function TurnView({ turn, index }: { turn: Turn; index: number }) {
         ) : null}
 
         {turn.answer ? (
-          // The only prose in the product, so it gets its own leading.
-          <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">
-            {turn.answer}
-            {turn.status === "streaming" ? (
-              // Not a blinking caret: a blink says "type here", a breathing
-              // bar says "output is arriving".
-              <span className="bg-foreground ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-xs align-text-bottom motion-reduce:animate-none" />
-            ) : null}
-          </p>
+          <Markdown text={turn.answer} streaming={turn.status === "streaming"} />
         ) : null}
 
         {/* No icon, for the reason a `Callout` has none: the words carry the

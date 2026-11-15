@@ -68,9 +68,17 @@ pub fn grab_selection() -> Option<String> {
 
     let grabbed = poll_for_new_clipboard_text(before);
 
-    // Restore before returning, whatever happened, and let the backup drop at
-    // the end of this scope — no long-lived copy of the user's clipboard.
-    restore_clipboard(backup);
+    // Restore before returning, and let the backup drop at the end of this
+    // scope — no long-lived copy of the user's clipboard.
+    //
+    // Only if the copy shortcut wrote something. What ADR-0002 restores is the
+    // pollution the grab caused, and a grab with nothing selected causes none:
+    // the pasteboard is still exactly what the user left there. "Restoring"
+    // over that replaced it with its own plain-text half — and when it held no
+    // text at all, a file copied in Finder or a screenshot, cleared it.
+    if change_count() != before {
+        restore_clipboard(backup);
+    }
 
     grabbed.filter(|text| !text.trim().is_empty())
 }
